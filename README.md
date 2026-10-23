@@ -1,36 +1,44 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pulse OS
 
-## Getting Started
+Особиста «жива ОС» на Next.js: фокус-таймер, задачі, звички, здоровʼя, фінанси в данських кронах (DKK), цілі з колесом балансу, розклад з підключеними календарями і режим компанії (угоди, проєкти, рахунки, команда).
 
-First, run the development server:
+## Запуск
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Відкрий http://localhost:3000. Дані зберігаються в `localStorage` браузера, тому в кожного браузера й пристрою свої дані.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Календар (iCal)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Календар підключається через секретне iCal-посилання (`.ics`). Підходять Google Calendar, Outlook, iCloud і будь-який інший календар з iCal-експортом. Події доступні лише для читання.
 
-## Learn More
+Є два способи:
 
-To learn more about Next.js, take a look at the following resources:
+1. **У застосунку:** Налаштування → «Мої календарі» → встав посилання. Воно зберігається в браузері і передається лише на твій власний сервер `/api/calendar`.
+2. **Через змінну середовища:** скопіюй `.env.example` у `.env.local` і заповни `ICAL_URLS` (через кому). Так посилання залишаються тільки на сервері.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Де взяти посилання:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Google:** Налаштування → обери календар → «Інтеграція календаря» → «Секретна адреса у форматі iCal».
+- **Outlook:** Налаштування → Календар → «Спільні календарі» → «Опублікувати календар» → ICS.
+- **iCloud:** Календар → «Поділитися» → «Публічний календар» → посилання `webcal://`.
 
-## Deploy on Vercel
+Сервер завантажує календарі, розгортає повторювані події з урахуванням часових поясів, винятків і перенесень, і повертає події на 2 тижні назад і 60 днів уперед. Синхронізація відбувається при запуску, кожні 10 хвилин і за кнопкою «Оновити».
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Структура
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/api/calendar/route.ts` — завантаження і розбір iCal (`ical.js`)
+- `lib/store.tsx` — стан застосунку, дії, таймер, синхронізація календаря
+- `lib/seed.ts` — демо-дані (прибираються в Налаштуваннях)
+- `lib/util.ts` — дати, форматування крон, константи
+- `components/views/*` — екрани
+- `components/Shell.tsx`, `Sheets.tsx`, `Palette.tsx` — оболонка, швидке додавання, командна палітра
+
+## Команди
+
+- `npm run dev` — розробка
+- `npm run build && npm start` — продакшн
+- `npm run lint`, `npm run typecheck` — перевірки

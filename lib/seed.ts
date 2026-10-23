@@ -1,0 +1,135 @@
+import type { State, Invoice } from './types';
+import { addD, rng, wStart, ymd } from './util';
+
+/** Fresh state. With demo=true it is filled with clearly marked example data (amounts in DKK). */
+export function makeState(demo: boolean): State {
+  const now = new Date();
+  let nextId = 100;
+  const id = () => nextId++;
+  const r = rng(42);
+
+  const sessions: State['sessions'] = [];
+  if (demo) {
+    for (let d = addD(wStart(), -7); d <= now; d = addD(d, 1)) {
+      const hours = [8, 9, 10, 11, 13, 14, 15, 16, 19, 20, 21];
+      const n = 1 + Math.floor(r() * 4);
+      for (let k = 0; k < n; k++) {
+        const h = hours[Math.floor(r() * hours.length)], m = r() < 0.55 ? 50 : 25;
+        const t = new Date(d); t.setHours(h, Math.floor(r() * 4) * 5, 0, 0);
+        if (t.getTime() + m * 6e4 < now.getTime()) sessions.push({ t: t.getTime(), m, demo: 1 });
+      }
+    }
+  }
+
+  const today = ymd(now), tom = ymd(addD(now, 1));
+  const habits: State['habits'] = demo
+    ? ['Ранкова зарядка', 'Читання 20 хв', '10 нових слів данською', 'Без телефону після 23:00'].map((name, j) => {
+        const days: Record<string, 1> = {};
+        for (let i = 1; i < 14; i++) if (r() < 0.8 - j * 0.12) days[ymd(addD(now, -i))] = 1;
+        if (j < 2) days[today] = 1;
+        return { id: id(), name, days, demo: 1 as const };
+      })
+    : [];
+
+  const health: State['health'] = {};
+  if (demo) {
+    for (let i = 0; i < 14; i++) {
+      health[ymd(addD(now, -i))] = i
+        ? { water: Math.round(4 + r() * 5), sleep: Math.round((5.5 + r() * 3) * 2) / 2, mood: 2 + Math.floor(r() * 4), steps: Math.round((3500 + r() * 8000) / 100) * 100, workout: r() < 0.45 ? 0 : 10 * (1 + Math.floor(r() * 6)), weight: 0, demo: 1 }
+        : { water: 3, sleep: 7, mood: 4, steps: 3200, workout: 0, weight: 0, demo: 1 };
+    }
+  }
+
+  const tx: State['money']['tx'] = [];
+  if (demo) {
+    const y = now.getFullYear(), m = now.getMonth();
+    const C = ['Їжа', 'Їжа', 'Їжа', 'Транспорт', 'Розваги', 'Покупки', 'Навчання'];
+    const N: Record<string, string[]> = { 'Їжа': ['Netto', 'Кава', 'Обід у кафе'], 'Транспорт': ['Rejsekort', 'DSB'], 'Розваги': ['Кіно', 'Концерт'], 'Покупки': ['Одяг', 'Дрібниці'], 'Навчання': ['Курс', 'Книга'] };
+    tx.push({ id: id(), type: 'in', amt: 6800, cat: 'SU / стипендія', note: 'SU', date: ymd(new Date(y, m, 1)), demo: 1 });
+    if (now.getDate() >= 10) tx.push({ id: id(), type: 'in', amt: 4500, cat: 'Фриланс', note: 'Лендінг для клієнта', date: ymd(new Date(y, m, 10)), demo: 1 });
+    tx.push({ id: id(), type: 'out', amt: 3900, cat: 'Житло', note: 'Husleje', date: ymd(new Date(y, m, Math.min(2, now.getDate()))), demo: 1 });
+    for (let d = 1; d <= now.getDate(); d++) {
+      const k = 1 + Math.floor(r() * 2);
+      for (let j = 0; j < k; j++) {
+        if (r() < 0.3) continue;
+        const c = C[Math.floor(r() * C.length)], nn = N[c];
+        tx.push({ id: id(), type: 'out', amt: Math.round((20 + r() * 230) / 5) * 5, cat: c, note: nn[Math.floor(r() * nn.length)], date: ymd(new Date(y, m, d)), demo: 1 });
+      }
+    }
+  }
+
+  const goals: State['goals'] = demo
+    ? ([['Прочитати 12 книг', 'Розвиток', 12, 7, 'книг', 75], ['Відкласти на ноутбук', 'Фінанси', 12000, 7400, 'kr.', 120], ['Пробігти 100 км', 'Здоровʼя', 100, 62, 'км', 45], ['Скласти данську на рівень B2', 'Карʼєра', 6, 3, 'модулів', 70]] as const)
+        .map(([title, area, target, cur, unit, dd]) => ({ id: id(), title, area, target, cur, unit, due: ymd(addD(now, dd)), demo: 1 as const }))
+    : [];
+
+  const co: State['co'] = { name: 'Моя студія', goal: 150000, invSeq: 0, deals: [], projects: [], invoices: [], team: [] };
+  if (demo) {
+    co.deals = ([['Сайт для кавʼярні', 'Kaffebar Bønne', 45000, 'proposal'], ['Брендинг фітнес-клубу', 'FitLab', 80000, 'talk'], ['Підтримка вебмагазину', 'Shopik ApS', 15000, 'lead'], ['Лендінг конференції', 'DevDays', 30000, 'lead'], ['Мобільний застосунок', 'MedCare', 220000, 'talk'], ['SMM на 3 місяці', 'Bloom', 36000, 'won']] as const)
+      .map(([title, client, amt, stage]) => ({ id: id(), title, client, amt, stage, demo: 1 as const }));
+    co.projects = ([['Редизайн сайту', 'Kaffebar Bønne', 20, 65, 'active', 60000], ['CRM-інтеграція', 'Shopik ApS', 4, 30, 'active', 40000], ['Брендбук', 'Bloom', 35, 10, 'paused', 55000], ['Лендінг до запуску', 'DevDays', -3, 100, 'done', 25000]] as const)
+      .map(([name, client, dd, progress, status, budget]) => ({ id: id(), name, client, due: ymd(addD(now, dd)), progress, status, budget, demo: 1 as const }));
+    co.team = ([['Олена', 'Дизайнерка', 80], ['Максим', 'Розробник', 105], ['Ірина', 'Проджект-менеджерка', 60], ['Андрій', 'Маркетолог', 40]] as const)
+      .map(([name, role, load]) => ({ id: id(), name, role, load, demo: 1 as const }));
+    const r2 = rng(5), cl = ['Kaffebar Bønne', 'Shopik ApS', 'Bloom', 'DevDays', 'FitLab', 'Nova Dental'];
+    const inv = (client: string, amt: number, iss: Date, due: Date, paidAt: Date | null) => {
+      co.invSeq++;
+      const i: Invoice = { id: id(), no: 'INV-' + String(co.invSeq).padStart(3, '0'), client, amt, issued: ymd(iss), due: ymd(due), paid: !!paidAt, paidAt: paidAt ? ymd(paidAt) : '', demo: 1 };
+      co.invoices.push(i);
+    };
+    for (let mo = 5; mo >= 0; mo--) {
+      const base = new Date(now.getFullYear(), now.getMonth() - mo, 1);
+      for (let j = 0; j < (mo ? 3 : 2); j++) {
+        const iss = addD(base, 3 + j * 8);
+        if (iss > now) continue;
+        const pa = addD(iss, 5 + Math.floor(r2() * 6));
+        inv(cl[Math.floor(r2() * cl.length)], Math.round((25000 + r2() * 35000) / 500) * 500, iss, addD(iss, 14), mo > 0 || j === 0 ? (pa > now ? now : pa) : null);
+      }
+    }
+    inv('FitLab', 18000, addD(now, -20), addD(now, -6), null);
+    inv('Kaffebar Bønne', 22500, addD(now, -2), addD(now, 12), null);
+  }
+
+  return {
+    v: 1, name: 'Друже', goal: 20, focusMin: 25, breakMin: 5, demo, notes: '', theme: 'system',
+    sessions,
+    tasks: demo
+      ? [
+          { id: id(), t: 'Дочитати розділ про графи', p: 'hi', d: false, demo: 1 },
+          { id: id(), t: 'Відповісти на лист куратору', p: 'lo', d: true, demo: 1 },
+          { id: id(), t: 'Зібрати референси для воркшопу', p: 'hi', d: false, demo: 1 },
+          { id: id(), t: 'Спортзал о 19:00', p: 'lo', d: false, demo: 1 },
+        ]
+      : [],
+    events: demo
+      ? [
+          { id: id(), date: today, s: '09:00', e: '10:30', title: 'Лекція: Алгоритми', c: 'c1', demo: 1 },
+          { id: id(), date: today, s: '12:30', e: '13:15', title: 'Обід', c: 'c2', demo: 1 },
+          { id: id(), date: today, s: '14:00', e: '16:00', title: 'Воркшоп з дизайну', c: 'c3', demo: 1 },
+          { id: id(), date: today, s: '17:00', e: '18:00', title: 'Зустріч клубу', c: 'c2', demo: 1 },
+          { id: id(), date: tom, s: '10:00', e: '11:30', title: 'Урок данської', c: 'c4', demo: 1 },
+        ]
+      : [],
+    timer: { mode: 'focus', left: 25 * 60, running: false, endAt: 0, task: '' },
+    log: [], unread: false, nextId,
+    habits, health, money: { budget: 9000, tx }, goals,
+    wheel: demo ? [7, 6, 5, 8, 6, 4, 7, 6] : [5, 5, 5, 5, 5, 5, 5, 5],
+    mode: 'me', view: 'home', co, icalUrls: [],
+  };
+}
+
+/** Removes every record that was created as an example. */
+export function stripDemo(s: State) {
+  s.sessions = s.sessions.filter(x => !x.demo);
+  s.tasks = s.tasks.filter(x => !x.demo);
+  s.events = s.events.filter(x => !x.demo);
+  s.habits = s.habits.filter(x => !x.demo);
+  s.goals = s.goals.filter(x => !x.demo);
+  s.money.tx = s.money.tx.filter(x => !x.demo);
+  for (const k of Object.keys(s.health)) if (s.health[k].demo) delete s.health[k];
+  s.co.deals = s.co.deals.filter(x => !x.demo);
+  s.co.projects = s.co.projects.filter(x => !x.demo);
+  s.co.invoices = s.co.invoices.filter(x => !x.demo);
+  s.co.team = s.co.team.filter(x => !x.demo);
+  s.demo = false;
+}
