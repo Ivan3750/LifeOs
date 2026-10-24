@@ -155,7 +155,7 @@ function ScoreCard() {
   const sc = dayScore(S, k, eventsOn(k), live, now);
   const hist = lastDays(7).map(d => ({ d, v: d === k ? sc.total : dayScore(S, d, eventsOn(d), live, now).total }));
   const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
-  const to: Record<string, string> = { focus: 'focus', sleep: 'health', habits: 'habits', mood: 'health', water: 'health', move: 'health', money: 'money' };
+  const to: Record<string, string> = { focus: 'focus', sleep: 'health', habits: 'habits', mood: 'health', money: 'money' };
   return (
     <div className="card s5">
       <div className="ch"><Icon n="trophy" className="ic" /><div><h3>Оцінка дня</h3><p>100 — усе супер, 0 — дуже погано</p></div></div>

@@ -27,7 +27,7 @@ function forms(st: Store): Record<string, FormSpec> {
 }
 
 const QA: Record<'me' | 'co', [string, string, IconName][]> = {
-  me: [['task', 'Задача', 'tasks'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['water', '+ склянка води', 'health'], ['habit', 'Звичка', 'habits'], ['note', 'Нотатка', 'notes']],
+  me: [['task', 'Задача', 'tasks'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['habit', 'Звичка', 'habits'], ['note', 'Нотатка', 'notes']],
   co: [['deal', 'Угода', 'deals'], ['invoice', 'Рахунок', 'invoice'], ['project', 'Проєкт', 'projects'], ['task', 'Задача', 'tasks'], ['event', 'Подія', 'schedule'], ['member', 'Учасник', 'team']],
 };
 
@@ -63,7 +63,7 @@ function FormBody({ spec, close }: { spec: FormSpec; close: () => void }) {
 
 export function SheetHost() {
   const st = useStore();
-  const { S, sheet, setSheet, go, A, toast } = st;
+  const { S, sheet, setSheet, go } = st;
   if (!sheet) return null;
   const close = () => setSheet(null);
   const m = S.mode === 'co' ? 'co' : 'me';
@@ -75,8 +75,7 @@ export function SheetHost() {
         <div className="qa-grid">
           {QA[m].map(([k, l, i]) => (
             <button key={k} onClick={() => {
-              if (k === 'water') { A.addH('water', 1); toast('Ще одна склянка води'); close(); }
-              else setSheet({ kind: 'form', key: k });
+              setSheet({ kind: 'form', key: k });
             }}><Icon n={i} className="ic" />{l}</button>
           ))}
         </div>

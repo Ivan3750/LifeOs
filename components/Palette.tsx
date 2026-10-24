@@ -12,7 +12,7 @@ export function Palette() {
 }
 
 function PaletteDialog() {
-  const { S, setPalette, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, toast, update } = useStore();
+  const { S, setPalette, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, update } = useStore();
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -30,7 +30,6 @@ function PaletteDialog() {
       { l: 'Новий рахунок', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'invoice' }) },
       { l: 'Новий проєкт', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'project' }) },
       { l: 'Нова подія', k: 'Розклад', run: () => setSheet({ kind: 'form', key: 'event' }) },
-      { l: 'Випити склянку води', k: 'Здоровʼя', run: () => { A.addH('water', 1); toast('Ще одна склянка води'); } },
       ...S.tasks.filter(t => !t.d).map(t => ({ l: 'Фокус на: ' + t.t, k: 'Задача', run: () => { update(s => { s.timer.task = t.t; }); go('focus'); } })),
       ...S.habits.filter(h => !h.days[TK()]).map(h => ({ l: 'Відмітити звичку: ' + h.name, k: 'Звичка', run: () => A.toggleHabit(h.id) })),
     ];
@@ -44,7 +43,7 @@ function PaletteDialog() {
     if (t.startsWith('+')) r = [{ l: 'Додати задачу: ' + t.slice(1).trim(), k: 'Enter', run: () => A.addTask(t.slice(1)) }, ...r];
     else if (ql && !r.length) r = [{ l: 'Додати задачу: ' + t, k: 'Enter', run: () => A.addTask(t) }];
     return r.slice(0, 9);
-  }, [q, S, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, toast, update]);
+  }, [q, S, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, update]);
 
   const run = (i: number) => { const c = items[i]; setPalette(false); c?.run(); };
   const s = Math.min(sel, items.length - 1);

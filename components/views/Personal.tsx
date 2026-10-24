@@ -237,7 +237,7 @@ export function Health() {
   const { S } = useStore();
   const keys = [...Array(14)].map((_, i) => ymd(addD(new Date(), i - 13)));
   const days = keys.map(k => S.health[k]);
-  const ser = (f: 'sleep' | 'water' | 'workout') => days.map(d => (d ? d[f] : 0));
+  const ser = (f: 'sleep') => days.map(d => (d ? d[f] : 0));
   const av = (f: Parameters<typeof ser>[0]) => avg(ser(f).filter(x => x > 0));
   const moods = keys.map(k => dayMood(S, k)), moodAv = avg(moods.filter(x => x > 0));
   // average clock time; times after noon count as the evening before so 23:30 and 00:30 average to midnight
@@ -254,10 +254,7 @@ export function Health() {
         <div className="card s5"><div className="ch"><div><h3>Як ти зараз?</h3><p>Запиши настрій з часом і деталями</p></div></div><MoodForm /></div>
         <div className="card s7"><MoodLog /></div>
         <div className="card s6"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {moodAv.toFixed(1)} з 10</p></div></div><Bars vals={moods.map(v => Math.round(v * 10) / 10)} max={10} color={v => moodColor(v)} unit="/10" /></div>
-        <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
-        <div className="card s6"><div className="ch"><div><h3>Вода</h3><p>У середньому {av('water').toFixed(1)} склянок</p></div></div><Bars vals={ser('water')} max={12} color="var(--water)" target={8} unit=" скл." /></div>
-        <div className="card s6"><div className="ch"><div><h3>Тренування</h3><p>{ser('workout').filter(x => x > 0).length} активних днів із 14</p></div></div><Bars vals={ser('workout')} max={Math.max(60, ...ser('workout'))} color="var(--good)" target={30} unit=" хв" /></div>
-      </div>
+        <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>      </div>
     </section>
   );
 }

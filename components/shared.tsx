@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
-import type { HealthField, State, Tx } from '@/lib/types';
-import { DAY, daysInMonth, fmtN, hhmm, money, pctW, sod, sum, TK, wStart, ymd, addD } from '@/lib/util';
+import type { State, Tx } from '@/lib/types';
+import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, wStart, ymd, addD } from '@/lib/util';
 import { dayMood, moodColor, moodsOn, moodWord } from '@/lib/score';
 
 export const today = () => TK();
@@ -21,19 +21,6 @@ export const streak = (S: State) => { let n = 0, d = new Date(); if (!dayMinutes
 export const habStreak = (days: Record<string, 1>) => { let n = 0, d = new Date(); if (!days[ymd(d)]) d = addD(d, -1); while (days[ymd(d)]) { n++; d = addD(d, -1); } return n; };
 export const loadC = (l: number) => (l >= 100 ? 'var(--m1)' : l >= 80 ? 'var(--accent)' : 'var(--good)');
 export const avg = (a: number[]) => (a.length ? sum(a) / a.length : 0);
-
-function StepTile({ f, label, goalTxt, unit, goal, color, dm, dp, plus }: { f: HealthField; label: string; goalTxt: string; unit: string; goal: number; color: string; dm: number; dp: number; plus: string }) {
-  const { S, A } = useStore();
-  const val = hdayOf(S)[f];
-  return (
-    <div className="tile">
-      <div className="lab"><span>{label}</span><span>{goalTxt}</span></div>
-      <div className="tv num">{val >= 1000 ? fmtN(val) : val}<small>{unit}</small></div>
-      <div className="bar"><i style={{ width: pctW(val, goal) + '%', background: color }} /></div>
-      <div className="step"><button className="sq" onClick={() => A.addH(f, -dm)} aria-label={`Зменшити: ${label}`}>−</button><button onClick={() => A.addH(f, dp)}>{plus}</button></div>
-    </div>
-  );
-}
 
 const QUICK_MOODS: [number, string][] = [[2, 'Погано'], [4, 'Так собі'], [6, 'Нормально'], [8, 'Добре'], [10, 'Чудово']];
 
@@ -92,10 +79,8 @@ export function LifeTiles({ full }: { full: boolean }) {
   const spent = sumT(S.money.tx.filter(x => x.date === TK()), 'out'), lim = S.money.budget / daysInMonth();
   return (
     <div className="life">
-      <StepTile f="water" label="Вода" goalTxt="ціль 8" unit="склянок" goal={8} color="var(--water)" dm={1} dp={1} plus="+ склянка" />
       <SleepTile />
       <MoodTile />
-      <StepTile f="workout" label="Рух" goalTxt="ціль 30 хв" unit="хв" goal={30} color="var(--good)" dm={10} dp={10} plus="+ 10 хв" />
       {full ? (
         <WeightTile />
       ) : (

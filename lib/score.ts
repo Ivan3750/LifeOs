@@ -71,16 +71,14 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   const target = Math.max(30, Math.min(dailyGoal, ft.free * 0.6 || dailyGoal));
   add('focus', 'Фокус', 30, ft.worked / target, `${Math.round(ft.worked)} з ${Math.round(target)} хв`);
 
+  // Sleep and mood count only once they are logged: an empty field is "not yet known", not a bad day.
   const sl = h?.sleep || 0;
-  add('sleep', 'Сон', 15, !sl ? 0 : sl >= 7 && sl <= 9 ? 1 : sl < 7 ? (sl - 4) / 3 : (12 - sl) / 3, sl ? `${sl} год (норма 7–9)` : 'не записано');
+  if (sl) add('sleep', 'Сон', 15, sl >= 7 && sl <= 9 ? 1 : sl < 7 ? (sl - 4) / 3 : (12 - sl) / 3, `${sl} год (норма 7–9)`);
 
   if (S.habits.length) { const done = S.habits.filter(x => x.days[k]).length; add('habits', 'Звички', 15, done / S.habits.length, `${done} з ${S.habits.length}`); }
 
   const mood = dayMood(S, k);
   if (mood) add('mood', 'Настрій', 10, (mood - 1) / 9, `${mood.toFixed(1)} з 10`);
-
-  add('water', 'Вода', 10, (h?.water || 0) / 8, `${h?.water || 0} з 8 склянок`);
-  add('move', 'Рух', 10, (h?.workout || 0) / 30, `${h?.workout || 0} з 30 хв`);
 
   if (S.money.budget > 0) {
     const lim = S.money.budget / daysInMonth(), spent = S.money.tx.filter(t => t.date === k && t.type === 'out').reduce((a, t) => a + t.amt, 0);
