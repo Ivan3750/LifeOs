@@ -2,8 +2,9 @@
 
 import { useState, type FormEvent } from 'react';
 import { logFocus, useStore } from '@/lib/store';
-import { makeState, stripDemo } from '@/lib/seed';
-import type { Theme } from '@/lib/types';
+import { stripDemo } from '@/lib/seed';
+import { TK } from '@/lib/util';
+import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
 import { CalStatusChip } from './Personal';
 import { SYNC_TEXT } from '../Shell';
@@ -106,9 +107,33 @@ function AccountSettings() {
   );
 }
 
+function download(name: string, type: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const csvCell = (v: string | number) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
+const csv = (rows: (string | number)[][]) => '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n'); // BOM so Excel reads Cyrillic
+
+function exportJson(S: State) {
+  download(`pulse-os-${TK()}.json`, 'application/json', JSON.stringify({ app: 'pulse-os', exportedAt: new Date().toISOString(), data: S }, null, 2));
+}
+
+function exportMoney(S: State) {
+  const rows = [...S.money.tx].sort((a, b) => a.date.localeCompare(b.date))
+    .map(t => [t.date, t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, t.note]);
+  download(`pulse-os-finansy-${TK()}.csv`, 'text/csv;charset=utf-8', csv([['Дата', 'Тип', 'Категорія', 'Сума, kr.', 'Нотатка'], ...rows]));
+}
+
+function exportFocus(S: State) {
+  const rows = [...S.sessions].sort((a, b) => a.t - b.t).map(x => { const d = new Date(x.t); return [d.toLocaleDateString('sv-SE'), d.toTimeString().slice(0, 5), x.m]; });
+  download(`pulse-os-fokus-${TK()}.csv`, 'text/csv;charset=utf-8', csv([['Дата', 'Початок', 'Хвилин'], ...rows]));
+}
+
 export function Prefs() {
   const { S, update, toast } = useStore();
-  const [armed, setArmed] = useState(false);
   return (
     <section className="view">
       <div className="vh"><div><h2>Налаштування</h2><p>Дані зберігаються лише в цьому браузері.</p></div></div>
@@ -128,11 +153,14 @@ export function Prefs() {
         </div>
         <div className="row">
           <button className="btn ghost" disabled={!S.demo} onClick={() => { update(stripDemo); toast('Демо-дані прибрано'); }}>Прибрати демо-дані</button>
-          <button className="btn ghost" onClick={() => {
-            if (!armed) { setArmed(true); setTimeout(() => setArmed(false), 3000); return; }
-            update(s => { const f = makeState(false); f.co.name = s.co.name; f.co.goal = s.co.goal; f.icalUrls = s.icalUrls; f.mode = s.mode; f.name = s.name; f.theme = s.theme; Object.assign(s, f); });
-            setArmed(false); toast('Усе очищено');
-          }}>{armed ? 'Точно? Натисни ще раз' : 'Почати з нуля'}</button>
+        </div>
+      </div>
+      <div className="card" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div><h3 style={{ margin: 0, fontSize: 16 }}>Експорт даних</h3><p className="help" style={{ margin: '4px 0 0' }}>Повна копія всіх даних у JSON або окремі таблиці для Excel і Google Sheets.</p></div>
+        <div className="row">
+          <button className="btn" onClick={() => { exportJson(S); toast('Копію даних завантажено'); }}>Усі дані (JSON)</button>
+          <button className="btn ghost" onClick={() => exportMoney(S)}>Фінанси (CSV)</button>
+          <button className="btn ghost" onClick={() => exportFocus(S)}>Сесії фокусу (CSV)</button>
         </div>
       </div>
       <AccountSettings />
