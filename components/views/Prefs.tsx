@@ -6,6 +6,7 @@ import { makeState, stripDemo } from '@/lib/seed';
 import type { Theme } from '@/lib/types';
 import { Icon } from '../Icon';
 import { CalStatusChip } from './Personal';
+import { SYNC_TEXT } from '../Shell';
 
 /** Hides the secret part of a calendar address so it can be shown on screen. */
 const maskUrl = (u: string) => {
@@ -76,6 +77,35 @@ function CalendarSettings() {
   );
 }
 
+function AccountSettings() {
+  const { sync, flush, dbOn } = useStore();
+  const [busy, setBusy] = useState(false);
+  const t = sync.at ? new Date(sync.at) : null;
+  const logout = async () => {
+    setBusy(true);
+    await flush().catch(() => {});
+    await fetch('/api/login', { method: 'DELETE' }).catch(() => {});
+    location.reload();
+  };
+  return (
+    <div className="card" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="ch" style={{ marginBottom: 0 }}>
+        <Icon n="refresh" className="ic" />
+        <div>
+          <h3>Синхронізація</h3>
+          <p>{dbOn ? 'Дані зберігаються в базі MySQL і однакові на всіх пристроях, де ти увійшов.' : 'База даних не налаштована, тому дані живуть лише в цьому браузері. Заповни DB_* або DATABASE_URL у .env.'}</p>
+        </div>
+      </div>
+      <div className="row">
+        <span className={`calstat ${sync.state === 'ok' ? 'ok' : sync.state === 'syncing' ? 'loading' : sync.state === 'error' ? 'error' : ''}`}><i />{SYNC_TEXT[sync.state]}{t && sync.state === 'ok' ? ` о ${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}` : ''}</span>
+        {dbOn && <button className="sel" onClick={() => flush()}>Синхронізувати зараз</button>}
+        <button className="btn ghost" style={{ marginLeft: 'auto' }} disabled={busy} onClick={logout}>{busy ? 'Виходжу…' : 'Вийти'}</button>
+      </div>
+      {sync.state === 'error' && sync.msg && <p className="help" style={{ color: 'var(--m1)' }}>{sync.msg}</p>}
+    </div>
+  );
+}
+
 export function Prefs() {
   const { S, update, toast } = useStore();
   const [armed, setArmed] = useState(false);
@@ -105,6 +135,7 @@ export function Prefs() {
           }}>{armed ? 'Точно? Натисни ще раз' : 'Почати з нуля'}</button>
         </div>
       </div>
+      <AccountSettings />
       <CalendarSettings />
     </section>
   );

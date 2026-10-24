@@ -46,6 +46,16 @@ function MiniTimer() {
   );
 }
 
+export const SYNC_TEXT = {
+  local: 'Лише на цьому пристрої', syncing: 'Зберігаю…', ok: 'Синхронізовано', offline: 'Офлайн, збережу пізніше', error: 'Помилка бази даних',
+} as const;
+
+function SyncLabel() {
+  const { sync } = useStore();
+  const cls = sync.state === 'error' ? 'sync-error' : sync.state === 'local' || sync.state === 'offline' ? 'sync-local' : undefined;
+  return <small className={cls} title={sync.msg}>{SYNC_TEXT[sync.state]}</small>;
+}
+
 function TopBar() {
   const { S, update, now, timerLeft, durOf, go, setPalette } = useStore();
   const [drop, setDrop] = useState(false);
@@ -84,7 +94,7 @@ function TopBar() {
       </div>
       <button className="me" onClick={() => go('prefs')} aria-label="Профіль">
         <span className="ava">{(S.name.trim()[0] || '?').toUpperCase()}</span>
-        <span className="who"><b>{S.name}</b><small>{S.mode === 'co' ? S.co.name : 'Особистий простір'}</small></span>
+        <span className="who"><b>{S.name}</b><SyncLabel /></span>
       </button>
     </div>
   );

@@ -19,9 +19,9 @@ function Current() {
   return <V key={view} />;
 }
 
-export default function App() {
+export default function App({ db }: { db: boolean }) {
   return (
-    <StoreProvider>
+    <StoreProvider db={db}>
       <Shell><Current /></Shell>
     </StoreProvider>
   );

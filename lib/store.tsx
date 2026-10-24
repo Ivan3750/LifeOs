@@ -28,20 +28,28 @@ export type CalStatus = { state: 'idle' | 'loading' | 'ok' | 'none' | 'error'; a
 
 const durOf = (s: State, m: 'focus' | 'break') => (m === 'focus' ? s.focusMin : s.breakMin) * 60;
 
+/** Fills fields that were added in later versions. */
+function fill(s: State): State {
+  const base = makeState(false);
+  return { ...base, ...s, co: { ...base.co, ...s.co }, money: { ...base.money, ...s.money } };
+}
+
 function load(): State {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const s = JSON.parse(raw) as State;
-      // fill fields added in later versions
-      const base = makeState(false);
-      return { ...base, ...s, co: { ...base.co, ...s.co }, money: { ...base.money, ...s.money } };
-    }
+    if (raw) return fill(JSON.parse(raw) as State);
   } catch {}
   return makeState(true);
 }
 
-function useStoreValue() {
+/* ---------- server sync bookkeeping ---------- */
+const SYNC_KEY = 'pulse-os-sync';
+type Meta = { version: number; dirty: boolean };
+export type SyncStatus = { state: 'local' | 'syncing' | 'ok' | 'offline' | 'error'; at?: number; msg?: string };
+const loadMeta = (): Meta => { try { const m = JSON.parse(localStorage.getItem(SYNC_KEY) || ''); if (typeof m?.version === 'number') return m; } catch {} return { version: 0, dirty: true }; };
+const saveMeta = (m: Meta) => { try { localStorage.setItem(SYNC_KEY, JSON.stringify(m)); } catch {} };
+
+function useStoreValue(dbOn: boolean) {
   // The app is rendered on the client only (see ClientApp), so browser storage can be read during init.
   const [S, setS] = useState<State>(load);
   const [view, setView] = useState(() => { const h = location.hash.slice(1); return vinfo(h) ? h : vinfo(S.view) ? S.view : 'home'; });
@@ -62,21 +70,113 @@ function useStoreValue() {
     else document.documentElement.dataset.theme = S.theme;
   }, [S?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const update = useCallback((fn: (s: State) => void) => {
-    setS(prev => {
-      if (!prev) return prev;
-      const next = structuredClone(prev);
-      fn(next);
-      try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
-  }, []);
-
   const toast = useCallback((msg: string) => {
     clearTimeout(toastT.current);
     setToast({ msg, id: Date.now() });
     toastT.current = setTimeout(() => setToast(null), 3200);
   }, []);
+
+  /* ---------- server sync ----------
+     The whole state is one JSON document in MySQL with a version number.
+     Local changes are saved after a short pause; a save based on an old version
+     is refused by the server (409) and the newer copy from the other device is loaded. */
+  const [sync, setSync] = useState<SyncStatus>({ state: dbOn ? 'syncing' : 'local' });
+  const Sref = useRef(S);
+  useEffect(() => { Sref.current = S; }, [S]);
+  const meta = useRef<Meta>(loadMeta());
+  const gen = useRef(0), pushing = useRef(false), pushTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pushRef = useRef<(keepalive?: boolean) => void>(() => {});
+
+  const adopt = useCallback((data: State, version: number) => {
+    const s = fill(data);
+    setS(s);
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {}
+    meta.current = { version, dirty: false }; saveMeta(meta.current);
+    setSync({ state: 'ok', at: Date.now() });
+  }, []);
+
+  const schedulePush = useCallback((ms = 800) => {
+    clearTimeout(pushTimer.current);
+    pushTimer.current = setTimeout(() => pushRef.current(), ms);
+  }, []);
+
+  const push = useCallback(async (keepalive = false) => {
+    if (pushing.current) { schedulePush(500); return; }
+    pushing.current = true;
+    const g = gen.current;
+    setSync(s => ({ ...s, state: 'syncing' }));
+    try {
+      const res = await fetch('/api/state', { method: 'PUT', keepalive, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data: Sref.current, baseVersion: meta.current.version }) });
+      if (res.status === 401) { location.reload(); return; }
+      const j = await res.json();
+      if (res.ok) {
+        meta.current.version = j.version;
+        if (g === gen.current) meta.current.dirty = false;
+        saveMeta(meta.current);
+        setSync({ state: 'ok', at: Date.now() });
+      } else if (res.status === 409) {
+        if (j.data) { adopt(j.data, j.version); toast('Дані змінено на іншому пристрої. Завантажено новішу версію'); }
+        else { meta.current.version = 0; schedulePush(100); }
+      } else {
+        setSync({ state: 'error', at: Date.now(), msg: j.message || 'Сервер не зміг зберегти дані' });
+        schedulePush(15000);
+      }
+    } catch {
+      setSync({ state: 'offline', at: Date.now() });
+      schedulePush(15000);
+    } finally {
+      pushing.current = false;
+      if (meta.current.dirty && g !== gen.current) schedulePush();
+    }
+  }, [adopt, schedulePush, toast]);
+  useEffect(() => { pushRef.current = push; }, [push]);
+
+  const pull = useCallback(async () => {
+    if (meta.current.dirty || pushing.current) return;
+    try {
+      const res = await fetch('/api/state?v=' + meta.current.version, { cache: 'no-store' });
+      if (res.status === 401) { location.reload(); return; }
+      const j = await res.json();
+      if (!res.ok) { setSync({ state: 'error', at: Date.now(), msg: j.message || 'База недоступна' }); return; }
+      if (j.data && !meta.current.dirty) adopt(j.data, j.version);
+      else setSync({ state: 'ok', at: Date.now() });
+    } catch { setSync({ state: 'offline', at: Date.now() }); }
+  }, [adopt]);
+
+  // first contact with the server, then poll while the page is visible
+  useEffect(() => {
+    if (!dbOn) return;
+    (async () => {
+      try {
+        const res = await fetch('/api/state', { cache: 'no-store' });
+        if (res.status === 401) { location.reload(); return; }
+        const j = await res.json();
+        if (!res.ok) { setSync({ state: 'error', at: Date.now(), msg: j.message || 'База недоступна' }); return; }
+        if (!j.data) { meta.current = { version: 0, dirty: true }; pushRef.current(); }
+        else if (j.version === meta.current.version && meta.current.dirty) pushRef.current();
+        else if (j.version !== meta.current.version) adopt(j.data, j.version);
+        else setSync({ state: 'ok', at: Date.now() });
+      } catch { setSync({ state: 'offline', at: Date.now() }); }
+    })();
+    const t = setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 15000);
+    const onFocus = () => pull();
+    const onHide = () => { if (document.visibilityState === 'hidden' && meta.current.dirty) { clearTimeout(pushTimer.current); pushRef.current(true); } };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onHide);
+    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onHide); };
+  }, [dbOn, adopt, pull]);
+
+  const flush = useCallback(async () => { clearTimeout(pushTimer.current); if (meta.current.dirty) await push(); else await pull(); }, [push, pull]);
+
+  const update = useCallback((fn: (s: State) => void) => {
+    setS(prev => {
+      const next = structuredClone(prev);
+      fn(next);
+      try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+    if (dbOn) { gen.current++; meta.current.dirty = true; saveMeta(meta.current); schedulePush(); }
+  }, [dbOn, schedulePush]);
 
   const notify = useCallback((msg: string) => {
     update(s => { s.log.unshift({ t: Date.now(), msg }); s.log = s.log.slice(0, 20); s.unread = true; });
@@ -279,7 +379,7 @@ function useStoreValue() {
     S, update, view, go, setMode, now, toastMsg, toast, notify,
     sheet, setSheet, palette, setPalette,
     timerLeft, toggleTimer, resetTimer, setTimerMode, completeTimer, durOf: (m: 'focus' | 'break') => (S ? durOf(S, m) : 0),
-    ext, cal, refreshCal, eventsOn, A,
+    ext, cal, refreshCal, eventsOn, A, sync, flush, dbOn,
   };
 }
 
@@ -288,8 +388,8 @@ export const goalStep = (target: number) => (target >= 200 ? Math.round(target /
 export type Store = ReturnType<typeof useStoreValue>;
 const Ctx = createContext<Store | null>(null);
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const v = useStoreValue();
+export function StoreProvider({ children, db }: { children: ReactNode; db: boolean }) {
+  const v = useStoreValue(db);
   return <Ctx.Provider value={v}>{children}</Ctx.Provider>;
 }
 

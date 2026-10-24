@@ -7,10 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:check": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/db-check.mjs"
   },
   "dependencies": {
     "ical.js": "2.2.1",
+    "mysql2": "3.24.5",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"

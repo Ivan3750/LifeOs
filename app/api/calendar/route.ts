@@ -1,5 +1,6 @@
 import ICAL from 'ical.js';
 import type { ExtEvent } from '@/lib/types';
+import { isAuthed, unauthorized } from '@/lib/server/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,6 +61,7 @@ function expand(text: string, from: Date, to: Date, src: number): ExtEvent[] {
 }
 
 export async function POST(req: Request) {
+  if (!(await isAuthed())) return unauthorized();
   let body: { urls?: unknown; from?: string; to?: string } = {};
   try { body = await req.json(); } catch {}
 
