@@ -2,8 +2,13 @@ export type Session = { t: number; m: number; demo?: 1 };
 export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; demo?: 1 };
 export type LocalEvent = { id: number; date: string; s: string; e: string; title: string; c: string; demo?: 1 };
 export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 1 };
-export type HealthDay = { water: number; sleep: number; mood: number; steps: number; workout: number; weight: number; demo?: 1 };
-export type HealthField = Exclude<keyof HealthDay, 'demo'>;
+/** One day, keyed by the date you woke up. bed/wake are 'HH:MM'; sleep hours are derived from them when both are set.
+    mood and steps are kept only for data saved by older versions (mood is now logged in State.moods). */
+export type HealthDay = { water: number; sleep: number; mood: number; steps: number; workout: number; weight: number; bed?: string; wake?: string; demo?: 1 };
+export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake'>;
+/** A mood check-in at a moment of the day. v: 1–10, energy: 1–5 (0 = not set). */
+export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
+export type Note = { id: number; title: string; text: string; created: number; updated: number; pinned?: boolean; demo?: 1 };
 export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; demo?: 1 };
 export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; demo?: 1 };
 export type Stage = 'lead' | 'talk' | 'proposal' | 'won' | 'lost';
@@ -20,6 +25,9 @@ export type State = {
   v: 1;
   name: string; goal: number; focusMin: number; breakMin: number;
   demo: boolean; notes: string; theme: Theme;
+  noteList: Note[]; moods: MoodEntry[];
+  /** Waking day used to count free hours when no wake/bed time is logged. */
+  dayStart: string; dayEnd: string;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;

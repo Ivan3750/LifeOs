@@ -53,7 +53,14 @@ export function liveSessions(s: State, at = Date.now()) {
 /** Fills fields that were added in later versions. */
 function fill(s: State): State {
   const base = makeState(false);
-  return { ...base, ...s, co: { ...base.co, ...s.co }, money: { ...base.money, ...s.money } };
+  const out = { ...base, ...s, co: { ...base.co, ...s.co }, money: { ...base.money, ...s.money } };
+  // notes used to be a single text field: keep it as the first note of the list
+  if (!s.noteList) {
+    const text = (s.notes || '').trim();
+    out.noteList = text ? [{ id: 1, title: 'Мої нотатки', text, created: Date.now(), updated: Date.now() }] : [];
+    out.notes = '';
+  }
+  return out;
 }
 
 function load(): State {
@@ -359,10 +366,29 @@ function useStoreValue(dbOn: boolean) {
         if (willAllDone) toast('Усі звички на сьогодні виконано!');
       },
       delHabit(id: number) { update(s => { s.habits = s.habits.filter(x => x.id !== id); }); },
-      addNote(text: string) {
-        const n = new Date();
-        update(s => { s.notes = `${n.getDate()}.${n.getMonth() + 1}, ${hhmm(n)}\n${text}` + (s.notes ? '\n\n' + s.notes : ''); });
-        toast('Нотатку збережено');
+      /** Adds a note and returns its id. The first line becomes the title when no title is given. */
+      addNote(text: string, title = '') {
+        const t = Date.now(), lines = text.trim().split('\n');
+        if (!title && lines.length > 1) { title = lines[0].slice(0, 80); text = lines.slice(1).join('\n').trim(); }
+        update(s => { s.noteList.unshift({ id: t, title: title.trim(), text, created: t, updated: t }); });
+        if (text || title) toast('Нотатку збережено');
+        return t;
+      },
+      saveNote(id: number, v: { title?: string; text?: string }) { update(s => { const n = s.noteList.find(x => x.id === id); if (!n) return; Object.assign(n, v); n.updated = Date.now(); delete n.demo; }); },
+      dropEmptyNote(id: number) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id || x.title.trim() || x.text.trim()); }); },
+      pinNote(id: number) { update(s => { const n = s.noteList.find(x => x.id === id); if (n) n.pinned = !n.pinned; }); },
+      delNote(id: number, quiet = false) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id); }); if (!quiet) toast('Нотатку видалено'); },
+      addMood(v: { t: number; v: number; energy: number; tags: string[]; note: string }) {
+        update(s => { s.moods.push({ id: s.nextId++, ...v, note: v.note.trim() }); s.moods.sort((a, b) => a.t - b.t); });
+        toast('Настрій записано');
+      },
+      delMood(id: number) { update(s => { s.moods = s.moods.filter(x => x.id !== id); }); },
+      /** Bed and wake time for the night that ended on day k. Sleep hours follow from them. */
+      setSleepTimes(bed: string, wake: string, k = TK()) {
+        update(s => {
+          const h = hday(s, k); h.bed = bed || undefined; h.wake = wake || undefined; delete h.demo;
+          if (bed && wake) h.sleep = Math.round((((toMin(wake) - toMin(bed)) + 1440) % 1440) / 6) / 10;
+        });
       },
       addGoal(v: { title: string; area: string; target: number; unit: string; due: string }) { update(s => { s.goals.push({ id: s.nextId++, cur: 0, ...v }); }); toast('Ціль додано'); },
       stepGoal(id: number, dir: number) {

@@ -1,5 +1,5 @@
 import type { State, Invoice } from './types';
-import { addD, rng, wStart, ymd } from './util';
+import { addD, rng, sod, wStart, ymd } from './util';
 
 /** Fresh state. With demo=true it is filled with clearly marked example data (amounts in DKK). */
 export function makeState(demo: boolean): State {
@@ -35,10 +35,28 @@ export function makeState(demo: boolean): State {
   if (demo) {
     for (let i = 0; i < 14; i++) {
       health[ymd(addD(now, -i))] = i
-        ? { water: Math.round(4 + r() * 5), sleep: Math.round((5.5 + r() * 3) * 2) / 2, mood: 2 + Math.floor(r() * 4), steps: Math.round((3500 + r() * 8000) / 100) * 100, workout: r() < 0.45 ? 0 : 10 * (1 + Math.floor(r() * 6)), weight: 0, demo: 1 }
-        : { water: 3, sleep: 7, mood: 4, steps: 3200, workout: 0, weight: 0, demo: 1 };
+        ? { water: Math.round(4 + r() * 5), sleep: Math.round((5.5 + r() * 3) * 2) / 2, mood: 0, steps: 0, workout: r() < 0.45 ? 0 : 10 * (1 + Math.floor(r() * 6)), weight: 0, demo: 1 }
+        : { water: 3, sleep: 7.5, mood: 0, steps: 0, workout: 0, weight: 0, bed: '23:30', wake: '07:00', demo: 1 };
     }
   }
+
+  const TAGS = ['Спокій', 'Радість', 'Втома', 'Мотивація', 'Стрес', 'Натхнення'];
+  const moods: State['moods'] = [];
+  if (demo) {
+    for (let i = 13; i >= 0; i--) {
+      for (const h of i ? [9, 14, 20].filter(() => r() < 0.7) : [8, 11]) {
+        const d = sod(addD(now, -i)); d.setHours(h, Math.floor(r() * 60));
+        if (d < now) moods.push({ id: id(), t: d.getTime(), v: 4 + Math.floor(r() * 6), energy: 2 + Math.floor(r() * 4), tags: [TAGS[Math.floor(r() * TAGS.length)]], note: '', demo: 1 });
+      }
+    }
+  }
+
+  const noteList: State['noteList'] = demo
+    ? [
+        { id: id(), title: 'Ідеї для воркшопу', text: '- почати з короткої гри\n- показати 3 приклади\n- залишити 10 хв на питання', created: addD(now, -3).getTime(), updated: addD(now, -1).getTime(), pinned: true, demo: 1 },
+        { id: id(), title: 'Список покупок', text: 'молоко, хліб, яблука, кава', created: addD(now, -1).getTime(), updated: addD(now, -1).getTime(), demo: 1 },
+      ]
+    : [];
 
   const tx: State['money']['tx'] = [];
   if (demo) {
@@ -92,6 +110,7 @@ export function makeState(demo: boolean): State {
 
   return {
     v: 1, name: 'Друже', goal: 20, focusMin: 25, breakMin: 5, demo, notes: '', theme: 'system',
+    noteList, moods, dayStart: '08:00', dayEnd: '22:00',
     sessions,
     tasks: demo
       ? [
@@ -123,6 +142,8 @@ export function stripDemo(s: State) {
   s.sessions = s.sessions.filter(x => !x.demo);
   s.tasks = s.tasks.filter(x => !x.demo);
   s.events = s.events.filter(x => !x.demo);
+  s.moods = s.moods.filter(x => !x.demo);
+  s.noteList = s.noteList.filter(x => !x.demo);
   s.habits = s.habits.filter(x => !x.demo);
   s.goals = s.goals.filter(x => !x.demo);
   s.money.tx = s.money.tx.filter(x => !x.demo);

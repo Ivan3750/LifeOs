@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import type { HealthField, State, Tx } from '@/lib/types';
-import { DAY, daysInMonth, fmtN, money, MOODC, MOODS, pctW, sod, sum, TK, wStart, ymd, addD } from '@/lib/util';
+import { DAY, daysInMonth, fmtN, hhmm, money, pctW, sod, sum, TK, wStart, ymd, addD } from '@/lib/util';
+import { dayMood, moodColor, moodsOn, moodWord } from '@/lib/score';
 
 export const today = () => TK();
-export const hdayOf = (S: State, k = TK()) => S.health[k] || { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0 };
+export const hdayOf = (S: State, k = TK()) => S.health[k] || { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0, bed: undefined, wake: undefined };
 export const monthTx = (S: State) => { const mk = TK().slice(0, 7); return S.money.tx.filter(t => t.date.slice(0, 7) === mk); };
 export const sumT = (a: Tx[], type: 'in' | 'out') => a.filter(t => t.type === type).reduce((x, t) => x + t.amt, 0);
 export const sumA = (a: { amt: number }[]) => a.reduce((x, i) => x + (+i.amt || 0), 0);
@@ -34,16 +35,39 @@ function StepTile({ f, label, goalTxt, unit, goal, color, dm, dp, plus }: { f: H
   );
 }
 
+const QUICK_MOODS: [number, string][] = [[2, 'Погано'], [4, 'Так собі'], [6, 'Нормально'], [8, 'Добре'], [10, 'Чудово']];
+
+/** Quick mood check-in: one tap saves the mood at the current time. Details are added on the Health page. */
 function MoodTile() {
+  const { S, A, go } = useStore();
+  const list = moodsOn(S, TK()), last = list[list.length - 1], avgV = dayMood(S, TK());
+  return (
+    <div className="tile">
+      <div className="lab"><span>Настрій</span><span>{last ? `${last.v}/10 о ${hhmm(new Date(last.t))}` : 'не відмічено'}</span></div>
+      <div className="moods">
+        {QUICK_MOODS.map(([v, m]) => <button key={v} title={m} aria-label={`Настрій зараз: ${m}`} style={{ ['--mc' as string]: moodColor(v) }} onClick={() => A.addMood({ t: Date.now(), v, energy: 0, tags: [], note: '' })}>{v / 2}</button>)}
+      </div>
+      <div className="muted" style={{ fontSize: 11, marginTop: 'auto', display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+        <span>{list.length ? `${list.length} ${list.length === 1 ? 'запис' : 'записи'} · ${moodWord(avgV).toLowerCase()}` : 'як ти зараз?'}</span>
+        <button style={{ textDecoration: 'underline', color: 'inherit' }} onClick={() => go('health')}>Детально</button>
+      </div>
+    </div>
+  );
+}
+
+/** Bed and wake time of last night; the hours of sleep are counted from them. */
+function SleepTile() {
   const { S, A } = useStore();
   const h = hdayOf(S);
   return (
     <div className="tile">
-      <div className="lab"><span>Настрій</span><span>{h.mood ? MOODS[h.mood - 1] : 'не відмічено'}</span></div>
-      <div className="moods">
-        {MOODS.map((m, i) => <button key={m} title={m} aria-label={`Настрій: ${m}`} aria-pressed={h.mood === i + 1} style={{ ['--mc' as string]: MOODC[i] }} onClick={() => A.setH('mood', i + 1)}>{i + 1}</button>)}
+      <div className="lab"><span>Сон</span><span>ціль 8 год</span></div>
+      <div className="tv num">{h.sleep || '—'}<small>{h.sleep ? 'год' : ''}</small></div>
+      <div className="bar"><i style={{ width: pctW(h.sleep, 8) + '%', background: 'var(--sleep)' }} /></div>
+      <div className="sleeptimes">
+        <label>Заснув<input type="time" value={h.bed || ''} onChange={e => A.setSleepTimes(e.target.value, h.wake || '')} aria-label="Коли заснув" /></label>
+        <label>Прокинувся<input type="time" value={h.wake || ''} onChange={e => A.setSleepTimes(h.bed || '', e.target.value)} aria-label="Коли прокинувся" /></label>
       </div>
-      <div className="muted" style={{ fontSize: 11, marginTop: 'auto' }}>1 погано · 5 чудово</div>
     </div>
   );
 }
@@ -69,14 +93,11 @@ export function LifeTiles({ full }: { full: boolean }) {
   return (
     <div className="life">
       <StepTile f="water" label="Вода" goalTxt="ціль 8" unit="склянок" goal={8} color="var(--water)" dm={1} dp={1} plus="+ склянка" />
-      <StepTile f="sleep" label="Сон" goalTxt="ціль 8 год" unit="год" goal={8} color="var(--sleep)" dm={0.5} dp={0.5} plus="+ 30 хв" />
+      <SleepTile />
       <MoodTile />
       <StepTile f="workout" label="Рух" goalTxt="ціль 30 хв" unit="хв" goal={30} color="var(--good)" dm={10} dp={10} plus="+ 10 хв" />
       {full ? (
-        <>
-          <StepTile f="steps" label="Кроки" goalTxt="ціль 8.000" unit="" goal={8000} color="var(--accent)" dm={1000} dp={1000} plus="+ 1.000" />
-          <WeightTile />
-        </>
+        <WeightTile />
       ) : (
         <div className="tile">
           <div className="lab"><span>Витрати</span><span>ліміт {money(lim)}</span></div>

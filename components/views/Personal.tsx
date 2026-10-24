@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { UiEvent } from '@/lib/types';
+import type { Note, UiEvent } from '@/lib/types';
+import { dayMood, ENERGY, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { goalStep, liveSessions, useStore } from '@/lib/store';
-import { addD, AREAS, CATS, COLORS, daysInMonth, daysTo, DN, fmt, fmtN, hmPlain, MON, MONTHN, money, MOODC, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { addD, AREAS, CATS, COLORS, daysInMonth, daysTo, DN, fmt, fmtN, hhmm, hmPlain, MON, MONTHN, money, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Bars, Radar } from '../charts';
 import { avg, CatBars, DelBtn, habStreak, LifeTiles, monthTx, sumT } from '../shared';
@@ -147,20 +148,114 @@ export function Habits() {
 }
 
 /* ---------------- Health ---------------- */
+function MoodForm() {
+  const { A } = useStore();
+  const blank = () => ({ date: TK(), time: hhmm(new Date()), v: 7, energy: 3, tags: [] as string[], note: '' });
+  const [m, setM] = useState(blank);
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    A.addMood({ t: new Date(`${m.date}T${m.time || '12:00'}`).getTime(), v: m.v, energy: m.energy, tags: m.tags, note: m.note });
+    setM(blank());
+  };
+  const toggleTag = (t: string) => setM({ ...m, tags: m.tags.includes(t) ? m.tags.filter(x => x !== t) : [...m.tags, t] });
+  return (
+    <form className="moodform" onSubmit={submit}>
+      <div className="row">
+        <label className="field" htmlFor="mdDate" style={{ flex: 1 }}>Дата<input id="mdDate" type="date" value={m.date} max={TK()} onChange={e => setM({ ...m, date: e.target.value })} /></label>
+        <label className="field" htmlFor="mdTime" style={{ flex: 1 }}>Час<input id="mdTime" type="time" value={m.time} onChange={e => setM({ ...m, time: e.target.value })} /></label>
+      </div>
+      <div className="field">
+        <div className="row" style={{ justifyContent: 'space-between' }}><span>Настрій</span><b className="num" style={{ color: moodColor(m.v) }}>{m.v}/10 · {moodWord(m.v)}</b></div>
+        <div className="scale10">
+          {[...Array(10)].map((_, i) => <button type="button" key={i} aria-pressed={m.v === i + 1} aria-label={`Настрій ${i + 1} з 10`} style={{ ['--mc' as string]: moodColor(i + 1) }} onClick={() => setM({ ...m, v: i + 1 })}>{i + 1}</button>)}
+        </div>
+      </div>
+      <div className="field">
+        <span>Енергія</span>
+        <div className="seg" style={{ alignSelf: 'flex-start' }}>
+          {ENERGY.map((l, i) => <button type="button" key={l} aria-pressed={m.energy === i + 1} onClick={() => setM({ ...m, energy: m.energy === i + 1 ? 0 : i + 1 })}>{l}</button>)}
+        </div>
+      </div>
+      <div className="field">
+        <span>Що відчуваєш</span>
+        <div className="tags">{MOOD_TAGS.map(t => <button type="button" key={t} aria-pressed={m.tags.includes(t)} onClick={() => toggleTag(t)}>{t}</button>)}</div>
+      </div>
+      <label className="field" htmlFor="mdNote">Що сталося, про що думаєш
+        <textarea id="mdNote" rows={3} placeholder="Необовʼязково: що вплинуло на настрій" value={m.note} onChange={e => setM({ ...m, note: e.target.value })} />
+      </label>
+      <button className="btn acc" style={{ alignSelf: 'flex-start' }}>Записати настрій</button>
+    </form>
+  );
+}
+
+/** Mood check-ins of one day as dots on a 24-hour line. */
+function MoodDay({ k }: { k: string }) {
+  const { S } = useStore();
+  const list = moodsOn(S, k), W = 720, H = 150, P = 20, x = (t: number) => P + ((W - 2 * P) * (new Date(t).getHours() * 60 + new Date(t).getMinutes())) / 1440, y = (v: number) => H - 22 - ((H - 40) * (v - 1)) / 9;
+  if (!list.length) return null;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto' }}>
+      {[0, 6, 12, 18, 24].map(h => <g key={h}><line x1={P + ((W - 2 * P) * h) / 24} x2={P + ((W - 2 * P) * h) / 24} y1="8" y2={H - 20} stroke="var(--line)" /><text className="chart-text" x={P + ((W - 2 * P) * h) / 24} y={H - 6} textAnchor="middle">{pad2(h % 24)}:00</text></g>)}
+      {list.length > 1 && <polyline fill="none" stroke="var(--muted)" strokeWidth="1.5" opacity=".5" points={list.map(m => `${x(m.t).toFixed(1)},${y(m.v).toFixed(1)}`).join(' ')} />}
+      {list.map(m => <circle key={m.id} cx={x(m.t)} cy={y(m.v)} r="6" fill={moodColor(m.v)}><title>{`${hhmm(new Date(m.t))} · ${m.v}/10${m.tags.length ? ' · ' + m.tags.join(', ') : ''}`}</title></circle>)}
+    </svg>
+  );
+}
+
+function MoodLog() {
+  const { S, A } = useStore();
+  const [k, setK] = useState(TK());
+  const list = [...moodsOn(S, k)].reverse(), dt = new Date(k + 'T00:00'), avgV = dayMood(S, k);
+  return (
+    <>
+      <div className="ch">
+        <div><h3>{k === TK() ? 'Сьогодні' : `${WD[dt.getDay()]}, ${dt.getDate()} ${MON[dt.getMonth()]}`}</h3><p>{list.length ? `${list.length} ${plural(list.length, 'запис', 'записи', 'записів')} · в середньому ${avgV.toFixed(1)}/10` : 'Записів настрою немає'}</p></div>
+        <div className="row" style={{ marginLeft: 'auto', gap: 6 }}>
+          <button className="btn ghost cal-nav" aria-label="Попередній день" onClick={() => setK(ymd(addD(dt, -1)))}>‹</button>
+          <button className="btn ghost cal-nav" aria-label="Наступний день" disabled={k >= TK()} onClick={() => setK(ymd(addD(dt, 1)))}>›</button>
+        </div>
+      </div>
+      <MoodDay k={k} />
+      <div className="list">
+        {list.map(m => (
+          <div className="item" key={m.id} style={{ alignItems: 'flex-start' }}>
+            <span className="moodval num" style={{ background: moodColor(m.v) }}>{m.v}</span>
+            <div className="t">
+              <div><b className="num">{hhmm(new Date(m.t))}</b> · {moodWord(m.v)}{m.energy > 0 && <span className="muted"> · енергія: {ENERGY[m.energy - 1].toLowerCase()}</span>}</div>
+              {m.tags.length > 0 && <div className="tags small">{m.tags.map(t => <span key={t}>{t}</span>)}</div>}
+              {m.note && <div className="muted" style={{ fontSize: 13, marginTop: 4, whiteSpace: 'pre-wrap' }}>{m.note}</div>}
+            </div>
+            <DelBtn label="Видалити запис настрою" onDelete={() => A.delMood(m.id)} />
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export function Health() {
   const { S } = useStore();
-  const days = [...Array(14)].map((_, i) => S.health[ymd(addD(new Date(), i - 13))]);
-  const ser = (f: 'sleep' | 'mood' | 'water' | 'steps' | 'workout') => days.map(d => (d ? d[f] : 0));
+  const keys = [...Array(14)].map((_, i) => ymd(addD(new Date(), i - 13)));
+  const days = keys.map(k => S.health[k]);
+  const ser = (f: 'sleep' | 'water' | 'workout') => days.map(d => (d ? d[f] : 0));
   const av = (f: Parameters<typeof ser>[0]) => avg(ser(f).filter(x => x > 0));
+  const moods = keys.map(k => dayMood(S, k)), moodAv = avg(moods.filter(x => x > 0));
+  // average clock time; times after noon count as the evening before so 23:30 and 00:30 average to midnight
+  const avgTime = (f: 'bed' | 'wake') => {
+    const ms = days.map(d => d?.[f]).filter(Boolean).map(t => { const m = toMin(t!); return f === 'bed' && m < 720 ? m + 1440 : m; });
+    if (!ms.length) return '—';
+    const m = Math.round(avg(ms)) % 1440; return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
+  };
   return (
     <section className="view">
-      <div className="vh"><div><h2>Здоровʼя</h2><p>Відмічай щодня. Графіки показують останні 14 днів.</p></div></div>
+      <div className="vh"><div><h2>Здоровʼя</h2><p>Відмічай щодня. Настрій можна записувати кілька разів на день. Графіки показують останні 14 днів.</p></div></div>
       <div className="card" style={{ marginTop: 18 }}><LifeTiles full /></div>
       <div className="grid" style={{ marginTop: 18 }}>
-        <div className="card s4"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
-        <div className="card s4"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {av('mood').toFixed(1)} з 5</p></div></div><Bars vals={ser('mood')} max={5} color={v => (v ? MOODC[Math.round(v) - 1] : 'var(--bar)')} unit="/5" /></div>
-        <div className="card s4"><div className="ch"><div><h3>Вода</h3><p>У середньому {av('water').toFixed(1)} склянок</p></div></div><Bars vals={ser('water')} max={12} color="var(--water)" target={8} unit=" скл." /></div>
-        <div className="card s6"><div className="ch"><div><h3>Кроки</h3><p>У середньому {fmtN(Math.round(av('steps')))} кроків</p></div></div><Bars vals={ser('steps')} max={Math.max(10000, ...ser('steps'))} color="var(--accent)" target={8000} unit="" /></div>
+        <div className="card s5"><div className="ch"><div><h3>Як ти зараз?</h3><p>Запиши настрій з часом і деталями</p></div></div><MoodForm /></div>
+        <div className="card s7"><MoodLog /></div>
+        <div className="card s6"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {moodAv.toFixed(1)} з 10</p></div></div><Bars vals={moods.map(v => Math.round(v * 10) / 10)} max={10} color={v => moodColor(v)} unit="/10" /></div>
+        <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
+        <div className="card s6"><div className="ch"><div><h3>Вода</h3><p>У середньому {av('water').toFixed(1)} склянок</p></div></div><Bars vals={ser('water')} max={12} color="var(--water)" target={8} unit=" скл." /></div>
         <div className="card s6"><div className="ch"><div><h3>Тренування</h3><p>{ser('workout').filter(x => x > 0).length} активних днів із 14</p></div></div><Bars vals={ser('workout')} max={Math.max(60, ...ser('workout'))} color="var(--good)" target={30} unit=" хв" /></div>
       </div>
     </section>
@@ -467,20 +562,67 @@ export function CalStatusChip() {
 }
 
 /* ---------------- Notes ---------------- */
-export function Notes() {
-  const { S, update } = useStore();
-  const [text, setText] = useState(S.notes);
+const noteTitle = (n: Note) => n.title.trim() || n.text.trim().split('\n')[0].slice(0, 60) || 'Без назви';
+const noteDate = (t: number) => { const d = new Date(t); return ymd(d) === TK() ? hhmm(d) : `${d.getDate()} ${MON[d.getMonth()].slice(0, 3)}${d.getFullYear() !== new Date().getFullYear() ? ' ' + d.getFullYear() : ''}`; };
+
+/** Editor of one note. Changes are saved after a short pause and when another note is opened. */
+function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
+  const { A } = useStore();
+  const [v, setV] = useState({ title: note.title, text: note.text });
   const [saved, setSaved] = useState('');
+  const latest = useRef(v);
+  const dirty = useRef(false);
   useEffect(() => {
-    if (text === S.notes) return;
-    const t = setTimeout(() => { update(s => { s.notes = text; }); const n = new Date(); setSaved(`Збережено о ${pad2(n.getHours())}:${pad2(n.getMinutes())}`); }, 400);
+    if (!dirty.current) return;
+    const t = setTimeout(() => { A.saveNote(note.id, latest.current); dirty.current = false; setSaved(`Збережено о ${hhmm(new Date())}`); }, 400);
     return () => clearTimeout(t);
-  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [v]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { if (dirty.current) A.saveNote(note.id, latest.current); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const change = (p: Partial<typeof v>) => { dirty.current = true; latest.current = { ...v, ...p }; setV(latest.current); };
   return (
-    <section className="view">
-      <div className="vh"><div><h2>Нотатки</h2><p>{saved || 'Зберігаються автоматично в цьому браузері.'}</p></div></div>
-      <textarea className="notes" style={{ marginTop: 18 }} placeholder="Думки, ідеї, конспект…" value={text} onChange={e => setText(e.target.value)} aria-label="Нотатки" />
-    </section>
+    <div className="noteed">
+      <div className="row" style={{ gap: 8 }}>
+        <button className="btn ghost noteback" onClick={onBack}><Icon n="left" />Усі нотатки</button>
+        <span className="muted" style={{ fontSize: 12, marginLeft: 'auto' }}>{saved || `Змінено ${noteDate(note.updated)}`}</span>
+        <button className="x" title={note.pinned ? 'Відкріпити' : 'Закріпити вгорі'} aria-pressed={!!note.pinned} aria-label="Закріпити нотатку" style={note.pinned ? { color: 'var(--accent)', opacity: 1 } : undefined} onClick={() => A.pinNote(note.id)}><Icon n="pin" /></button>
+        <DelBtn label="Видалити нотатку" onDelete={() => { dirty.current = false; A.delNote(note.id); onBack(); }} />
+      </div>
+      <input className="notetitle" placeholder="Назва" value={v.title} onChange={e => change({ title: e.target.value })} aria-label="Назва нотатки" />
+      <textarea className="notetext" placeholder="Думки, ідеї, конспект…" value={v.text} onChange={e => change({ text: e.target.value })} aria-label="Текст нотатки" autoFocus={!note.text && !note.title} />
+    </div>
   );
 }
 
+export function Notes() {
+  const { S, A } = useStore();
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState<number | null>(() => (typeof window !== 'undefined' && window.innerWidth > 760 ? S.noteList[0]?.id ?? null : null));
+  const ql = q.trim().toLowerCase();
+  const list = S.noteList
+    .filter(n => !ql || (n.title + '\n' + n.text).toLowerCase().includes(ql))
+    .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.updated - a.updated);
+  const cur = S.noteList.find(n => n.id === sel) || null;
+  // a note left empty is dropped when another one is opened
+  const open = (id: number | null) => { if (cur && cur.id !== id) { const old = cur.id; setTimeout(() => A.dropEmptyNote(old), 0); } setSel(id); };
+  return (
+    <section className="view">
+      <div className="vh">
+        <div><h2>Нотатки</h2><p>{S.noteList.length ? `${S.noteList.length} ${plural(S.noteList.length, 'нотатка', 'нотатки', 'нотаток')}. Зберігаються автоматично.` : 'Зберігаються автоматично.'}</p></div>
+        <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => { setQ(''); open(A.addNote('')); }}><Icon n="plus" />Нова нотатка</button>
+      </div>
+      <div className={`card notesapp${cur ? ' open' : ''}`} style={{ marginTop: 18 }}>
+        <div className="notelist">
+          <input className="notesearch" type="search" placeholder="Пошук у нотатках" value={q} onChange={e => setQ(e.target.value)} aria-label="Пошук у нотатках" />
+          {list.map(n => (
+            <button key={n.id} className={`noteitem${n.id === sel ? ' on' : ''}`} onClick={() => open(n.id)}>
+              <b>{n.pinned && <Icon n="pin" />}{noteTitle(n)}</b>
+              <span className="muted">{noteDate(n.updated)} · {(n.title.trim() ? n.text : n.text.split('\n').slice(1).join(' ')).trim().slice(0, 90) || 'Порожньо'}</span>
+            </button>
+          ))}
+          {!list.length && <p className="muted" style={{ padding: '8px 4px', fontSize: 13 }}>{ql ? 'Нічого не знайдено.' : 'Нотаток поки немає. Натисни «Нова нотатка».'}</p>}
+        </div>
+        {cur ? <NoteEditor key={cur.id} note={cur} onBack={() => open(null)} /> : <div className="noteempty muted">Вибери нотатку зліва або створи нову.</div>}
+      </div>
+    </section>
+  );
+}

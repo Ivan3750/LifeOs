@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useStore } from '@/lib/store';
-import { addD, DAY, DN, MON, MONTHN, money, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { liveSessions, useStore } from '@/lib/store';
+import { dayScore, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score';
+import { addD, DAY, DN, hhmm, MON, MONTHN, money, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { CatBars, dayMinutes, habStreak, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
@@ -110,6 +111,71 @@ function HeatMap() {
   );
 }
 
+const hrs = (m: number) => { const h = m / 60; return h >= 10 || Number.isInteger(Math.round(h * 10) / 10) ? String(Math.round(h * 10) / 10) : (Math.round(h * 10) / 10).toFixed(1); };
+
+/** Focus time against the free time left by the calendar, e.g. 5/7 hours. */
+function FreeTimeCard() {
+  const { S, eventsOn, now, go } = useStore();
+  const live = liveSessions(S, now), k = TK();
+  const t = freeTime(S, k, eventsOn(k), live, now);
+  const pct = t.free ? Math.round((t.worked / t.free) * 100) : 0;
+  const week = lastDays(7).map(d => ({ d, ...freeTime(S, d, eventsOn(d), live, now) }));
+  const maxFree = Math.max(60, ...week.map(w => w.free));
+  return (
+    <div className="card s7">
+      <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з вільних від календаря годин ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {S.dayStart}–{S.dayEnd}</button></div>
+      <div className="bigstat"><span className="v num">{hrs(t.worked)}<small>/</small>{hrs(t.free)}<small>год</small></span><span className={`delta ${pct >= 60 ? 'up' : 'dn'}`}>{pct}%</span></div>
+      <div className="muted" style={{ fontSize: 12 }}>Сьогодні вільно з {hhmm(new Date(t.start))} до {hhmm(new Date(t.end))}{S.health[k]?.wake ? ' (від часу, коли прокинувся)' : ''}, без подій з календаря</div>
+      <div className="freeweek">
+        {week.map(w => {
+          const dt = new Date(w.d + 'T00:00');
+          return (
+            <div key={w.d} className={`fw${w.d === k ? ' today' : ''}`} title={`${hrs(w.worked)} з ${hrs(w.free)} год вільного часу`}>
+              <span>{DN[weekdayIdx(dt)]}</span>
+              <div className="trk"><i className="free" style={{ width: (w.free / maxFree) * 100 + '%' }} /><i className="work" style={{ width: (Math.min(w.worked, Math.max(w.free, w.worked)) / maxFree) * 100 + '%' }} /></div>
+              <b className="num">{hrs(w.worked)}/{hrs(w.free)}</b>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** Day score 0–100 with what it is made of. */
+function ScoreCard() {
+  const { S, eventsOn, now, go } = useStore();
+  const live = liveSessions(S, now), k = TK();
+  const sc = dayScore(S, k, eventsOn(k), live, now);
+  const hist = lastDays(7).map(d => ({ d, v: d === k ? sc.total : dayScore(S, d, eventsOn(d), live, now).total }));
+  const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
+  const to: Record<string, string> = { focus: 'focus', sleep: 'health', habits: 'habits', mood: 'health', water: 'health', move: 'health', money: 'money' };
+  return (
+    <div className="card s5">
+      <div className="ch"><Icon n="trophy" className="ic" /><div><h3>Оцінка дня</h3><p>100 — усе супер, 0 — дуже погано</p></div></div>
+      <div className="score">
+        <div className="scorebig" style={{ ['--sc' as string]: scoreColor(sc.total) }}>
+          <b className="num">{sc.total}</b><small>/100</small>
+          <span>{scoreWord(sc.total)}</span>
+        </div>
+        <div className="scoreparts">
+          {sc.parts.map(p => (
+            <button key={p.key} className="sp" onClick={() => go(to[p.key])} title={p.hint}>
+              <span>{p.label}</span>
+              <div className="bar"><i style={{ width: (p.got / p.max) * 100 + '%', background: p.got / p.max >= 0.7 ? 'var(--good)' : p.got / p.max >= 0.4 ? 'var(--accent-2)' : 'var(--m1)' }} /></div>
+              <em className="num">{Math.round(p.got)}/{p.max}</em>
+            </button>
+          ))}
+        </div>
+      </div>
+      {weak && weak.got < weak.max && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>Найбільше балів можна додати: <b style={{ color: 'var(--ink)' }}>{weak.label.toLowerCase()}</b> ({weak.hint})</p>}
+      <div className="scorehist">
+        {hist.map(h => { const dt = new Date(h.d + 'T00:00'); return <div key={h.d} className={h.d === k ? 'today' : ''} title={`${dt.getDate()} ${MON[dt.getMonth()]}: ${h.v}/100`}><i style={{ height: Math.max(3, h.v * 0.44), background: scoreColor(h.v) }} /><span>{DN[weekdayIdx(dt)]}</span><b className="num">{h.v}</b></div>; })}
+      </div>
+    </div>
+  );
+}
+
 export function Home() {
   const { S, A, go } = useStore();
   const ti = weekdayIdx(), w = weekMinutes(S), lw = weekMinutes(S, -1), tot = w.reduce((a, b) => a + b, 0);
@@ -130,6 +196,9 @@ export function Home() {
           <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Вода, сон, настрій, рух і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
           <LifeTiles full={false} />
         </div>
+
+        <ScoreCard />
+        <FreeTimeCard />
 
         <div className="card s4">
           <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div><span className="sel">Цей тиждень</span></div>

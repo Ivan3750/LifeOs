@@ -145,6 +145,12 @@ export function Prefs() {
           <NumField id="pBreak" label="Тривалість перерви, хв" value={S.breakMin} min={1} max={60} onSave={n => update(s => { s.breakMin = n; if (!s.timer.running && s.timer.mode === 'break') s.timer.left = n * 60; })} />
           <TextField id="pCo" label="Назва компанії" value={S.co.name} fallback="Моя компанія" onSave={v => update(s => { s.co.name = v; })} />
           <NumField id="pCoGoal" label="Ціль виручки на місяць, kr." value={S.co.goal} min={1000} max={100000000} onSave={n => update(s => { s.co.goal = n; })} />
+          <label className="field" htmlFor="pDayStart">Початок дня (для вільного часу)
+            <input id="pDayStart" type="time" value={S.dayStart} onChange={e => e.target.value && update(s => { s.dayStart = e.target.value; })} />
+          </label>
+          <label className="field" htmlFor="pDayEnd">Кінець дня
+            <input id="pDayEnd" type="time" value={S.dayEnd} onChange={e => e.target.value && update(s => { s.dayEnd = e.target.value; })} />
+          </label>
           <label className="field" htmlFor="pTheme">Тема
             <select id="pTheme" value={S.theme} onChange={e => update(s => { s.theme = e.target.value as Theme; })}>
               <option value="system">Як у системі</option><option value="light">Світла</option><option value="dark">Темна</option>
