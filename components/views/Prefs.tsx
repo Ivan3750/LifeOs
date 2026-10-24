@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useStore } from '@/lib/store';
+import { logFocus, useStore } from '@/lib/store';
 import { makeState, stripDemo } from '@/lib/seed';
 import type { Theme } from '@/lib/types';
 import { Icon } from '../Icon';
@@ -116,7 +116,7 @@ export function Prefs() {
         <div className="kv">
           <TextField id="pName" label="Імʼя" value={S.name} fallback="Друже" onSave={v => update(s => { s.name = v; })} />
           <NumField id="pGoal" label="Ціль фокусу на тиждень, год" value={S.goal} min={1} max={80} onSave={n => update(s => { s.goal = n; })} />
-          <NumField id="pFocus" label="Тривалість фокусу, хв" value={S.focusMin} min={5} max={120} onSave={n => update(s => { s.focusMin = n; if (!s.timer.running && s.timer.mode === 'focus') s.timer.left = n * 60; })} />
+          <NumField id="pFocus" label="Тривалість фокусу, хв" value={S.focusMin} min={5} max={120} onSave={n => update(s => { if (!s.timer.running && s.timer.mode === 'focus') { logFocus(s); s.timer.sid = 0; s.timer.left = n * 60; } s.focusMin = n; })} />
           <NumField id="pBreak" label="Тривалість перерви, хв" value={S.breakMin} min={1} max={60} onSave={n => update(s => { s.breakMin = n; if (!s.timer.running && s.timer.mode === 'break') s.timer.left = n * 60; })} />
           <TextField id="pCo" label="Назва компанії" value={S.co.name} fallback="Моя компанія" onSave={v => update(s => { s.co.name = v; })} />
           <NumField id="pCoGoal" label="Ціль виручки на місяць, kr." value={S.co.goal} min={1000} max={100000000} onSave={n => update(s => { s.co.goal = n; })} />

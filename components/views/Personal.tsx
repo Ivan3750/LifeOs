@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
-import { goalStep, useStore } from '@/lib/store';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import type { UiEvent } from '@/lib/types';
+import { goalStep, liveSessions, useStore } from '@/lib/store';
 import { addD, AREAS, CATS, COLORS, daysInMonth, daysTo, DN, fmt, fmtN, hmPlain, MON, MONTHN, money, MOODC, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Bars, Radar } from '../charts';
@@ -9,10 +10,11 @@ import { avg, CatBars, DelBtn, habStreak, LifeTiles, monthTx, sumT } from '../sh
 
 /* ---------------- Focus ---------------- */
 export function Focus() {
-  const { S, update, timerLeft, toggleTimer, resetTimer, setTimerMode, completeTimer, durOf } = useStore();
+  const { S, update, now, timerLeft, toggleTimer, resetTimer, setTimerMode, completeTimer, durOf } = useStore();
   const T = S.timer, dur = durOf(T.mode), C = 552.9;
-  const a = sod(new Date()).getTime(), today = S.sessions.filter(s => s.t >= a);
-  const recent = [...S.sessions].sort((x, y) => y.t - x.t).slice(0, 12);
+  const all = liveSessions(S, now);
+  const a = sod(new Date()).getTime(), today = all.filter(s => s.t >= a);
+  const recent = [...all].sort((x, y) => y.t - x.t).slice(0, 12);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.code === 'Space' && !/INPUT|TEXTAREA|SELECT|BUTTON/.test(document.activeElement?.tagName || '')) { e.preventDefault(); toggleTimer(); } };
     document.addEventListener('keydown', onKey);
@@ -20,7 +22,7 @@ export function Focus() {
   }, [toggleTimer]);
   return (
     <section className="view">
-      <div className="vh"><div><h2>Фокус</h2><p>Таймер Помодоро. Завершені сесії одразу йдуть у статистику. Пробіл: старт і пауза.</p></div></div>
+      <div className="vh"><div><h2>Фокус</h2><p>Таймер Помодоро. У статистику йде весь час фокусу, навіть якщо зупинився раніше. Пробіл: старт і пауза.</p></div></div>
       <div className="grid" style={{ marginTop: 18 }}>
         <div className="card s7">
           <div className="row" style={{ justifyContent: 'center' }}>
@@ -57,7 +59,7 @@ export function Focus() {
           </div>
           <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Журнал сесій</div>
           <div className="list log">
-            {recent.map(s => { const d = new Date(s.t); return <div className="item" key={s.t}><span className="sw c1" /><span className="t">{DN[weekdayIdx(d)]}, {pad2(d.getHours())}:{pad2(d.getMinutes())}</span><span className="num">{s.m} хв</span></div>; })}
+            {recent.map(s => { const d = new Date(s.t); return <div className="item" key={s.t}><span className="sw c1" /><span className="t">{DN[weekdayIdx(d)]}, {pad2(d.getHours())}:{pad2(d.getMinutes())}{'live' in s && <span className="muted"> · триває</span>}</span><span className="num">{s.m} хв</span></div>; })}
             {!recent.length && <p className="muted">Ще немає сесій. Натисни «Старт».</p>}
           </div>
         </div>
@@ -298,30 +300,149 @@ export function Goals() {
 }
 
 /* ---------------- Schedule ---------------- */
+type CalView = 'day' | 'week' | 'month';
+const HOUR = 44;
+
+/** Puts overlapping events side by side: each gets a lane and the number of lanes in its group. */
+function lanes(evs: UiEvent[]) {
+  const out: { e: UiEvent; lane: number; of: number }[] = [];
+  let group: typeof out = [], ends: number[] = [], groupEnd = -1;
+  const close = () => { for (const g of group) g.of = ends.length; group = []; ends = []; };
+  for (const e of [...evs].sort((a, b) => toMin(a.s) - toMin(b.s) || toMin(b.e) - toMin(a.e))) {
+    const s0 = toMin(e.s), e0 = Math.max(toMin(e.e), s0 + 15);
+    if (s0 >= groupEnd) close();
+    let lane = ends.findIndex(x => x <= s0);
+    if (lane < 0) { lane = ends.length; ends.push(e0); } else ends[lane] = e0;
+    groupEnd = Math.max(groupEnd, e0);
+    const item = { e, lane, of: 1 }; group.push(item); out.push(item);
+  }
+  close();
+  return out;
+}
+
 export function Schedule() {
-  const { S, A, eventsOn, cal, refreshCal, go } = useStore();
+  const { S, A, eventsOn, cal, refreshCal, go, now } = useStore();
+  const [mode, setMode] = useState<CalView>(() => (typeof window !== 'undefined' && window.innerWidth < 640 ? 'day' : 'week'));
+  const [anchor, setAnchor] = useState(TK());
   const [v, setV] = useState({ title: '', date: TK(), s: '10:00', e: '11:00', c: 'c1' });
   const [err, setErr] = useState('');
-  const days = [...Array(14)].map((_, i) => ymd(addD(new Date(), i)));
+  const titleRef = useRef<HTMLInputElement>(null);
+  const today = TK(), at = new Date(anchor + 'T00:00');
+
+  const days = mode === 'day' ? [anchor] : mode === 'week' ? [...Array(7)].map((_, i) => ymd(addD(wStart(at), i))) : [];
+  const monthDays = (() => {
+    if (mode !== 'month') return [];
+    const first = new Date(at.getFullYear(), at.getMonth(), 1), ws = wStart(first);
+    const last = new Date(at.getFullYear(), at.getMonth() + 1, 0);
+    const n = Math.ceil((Math.round((last.getTime() - ws.getTime()) / 864e5) + 1) / 7) * 7;
+    return [...Array(n)].map((_, i) => addD(ws, i));
+  })();
+
+  const evs = Object.fromEntries(days.map(d => [d, eventsOn(d)]));
+  const timed = days.flatMap(d => evs[d].filter(e => !e.allDay));
+  const h0 = Math.min(7, ...timed.map(e => Math.floor(toMin(e.s) / 60)));
+  const h1 = Math.max(22, ...timed.map(e => Math.ceil(toMin(e.e) / 60)));
+  const hours = [...Array(h1 - h0)].map((_, i) => h0 + i);
+  const anyAllDay = days.some(d => evs[d].some(e => e.allDay));
+
+  const shift = (dir: number) => {
+    if (mode === 'month') setAnchor(ymd(new Date(at.getFullYear(), at.getMonth() + dir, 1)));
+    else setAnchor(ymd(addD(at, dir * (mode === 'week' ? 7 : 1))));
+  };
+  const title = mode === 'month' ? `${MONTHN[at.getMonth()]} ${at.getFullYear()}`
+    : mode === 'day' ? `${anchor === today ? 'Сьогодні, ' : WD[at.getDay()] + ', '}${at.getDate()} ${MON[at.getMonth()]}`
+    : (() => { const a = new Date(days[0] + 'T00:00'), b = new Date(days[6] + 'T00:00'); return a.getMonth() === b.getMonth() ? `${a.getDate()}–${b.getDate()} ${MON[b.getMonth()]}` : `${a.getDate()} ${MON[a.getMonth()]} – ${b.getDate()} ${MON[b.getMonth()]}`; })();
+
+  const pick = (date: string, hour?: number) => {
+    const next = { ...v, date };
+    if (hour !== undefined) { next.s = `${pad2(hour)}:00`; next.e = `${pad2(Math.min(hour + 1, 23))}:${hour + 1 > 23 ? '59' : '00'}`; }
+    setV(next); setErr('');
+    setTimeout(() => { titleRef.current?.focus(); titleRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 0);
+  };
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (toMin(v.e) <= toMin(v.s)) { setErr('Кінець має бути пізніше за початок.'); return; }
     setErr('');
-    if (A.addEvent({ ...v, title: v.title.trim() })) setV({ ...v, title: '' });
+    if (A.addEvent({ ...v, title: v.title.trim() })) { setV({ ...v, title: '' }); setAnchor(v.date); }
   };
   const hasCal = S.icalUrls.length > 0 || cal.state === 'ok';
+  const nowD = new Date(now), nowMin = nowD.getHours() * 60 + nowD.getMinutes();
+  const evClass = (e: UiEvent) => `cev ${e.ext ? 'ext' : e.c}`;
+  const evTitle = (e: UiEvent) => `${e.title}${e.allDay ? '' : ` · ${e.s}–${e.e}`}${e.location ? ` · ${e.location}` : ''}${e.ext ? ' (календар)' : ''}`;
+  const delBtn = (e: UiEvent) => !e.ext && <button className="cx" aria-label={`Видалити подію ${e.title}`} title="Видалити" onClick={x => { x.stopPropagation(); A.delEvent(e.localId!); }}><Icon n="x" /></button>;
+
   return (
     <section className="view">
       <div className="vh">
-        <div><h2>Розклад</h2><p>Твої події і підключені календарі на 14 днів уперед.</p></div>
+        <div><h2>Розклад</h2><p>Твій календар і підключені календарі. Натисни на вільний час, щоб додати подію.</p></div>
         <div className="row" style={{ marginLeft: 'auto' }}>
           <CalStatusChip />
           {hasCal ? <button className="btn ghost" onClick={refreshCal}><Icon n="refresh" />Оновити</button> : <button className="btn ghost" onClick={() => go('prefs')}><Icon n="link" />Підключити календар</button>}
         </div>
       </div>
       <div className="grid" style={{ marginTop: 18 }}>
-        <form className="card s5" style={{ display: 'flex', flexDirection: 'column', gap: 12, alignSelf: 'start' }} onSubmit={submit}>
-          <label className="field" htmlFor="evTitle">Назва<input id="evTitle" required placeholder="Лекція, зустріч, спорт…" autoComplete="off" value={v.title} onChange={e => setV({ ...v, title: e.target.value })} /></label>
+        <div className="card cal-main">
+          <div className="cal-bar">
+            <div className="row" style={{ gap: 6 }}>
+              <button className="btn ghost cal-nav" aria-label="Назад" onClick={() => shift(-1)}>‹</button>
+              <button className="btn ghost cal-nav" aria-label="Вперед" onClick={() => shift(1)}>›</button>
+              <button className="btn ghost" style={{ padding: '8px 14px' }} onClick={() => setAnchor(today)}>Сьогодні</button>
+            </div>
+            <h3 className="cal-title">{title}</h3>
+            <div className="seg">
+              {([['day', 'День'], ['week', 'Тиждень'], ['month', 'Місяць']] as const).map(([k, l]) => <button key={k} aria-pressed={mode === k} onClick={() => setMode(k)}>{l}</button>)}
+            </div>
+          </div>
+
+          {mode === 'month' ? (
+            <div className="cal-month">
+              {DN.map(d => <div key={d} className="cal-dn">{d}</div>)}
+              {monthDays.map(d => {
+                const k = ymd(d), list = eventsOn(k), out = d.getMonth() !== at.getMonth();
+                return (
+                  <button key={k} className={`cal-cell${out ? ' out' : ''}${k === today ? ' today' : ''}`} onClick={() => { setAnchor(k); setMode(window.innerWidth < 640 ? 'day' : 'week'); pick(k); }}>
+                    <span className="n num">{d.getDate()}</span>
+                    {list.slice(0, 3).map(e => <span key={e.id} className={evClass(e)} title={evTitle(e)}>{!e.allDay && <b className="num">{e.s}</b>}{e.title}</span>)}
+                    {list.length > 3 && <span className="more">+{list.length - 3} ще</span>}
+                    {list.length > 0 && <span className="dots">{list.slice(0, 4).map(e => <i key={e.id} className={e.ext ? 'ext' : e.c} />)}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="cal-scroll">
+              <div className="cal-week" style={{ gridTemplateColumns: `48px repeat(${days.length}, minmax(${mode === 'day' ? 0 : 92}px, 1fr))` }}>
+                <div className="cal-corner" />
+                {days.map(d => { const dt = new Date(d + 'T00:00'); return <button key={d} className={`cal-head${d === today ? ' today' : ''}`} onClick={() => { setAnchor(d); setMode('day'); }}><small>{DN[weekdayIdx(dt)]}</small><b className="num">{dt.getDate()}</b></button>; })}
+                {anyAllDay && <>
+                  <div className="cal-hl">весь день</div>
+                  {days.map(d => <div key={d} className="cal-allday">{evs[d].filter(e => e.allDay).map(e => <span key={e.id} className={evClass(e)} title={evTitle(e)}>{e.title}</span>)}</div>)}
+                </>}
+                <div className="cal-hours">{hours.map(h => <div key={h} style={{ height: HOUR }}><span className="num">{pad2(h)}:00</span></div>)}</div>
+                {days.map(d => (
+                  <div key={d} className={`cal-col${d === today ? ' today' : ''}`} style={{ height: hours.length * HOUR }}>
+                    {hours.map(h => <button key={h} className="cal-slot" style={{ top: (h - h0) * HOUR, height: HOUR }} aria-label={`Додати подію ${d} о ${pad2(h)}:00`} onClick={() => pick(d, h)} />)}
+                    {lanes(evs[d].filter(e => !e.allDay)).map(({ e, lane, of }) => {
+                      const s0 = toMin(e.s), e0 = Math.max(toMin(e.e), s0 + 20);
+                      return (
+                        <div key={e.id} className={evClass(e)} title={evTitle(e)}
+                          style={{ top: (s0 / 60 - h0) * HOUR, height: Math.max(20, ((e0 - s0) / 60) * HOUR - 2), left: `calc(${(lane / of) * 100}% + 2px)`, width: `calc(${100 / of}% - 4px)` }}>
+                          <b>{e.title}</b><small className="num">{e.s}–{e.e}{e.location ? ` · ${e.location}` : ''}</small>{delBtn(e)}
+                        </div>
+                      );
+                    })}
+                    {d === today && nowMin >= h0 * 60 && nowMin <= h1 * 60 && <div className="cal-now" style={{ top: (nowMin / 60 - h0) * HOUR }} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {mode !== 'month' && days.every(d => !evs[d].length) && <p className="muted" style={{ margin: '12px 0 0', fontSize: 13 }}>{mode === 'day' ? 'Цього дня подій немає.' : 'Цього тижня подій немає.'} Натисни на годину в календарі, щоб додати.</p>}
+        </div>
+
+        <form className="card cal-side" style={{ display: 'flex', flexDirection: 'column', gap: 12, alignSelf: 'start' }} onSubmit={submit}>
+          <h3 style={{ margin: 0, fontSize: 16 }}>Нова подія</h3>
+          <label className="field" htmlFor="evTitle">Назва<input ref={titleRef} id="evTitle" required placeholder="Лекція, зустріч, спорт…" autoComplete="off" value={v.title} onChange={e => setV({ ...v, title: e.target.value })} /></label>
           <label className="field" htmlFor="evDate">Дата<input type="date" id="evDate" required value={v.date} onChange={e => setV({ ...v, date: e.target.value })} /></label>
           <div className="row">
             <label className="field" htmlFor="evStart" style={{ flex: 1 }}>Початок<input type="time" id="evStart" required value={v.s} onChange={e => setV({ ...v, s: e.target.value })} /></label>
@@ -330,30 +451,8 @@ export function Schedule() {
           <label className="field" htmlFor="evColor">Колір<select id="evColor" value={v.c} onChange={e => setV({ ...v, c: e.target.value })}>{COLORS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
           {err && <p className="muted" style={{ margin: 0, fontSize: 12, color: 'var(--m1)' }}>{err}</p>}
           <button className="btn" style={{ alignSelf: 'flex-start' }}>Додати подію</button>
-          <p className="help">Події з підключених календарів позначені «Календар». Їх змінюють у самому календарі, тут вони лише для перегляду.</p>
+          <p className="help">Події з підключених календарів показані бузковим. Їх змінюють у самому календарі, тут вони лише для перегляду. Свою подію можна видалити хрестиком.</p>
         </form>
-        <div className="card s7">
-          <div className="list">
-            {days.map((d, di) => {
-              const evs = eventsOn(d); if (!evs.length) return null;
-              const dt = new Date(d + 'T00:00');
-              return (
-                <div key={d}>
-                  <div className="muted" style={{ fontSize: 12, margin: `${di ? 16 : 0}px 0 4px` }}>{d === TK() ? 'Сьогодні' : WD[dt.getDay()]}, {dt.getDate()} {MON[dt.getMonth()]}</div>
-                  {evs.map(e => (
-                    <div className="item" key={e.id}>
-                      <span className={`sw ${e.ext ? 'c4' : e.c}`} style={e.ext ? { background: 'var(--cal)' } : undefined} />
-                      <span className="num muted" style={{ fontSize: 12, minWidth: 82 }}>{e.allDay ? 'Весь день' : `${e.s}–${e.e}`}</span>
-                      <span className="t">{e.title}{e.location && <span className="muted"> · {e.location}</span>}</span>
-                      {e.ext ? <span className="pillst cal">Календар</span> : <button className="x" aria-label="Видалити подію" onClick={() => A.delEvent(e.localId!)}><Icon n="x" /></button>}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-            {days.every(d => !eventsOn(d).length) && <p className="muted">На найближчі два тижні подій немає.</p>}
-          </div>
-        </div>
       </div>
     </section>
   );
