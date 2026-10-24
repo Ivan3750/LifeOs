@@ -125,7 +125,13 @@ function FreeTimeCard() {
     <div className="card s7">
       <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з вільних від календаря годин ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {S.dayStart}–{S.dayEnd}</button></div>
       <div className="bigstat"><span className="v num">{hrs(t.worked)}<small>/</small>{hrs(t.free)}<small>год</small></span><span className={`delta ${pct >= 60 ? 'up' : 'dn'}`}>{pct}%</span></div>
-      <div className="muted" style={{ fontSize: 12 }}>Сьогодні вільно з {hhmm(new Date(t.start))} до {hhmm(new Date(t.end))}{S.health[k]?.wake ? ' (від часу, коли прокинувся)' : ''}, без подій з календаря</div>
+      <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
+        День {hhmm(new Date(t.start))}–{hhmm(new Date(t.fullEnd))}{S.health[k]?.wake ? ' (від часу, коли прокинувся)' : ''}.{' '}
+        {t.blockers.length
+          ? <>Події забирають {hrs(t.busyDay)} год: {t.blockers.map(b => `${b.title} ${b.s}–${b.e}`).join(', ')}.</>
+          : 'Подій у календарі на цей час немає.'}
+        {t.windows.length > 0 && <> Вільні вікна: {t.windows.map(([a, b]) => `${hhmm(new Date(a))}–${hhmm(new Date(b))}`).join(', ')}.</>}
+      </div>
       <div className="freeweek">
         {week.map(w => {
           const dt = new Date(w.d + 'T00:00');

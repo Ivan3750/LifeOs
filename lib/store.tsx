@@ -330,8 +330,12 @@ function useStoreValue(dbOn: boolean) {
         // all-day events end on the (exclusive) next day
         const d0 = x.start.slice(0, 10), d1 = x.end.slice(0, 10);
         if (date >= d0 && date < d1) theirs.push({ id: 'x' + x.id + date, date, s: '00:00', e: '23:59', title: x.title, c: 'c4', ext: true, allDay: true, location: x.location });
-      } else if (ymd(st) === date) {
-        theirs.push({ id: 'x' + x.id, date, s: hhmm(st), e: ymd(en) === date ? hhmm(en) : '23:59', title: x.title, c: 'c4', ext: true, location: x.location });
+      } else {
+        // timed events also count on the following days they run into (night shifts, trips)
+        const d0 = new Date(date + 'T00:00'), d1 = addD(d0, 1);
+        if (st < d1 && en > d0) {
+          theirs.push({ id: 'x' + x.id + date, date, s: st > d0 ? hhmm(st) : '00:00', e: en < d1 ? hhmm(en) : '23:59', title: x.title, c: 'c4', ext: true, location: x.location });
+        }
       }
     }
     return [...mine, ...theirs].sort((a, b) => Number(!a.allDay) - Number(!b.allDay) || a.s.localeCompare(b.s));

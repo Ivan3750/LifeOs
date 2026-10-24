@@ -26,22 +26,34 @@ export function wakingWindow(S: State, k: string, now = Date.now()) {
   return { start, end: Math.min(end, Math.max(start, now)), fullEnd: end };
 }
 
-/** Free minutes of a day (waking window minus calendar events) and focus minutes in that time. */
+/** Free minutes of a day (waking window minus calendar events) and focus minutes in that time.
+    Also returns the free windows and the events that took time out of the waking day. */
 export function freeTime(S: State, k: string, events: UiEvent[], sessions = S.sessions, now = Date.now()) {
   const { start, end, fullEnd } = wakingWindow(S, k, now);
   const d0 = new Date(k + 'T00:00').getTime();
-  const busy = events.filter(e => !e.allDay).map(e => [d0 + toMin(e.s) * 6e4, d0 + toMin(e.e) * 6e4] as [number, number]).sort((a, b) => a[0] - b[0]);
-  const freeBetween = (a: number, b: number) => {
-    let free = Math.max(0, b - a), cur = a;
-    for (const [s0, s1] of busy) { const x = Math.max(s0, cur), y = Math.min(s1, b); if (y > x) { free -= y - x; cur = y; } }
-    return free / 6e4;
+  const timed = events.filter(e => !e.allDay).map(e => ({ e, a: d0 + toMin(e.s) * 6e4, b: d0 + toMin(e.e) * 6e4 })).filter(x => x.b > x.a).sort((x, y) => x.a - y.a);
+  // overlapping events are merged so shared time is subtracted once
+  const merged: [number, number][] = [];
+  for (const { a, b } of timed) { const last = merged[merged.length - 1]; if (last && a <= last[1]) last[1] = Math.max(last[1], b); else merged.push([a, b]); }
+  const windowsBetween = (a: number, b: number) => {
+    const out: [number, number][] = [];
+    let cur = a;
+    for (const [s0, s1] of merged) { if (s1 <= cur) continue; if (s0 >= b) break; if (s0 > cur) out.push([cur, s0]); cur = Math.max(cur, s1); }
+    if (b > cur) out.push([cur, b]);
+    return out;
   };
+  const mins = (w: [number, number][]) => w.reduce((t, [a, b]) => t + (b - a), 0) / 6e4;
+  const windows = windowsBetween(start, fullEnd);
+  const blockers = timed
+    .map(({ e, a, b }) => ({ title: e.title, s: e.s, e: e.e, ext: !!e.ext, min: Math.max(0, Math.min(b, fullEnd) - Math.max(a, start)) / 6e4 }))
+    .filter(x => x.min > 0);
   const daySessions = sessions.filter(s => s.t >= d0 && s.t < d0 + DAY);
   return {
-    free: freeBetween(start, end),             // free so far (whole day for past days)
-    freeDay: freeBetween(start, fullEnd),      // free in the whole planned day
+    free: mins(windowsBetween(start, end)),    // free so far (whole day for past days)
+    freeDay: mins(windows),                    // free in the whole planned day
+    busyDay: (fullEnd - start) / 6e4 - mins(windows),
     worked: daySessions.reduce((a, s) => a + s.m, 0),
-    start, end,
+    start, end, fullEnd, windows, blockers,
   };
 }
 
