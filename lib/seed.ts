@@ -111,6 +111,11 @@ export function makeState(demo: boolean): State {
   return {
     v: 1, name: 'Друже', goal: 20, focusMin: 25, breakMin: 5, demo, notes: '', theme: 'system',
     noteList, moods, dayStart: '08:00', dayEnd: '22:00',
+    meals: [
+      { key: 'breakfast', label: 'Сніданок', s: '08:00', e: '08:30', on: true },
+      { key: 'lunch', label: 'Обід', s: '12:30', e: '13:15', on: true },
+      { key: 'dinner', label: 'Вечеря', s: '18:30', e: '19:15', on: true },
+    ],
     sessions,
     tasks: demo
       ? [

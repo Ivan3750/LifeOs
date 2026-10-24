@@ -514,3 +514,71 @@ main{min-width:0;display:flex;flex-direction:column;gap:18px}
 .fw .trk .work{background:var(--accent)}
 .fw b{text-align:right;color:var(--ink);font-weight:600}
 @media (max-width:600px){.score{grid-template-columns:96px minmax(0,1fr);gap:12px}.scorebig{border-width:6px}.scorebig b{font-size:30px}}
+
+/* home calendar: week strip + day timeline */
+.sched{min-height:0}
+.sched .hd{margin-bottom:10px}
+.sched .hd b{font-size:15px}
+.sched .rnd.add{background:var(--accent);border-color:var(--accent);color:#fff}
+.sched .rnd.add svg{width:15px;height:15px}
+.wkstrip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-bottom:10px;position:relative;z-index:1}
+.wkstrip button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0 5px;border-radius:12px;color:var(--night-muted);font-size:10px}
+.wkstrip button b{font-size:14px;color:var(--on-night);font-weight:600}
+.wkstrip button i{display:flex;gap:2px;height:4px}
+.wkstrip button em{width:4px;height:4px;border-radius:50%;background:#C9B8FF}
+.wkstrip button.today b{color:var(--accent-2)}
+.wkstrip button[aria-pressed="true"]{background:rgba(255,255,255,.1)}
+.wkstrip button:hover{background:rgba(255,255,255,.06)}
+.dv{position:relative;z-index:1;height:230px;overflow-y:auto;overscroll-behavior:contain;border-radius:12px;scrollbar-width:thin}
+.dv-in{position:relative;cursor:copy}
+.dv-h{position:absolute;left:0;right:0;border-top:1px solid rgba(255,255,255,.07);pointer-events:none}
+.dv-h span{position:absolute;top:-7px;left:0;font-size:10px;font-family:var(--f-num);color:var(--night-muted);background:var(--night);padding-right:4px}
+.dv-meal{position:absolute;left:46px;right:4px;border:1px dashed rgba(255,255,255,.22);border-radius:8px;font-size:10px;color:var(--night-muted);padding:2px 7px;pointer-events:none;overflow:hidden;white-space:nowrap}
+.dv-ev{position:absolute;border-radius:8px;padding:3px 7px;text-align:left;overflow:hidden;color:#151311;background:#fff;font-size:11px;line-height:1.2;display:flex;flex-direction:column;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25)}
+.dv-ev b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-ev small{font-size:9.5px;opacity:.75}
+.dv-ev.c1{background:var(--accent);color:#fff}.dv-ev.c3{background:#5FC994}.dv-ev.c4,.dv-ev.ext{background:#C9B8FF}
+.dv-ev[aria-pressed="true"]{outline:2px solid #fff;outline-offset:1px}
+.dv-now{position:absolute;left:40px;right:0;height:2px;background:var(--accent);pointer-events:none}
+.dv-now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.dv-foot,.dv-pop{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:var(--night-muted);position:relative;z-index:1}
+.dv-foot span{margin-right:auto}
+.dv-foot button{text-decoration:underline;color:var(--on-night)}
+.dv-pop{background:rgba(255,255,255,.08);border-radius:12px;padding:8px 8px 8px 12px;color:var(--on-night)}
+.dv-pop>div{flex:1}
+.dv-pop b{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-pop small{color:var(--night-muted)}
+
+/* day score history as buttons */
+.scorehist button{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;font-size:10px;color:var(--muted);min-width:0;border-radius:10px;padding:2px 0}
+.scorehist button[aria-pressed="true"]{background:var(--bg)}
+.scorehist button[aria-pressed="true"] span{color:var(--ink);font-weight:600}
+.scorehist button i{width:60%;max-width:22px;border-radius:5px;display:block}
+.scorehist button b{font-size:11px;color:var(--ink)}
+.scorehist button.today span{color:var(--accent);font-weight:600}
+.scorehist{height:92px}
+
+/* mood */
+.tagin{font:inherit;font-size:12px;padding:6px 11px;border-radius:99px;background:transparent;border:1px dashed var(--line);color:var(--ink);width:110px;outline:none}
+.tagin:focus{border-color:var(--accent)}
+.moodcal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.moodcal>span{font-size:11px;color:var(--muted);text-align:center}
+.moodcal button{aspect-ratio:1;border-radius:10px;background:var(--bg);font-size:12px;font-weight:600;color:var(--muted);font-family:var(--f-num);border:2px solid transparent}
+.moodcal button.today{border-color:var(--accent)}
+.moodcal button[aria-pressed="true"]{outline:2px solid var(--ink);outline-offset:1px}
+.moodcal button:disabled{opacity:.35;cursor:default}
+.moodlegend{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;font-size:11px;color:var(--muted)}
+.moodlegend span{display:flex;align-items:center;gap:5px}
+.moodlegend i{width:9px;height:9px;border-radius:3px}
+.moodtags{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:16px}
+.tags.small span.up{background:var(--good-soft);color:var(--good);border-color:transparent}
+.tags.small span.dn{background:var(--accent-soft);color:var(--m1);border-color:transparent}
+
+/* meals in settings */
+.meals{display:flex;flex-direction:column;gap:8px}
+.mealrow{display:grid;grid-template-columns:150px auto auto auto;gap:8px;align-items:center;justify-content:start}
+.mealrow input[type="time"]{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;color:inherit}
+.mealrow input:disabled{opacity:.45}
+.mealon{display:flex;align-items:center;gap:8px;font-size:14px}
+.mealon input{accent-color:var(--accent);width:18px;height:18px}
+@media (max-width:520px){.mealrow{grid-template-columns:1fr auto auto auto}.mealrow input[type="time"]{padding:8px 6px;font-size:16px}}

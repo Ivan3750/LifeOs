@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { liveSessions, useStore } from '@/lib/store';
 import { dayScore, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score';
-import { addD, DAY, DN, hhmm, MON, MONTHN, money, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { FocusArea, Rhythm, Ring } from '../charts';
-import { CatBars, dayMinutes, habStreak, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
+import { CatBars, dayMinutes, habStreak, lanes, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
 
 const QUOTES: [string, string, string][] = [['Маленькі кроки', 'щодня', 'дають великий результат.'], ['Фокус —', 'це вміння', 'сказати «ні» зайвому.'], ['Краще', 'зроблено,', 'ніж ідеально.'], ['Сьогоднішня', 'робота —', 'завтрашня свобода.']];
 
@@ -48,38 +48,91 @@ function Hero() {
   );
 }
 
+const DV_HOUR = 38; // px per hour in the home day view
+
+/** Home calendar: week strip, a scrollable day timeline with meals, and tap-to-add. */
 export function SchedCard() {
-  const { eventsOn, now, go } = useStore();
-  const [day, setDay] = useState(() => sod(new Date()));
-  const isToday = ymd(day) === TK();
-  const H0 = 8 * 60, H1 = 20 * 60, span = H1 - H0;
-  const all = eventsOn(ymd(day)), allDay = all.filter(e => e.allDay), timed = all.filter(e => !e.allDay);
-  const lanes: number[] = [];
-  const n = new Date(now), m = n.getHours() * 60 + n.getMinutes();
+  const { S, A, eventsOn, now, setSheet, go } = useStore();
+  const [day, setDay] = useState(TK);
+  const [open, setOpen] = useState<string | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const dt = new Date(day + 'T00:00'), today = TK(), isToday = day === today;
+  const week = [...Array(7)].map((_, i) => ymd(addD(wStart(dt), i)));
+  const all = eventsOn(day), allDay = all.filter(e => e.allDay), timed = all.filter(e => !e.allDay);
+  const meals = S.meals.filter(m => m.on);
+  const h0 = Math.min(Math.floor(toMin(S.dayStart) / 60), ...timed.map(e => Math.floor(toMin(e.s) / 60)));
+  const h1 = Math.max(Math.ceil(toMin(S.dayEnd) / 60), ...timed.map(e => Math.ceil(toMin(e.e) / 60)));
+  const y = (min: number) => ((min - h0 * 60) / 60) * DV_HOUR;
+  const n = new Date(now), nowMin = n.getHours() * 60 + n.getMinutes();
+  const ft = freeTime(S, day, all, S.sessions, now);
+  const sel = all.find(e => e.id === open);
+
+  // open each day at "now" (today) or at its first event
+  useEffect(() => {
+    const el = scroller.current; if (!el) return;
+    const first = timed[0] ? toMin(timed[0].s) : toMin(S.dayStart);
+    el.scrollTop = Math.max(0, y(isToday ? nowMin : first) - 50);
+  }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const addAt = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const h = Math.min(23, Math.max(0, Math.floor(h0 + (e.clientY - r.top) / DV_HOUR)));
+    setSheet({ kind: 'form', key: 'event', init: { date: day, s: `${pad2(h)}:00`, e: h < 23 ? `${pad2(h + 1)}:00` : '23:59' } });
+  };
+  const goDay = (k: string) => { setDay(k); setOpen(null); };
+
   return (
     <div className="sched s4 sched-wrap">
       <div className="hd">
-        <b>{WD[day.getDay()].slice(0, 3)}, {day.getDate()} {MON[day.getMonth()]}</b>
-        <button className="chip" style={{ opacity: isToday ? 1 : 0.7 }} onClick={() => setDay(sod(new Date()))}>Сьогодні</button>
-        <button className="rnd" aria-label="Попередній день" onClick={() => setDay(d => addD(d, -1))}><Icon n="left" /></button>
-        <button className="rnd" aria-label="Наступний день" onClick={() => setDay(d => addD(d, 1))}><Icon n="right" /></button>
+        <b>{isToday ? 'Сьогодні' : WD[dt.getDay()]}, {dt.getDate()} {MON[dt.getMonth()]}</b>
+        {!isToday && <button className="chip" onClick={() => goDay(today)}>Сьогодні</button>}
+        <button className="rnd" aria-label="Попередній день" onClick={() => goDay(ymd(addD(dt, -1)))}><Icon n="left" /></button>
+        <button className="rnd" aria-label="Наступний день" onClick={() => goDay(ymd(addD(dt, 1)))}><Icon n="right" /></button>
+        <button className="rnd add" aria-label="Додати подію" onClick={() => setSheet({ kind: 'form', key: 'event', init: { date: day } })}><Icon n="plus" /></button>
+      </div>
+      <div className="wkstrip">
+        {week.map((k, i) => {
+          const c = eventsOn(k).length, d = new Date(k + 'T00:00');
+          return (
+            <button key={k} aria-pressed={k === day} className={k === today ? 'today' : ''} onClick={() => goDay(k)} aria-label={`${WD[d.getDay()]}, ${d.getDate()} ${MON[d.getMonth()]}: ${c} ${plural(c, 'подія', 'події', 'подій')}`}>
+              <span>{DN[i]}</span><b className="num">{d.getDate()}</b><i>{[...Array(Math.min(3, c))].map((_, j) => <em key={j} />)}</i>
+            </button>
+          );
+        })}
       </div>
       {allDay.length > 0 && <div className="allday">{allDay.map(e => <span key={e.id} title={e.title}>{e.title}</span>)}</div>}
-      <div className="tlwrap" style={{ flex: 1, display: 'flex', overflowX: 'auto', position: 'relative', zIndex: 1 }}>
-        <div className="tl">
-          <div className="hours">{['08', '10', '12', '14', '16', '18', '20'].map(h => <span key={h}>{h}:00</span>)}</div>
-          {timed.map(e => {
-            const s = Math.max(toMin(e.s), H0), en = Math.min(Math.max(toMin(e.e), s + 30), H1);
-            if (en <= H0 || s >= H1) return null;
-            let lane = lanes.findIndex(x => x <= s); if (lane < 0) { lane = lanes.length; lanes.push(0); } lanes[lane] = en;
-            const lp = ((s - H0) / span) * 100, wp = Math.max(((en - s) / span) * 100, 17);
-            return <div key={e.id} className={`ev ${e.ext ? 'ext' : e.c}`} title={e.location ? `${e.title} · ${e.location}` : e.title} style={{ left: Math.min(lp, 83) + '%', width: wp + '%', top: 24 + (lane % 3) * 42 }}>{e.title}<small>{e.s}–{e.e}</small></div>;
+      <div className="dv" ref={scroller}>
+        <div className="dv-in" style={{ height: (h1 - h0) * DV_HOUR }} onClick={addAt} title="Натисни на вільний час, щоб додати подію">
+          {[...Array(h1 - h0 + 1)].map((_, i) => <div key={i} className="dv-h" style={{ top: i * DV_HOUR }}><span>{pad2((h0 + i) % 24)}:00</span></div>)}
+          {meals.map(m => { const a = y(toMin(m.s)), b = y(toMin(m.e)); return b > a && <div key={m.key} className="dv-meal" style={{ top: a, height: Math.max(12, b - a) }}>{m.label}</div>; })}
+          {lanes(timed).map(({ e, lane, of }) => {
+            const s0 = toMin(e.s), e0 = Math.max(toMin(e.e), s0 + 20);
+            return (
+              <button key={e.id} className={`dv-ev ${e.ext ? 'ext' : e.c}`} aria-pressed={open === e.id} onClick={() => setOpen(open === e.id ? null : e.id)}
+                style={{ top: y(s0) + 1, height: Math.max(20, y(e0) - y(s0) - 2), left: `calc(46px + (100% - 50px) * ${lane / of})`, width: `calc((100% - 50px) / ${of} - 3px)` }}>
+                <b>{e.title}</b><small className="num">{e.s}–{e.e}</small>
+              </button>
+            );
           })}
-          {!all.length && <div className="empty">Подій немає. <button style={{ textDecoration: 'underline', color: 'inherit' }} onClick={() => go('schedule')}>Додати</button></div>}
-          {isToday && m >= H0 && m <= H1 && <div className="now" style={{ left: ((m - H0) / span) * 100 + '%' }} />}
+          {isToday && nowMin >= h0 * 60 && nowMin <= h1 * 60 && <div className="dv-now" style={{ top: y(nowMin) }} />}
         </div>
       </div>
-      <svg className="ridge" viewBox="0 0 400 70" preserveAspectRatio="none"><path d="M0 50 L60 30 L110 46 L170 18 L240 44 L300 26 L360 40 L400 30 L400 70 L0 70Z" fill="var(--night-2)" /></svg>
+      {sel ? (
+        <div className="dv-pop">
+          <div style={{ minWidth: 0 }}>
+            <b>{sel.title}</b>
+            <small>{sel.allDay ? 'Весь день' : `${sel.s}–${sel.e}`}{sel.location ? ` · ${sel.location}` : ''} · {sel.ext ? 'з календаря' : 'моя подія'}</small>
+          </div>
+          {!sel.ext && <button className="chip" onClick={() => { A.delEvent(sel.localId!); setOpen(null); }}>Видалити</button>}
+          <button className="rnd" aria-label="Закрити" onClick={() => setOpen(null)}><Icon n="x" /></button>
+        </div>
+      ) : (
+        <div className="dv-foot">
+          <span>{timed.length ? `${timed.length} ${plural(timed.length, 'подія', 'події', 'подій')}` : 'Подій немає'} · вільно {hrs(ft.freeDay)} год</span>
+          <button onClick={() => go('schedule')}>Весь розклад</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -119,17 +172,18 @@ function FreeTimeCard() {
   const live = liveSessions(S, now), k = TK();
   const t = freeTime(S, k, eventsOn(k), live, now);
   const pct = t.free ? Math.round((t.worked / t.free) * 100) : 0;
+  const evBlock = t.blockers.filter(b => !b.meal), mealBlock = t.blockers.filter(b => b.meal);
   const week = lastDays(7).map(d => ({ d, ...freeTime(S, d, eventsOn(d), live, now) }));
   const maxFree = Math.max(60, ...week.map(w => w.free));
   return (
     <div className="card s7">
-      <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з вільних від календаря годин ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {S.dayStart}–{S.dayEnd}</button></div>
+      <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з годин, вільних від подій і їжі, ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {S.dayStart}–{S.dayEnd}</button></div>
       <div className="bigstat"><span className="v num">{hrs(t.worked)}<small>/</small>{hrs(t.free)}<small>год</small></span><span className={`delta ${pct >= 60 ? 'up' : 'dn'}`}>{pct}%</span></div>
       <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
         День {hhmm(new Date(t.start))}–{hhmm(new Date(t.fullEnd))}{S.health[k]?.wake ? ' (від часу, коли прокинувся)' : ''}.{' '}
-        {t.blockers.length
-          ? <>Події забирають {hrs(t.busyDay)} год: {t.blockers.map(b => `${b.title} ${b.s}–${b.e}`).join(', ')}.</>
-          : 'Подій у календарі на цей час немає.'}
+        {t.blockers.length > 0 && <>Події та їжа забирають {hrs(t.busyDay)} год.{' '}</>}
+        {evBlock.length ? <>Події: {evBlock.map(b => `${b.title} ${b.s}–${b.e}`).join(', ')}. </> : 'Подій у календарі на цей час немає. '}
+        {mealBlock.length > 0 && <>Їжа: {mealBlock.map(b => `${b.title.toLowerCase()} ${b.s}–${b.e}`).join(', ')}.</>}
         {t.windows.length > 0 && <> Вільні вікна: {t.windows.map(([a, b]) => `${hhmm(new Date(a))}–${hhmm(new Date(b))}`).join(', ')}.</>}
       </div>
       <div className="freeweek">
@@ -148,17 +202,28 @@ function FreeTimeCard() {
   );
 }
 
-/** Day score 0–100 with what it is made of. */
+/** Day score 0–100 with what it is made of. Arrows and the bars below switch to earlier days. */
 function ScoreCard() {
   const { S, eventsOn, now, go } = useStore();
-  const live = liveSessions(S, now), k = TK();
+  const live = liveSessions(S, now), today = TK();
+  const [k, setK] = useState(today);
+  const dt = new Date(k + 'T00:00'), isToday = k === today;
   const sc = dayScore(S, k, eventsOn(k), live, now);
-  const hist = lastDays(7).map(d => ({ d, v: d === k ? sc.total : dayScore(S, d, eventsOn(d), live, now).total }));
+  // 7 bars: the picked day and the days around it, never past today
+  const endK = ymd(addD(dt, 3)) > today ? today : ymd(addD(dt, 3));
+  const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : dayScore(S, d, eventsOn(d), live, now).total }));
   const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
   const to: Record<string, string> = { focus: 'focus', sleep: 'health', habits: 'habits', mood: 'health', money: 'money' };
   return (
     <div className="card s5">
-      <div className="ch"><Icon n="trophy" className="ic" /><div><h3>Оцінка дня</h3><p>100 — усе супер, 0 — дуже погано</p></div></div>
+      <div className="ch">
+        <Icon n="trophy" className="ic" />
+        <div><h3>Оцінка дня</h3><p>{isToday ? 'Сьогодні, рахується наживо' : `${WD[dt.getDay()]}, ${dt.getDate()} ${MON[dt.getMonth()]}`}</p></div>
+        <div className="row" style={{ marginLeft: 'auto', gap: 6, flexWrap: 'nowrap' }}>
+          <button className="btn ghost cal-nav" aria-label="Попередній день" onClick={() => setK(ymd(addD(dt, -1)))}>‹</button>
+          <button className="btn ghost cal-nav" aria-label="Наступний день" disabled={isToday} onClick={() => setK(ymd(addD(dt, 1)))}>›</button>
+        </div>
+      </div>
       <div className="score">
         <div className="scorebig" style={{ ['--sc' as string]: scoreColor(sc.total) }}>
           <b className="num">{sc.total}</b><small>/100</small>
@@ -174,9 +239,17 @@ function ScoreCard() {
           ))}
         </div>
       </div>
-      {weak && weak.got < weak.max && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>Найбільше балів можна додати: <b style={{ color: 'var(--ink)' }}>{weak.label.toLowerCase()}</b> ({weak.hint})</p>}
+      {!sc.parts.length && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>За цей день нічого не записано.</p>}
+      {weak && weak.got < weak.max && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>{isToday ? 'Найбільше балів можна додати' : 'Найбільше балів втрачено'}: <b style={{ color: 'var(--ink)' }}>{weak.label.toLowerCase()}</b> ({weak.hint})</p>}
       <div className="scorehist">
-        {hist.map(h => { const dt = new Date(h.d + 'T00:00'); return <div key={h.d} className={h.d === k ? 'today' : ''} title={`${dt.getDate()} ${MON[dt.getMonth()]}: ${h.v}/100`}><i style={{ height: Math.max(3, h.v * 0.44), background: scoreColor(h.v) }} /><span>{DN[weekdayIdx(dt)]}</span><b className="num">{h.v}</b></div>; })}
+        {hist.map(h => {
+          const d = new Date(h.d + 'T00:00');
+          return (
+            <button key={h.d} className={`${h.d === today ? 'today' : ''}`} aria-pressed={h.d === k} onClick={() => setK(h.d)} title={`${d.getDate()} ${MON[d.getMonth()]}: ${h.v}/100`} aria-label={`Оцінка за ${d.getDate()} ${MON[d.getMonth()]}: ${h.v}`}>
+              <i style={{ height: Math.max(3, h.v * 0.44), background: scoreColor(h.v) }} /><span>{DN[weekdayIdx(d)]} {d.getDate()}</span><b className="num">{h.v}</b>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -199,7 +272,7 @@ export function Home() {
         <SchedCard />
 
         <div className="card s12">
-          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Вода, сон, настрій, рух і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
+          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
           <LifeTiles full={false} />
         </div>
 

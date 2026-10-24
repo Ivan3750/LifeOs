@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
-import type { State, Tx } from '@/lib/types';
-import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, wStart, ymd, addD } from '@/lib/util';
+import type { State, Tx, UiEvent } from '@/lib/types';
+import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
 import { dayMood, moodColor, moodsOn, moodWord } from '@/lib/score';
 
 export const today = () => TK();
@@ -11,7 +11,7 @@ export const hdayOf = (S: State, k = TK()) => S.health[k] || { water: 0, sleep: 
 export const monthTx = (S: State) => { const mk = TK().slice(0, 7); return S.money.tx.filter(t => t.date.slice(0, 7) === mk); };
 export const sumT = (a: Tx[], type: 'in' | 'out') => a.filter(t => t.type === type).reduce((x, t) => x + t.amt, 0);
 export const sumA = (a: { amt: number }[]) => a.reduce((x, i) => x + (+i.amt || 0), 0);
-export const dayMinutes = (S: State, d: Date) => { const a = sod(d).getTime(); return S.sessions.filter(s => s.t >= a && s.t < a + DAY).reduce((x, s) => x + s.m, 0); };
+export const dayMinutes = (S: State, d: Date) => { const a = sod(d).getTime(), b = addD(sod(d), 1).getTime(); return S.sessions.filter(s => s.t >= a && s.t < b).reduce((x, s) => x + s.m, 0); };
 export const weekMinutes = (S: State, off = 0) => {
   const ws = addD(wStart(), off * 7).getTime(), arr = [0, 0, 0, 0, 0, 0, 0];
   S.sessions.forEach(s => { const i = Math.floor((sod(s.t).getTime() - ws) / DAY); if (i >= 0 && i < 7) arr[i] += s.m; });
@@ -113,4 +113,21 @@ export function DelBtn({ onDelete, label }: { onDelete: () => void; label: strin
       <span className="icn" dangerouslySetInnerHTML={{ __html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>' }} />
     </button>
   );
+}
+
+/** Puts overlapping events side by side: each gets a lane and the number of lanes in its group. */
+export function lanes(evs: UiEvent[]) {
+  const out: { e: UiEvent; lane: number; of: number }[] = [];
+  let group: typeof out = [], ends: number[] = [], groupEnd = -1;
+  const close = () => { for (const g of group) g.of = ends.length; group = []; ends = []; };
+  for (const e of [...evs].sort((a, b) => toMin(a.s) - toMin(b.s) || toMin(b.e) - toMin(a.e))) {
+    const s0 = toMin(e.s), e0 = Math.max(toMin(e.e), s0 + 15);
+    if (s0 >= groupEnd) close();
+    let lane = ends.findIndex(x => x <= s0);
+    if (lane < 0) { lane = ends.length; ends.push(e0); } else ends[lane] = e0;
+    groupEnd = Math.max(groupEnd, e0);
+    const item = { e, lane, of: 1 }; group.push(item); out.push(item);
+  }
+  close();
+  return out;
 }

@@ -1,5 +1,5 @@
 import type { State, UiEvent } from './types';
-import { addD, DAY, daysInMonth, sod, toMin, ymd } from './util';
+import { addD, daysInMonth, sod, toMin, ymd } from './util';
 
 export const MOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність', 'Втома', 'Стрес', 'Тривога', 'Сум', 'Злість', 'Нудьга', 'Самотність'];
 export const ENERGY = ['Без сил', 'Мало', 'Нормально', 'Бадьоро', 'Повно енергії'];
@@ -17,21 +17,28 @@ export function dayMood(S: State, k: string) {
   return old * 2;
 }
 
+/** Timestamp of a local clock time on day k. Built from the date itself, so days with a clock change
+    (23 or 25 hours long) still put 08:00 at 08:00. '23:59' and '24:00' style ends are kept as given. */
+const at = (k: string, hm: string) => { const m = toMin(hm); const d = new Date(k + 'T00:00'); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return d.getTime(); };
+
 /** Waking window of a day: from the logged wake time (or dayStart) to dayEnd, with the end cut at "now" for today. */
 export function wakingWindow(S: State, k: string, now = Date.now()) {
-  const d0 = new Date(k + 'T00:00').getTime(), h = S.health[k];
-  const start = d0 + toMin(h?.wake || S.dayStart) * 6e4;
-  let end = d0 + toMin(S.dayEnd) * 6e4;
+  const h = S.health[k];
+  const start = at(k, h?.wake || S.dayStart);
+  let end = at(k, S.dayEnd);
   if (end <= start) end = start;
   return { start, end: Math.min(end, Math.max(start, now)), fullEnd: end };
 }
 
-/** Free minutes of a day (waking window minus calendar events) and focus minutes in that time.
-    Also returns the free windows and the events that took time out of the waking day. */
+/** Free minutes of a day (waking window minus calendar events and meals) and focus minutes in that time.
+    Also returns the free windows and the events and meals that took time out of the waking day. */
 export function freeTime(S: State, k: string, events: UiEvent[], sessions = S.sessions, now = Date.now()) {
   const { start, end, fullEnd } = wakingWindow(S, k, now);
-  const d0 = new Date(k + 'T00:00').getTime();
-  const timed = events.filter(e => !e.allDay).map(e => ({ e, a: d0 + toMin(e.s) * 6e4, b: d0 + toMin(e.e) * 6e4 })).filter(x => x.b > x.a).sort((x, y) => x.a - y.a);
+  const d0 = new Date(k + 'T00:00').getTime(), d1 = addD(new Date(d0), 1).getTime();
+  const timed = [
+    ...events.filter(e => !e.allDay).map(e => ({ title: e.title, s: e.s, e: e.e, ext: !!e.ext, meal: false })),
+    ...(S.meals || []).filter(m => m.on).map(m => ({ title: m.label, s: m.s, e: m.e, ext: false, meal: true })),
+  ].map(e => ({ e, a: at(k, e.s), b: at(k, e.e) })).filter(x => x.b > x.a).sort((x, y) => x.a - y.a);
   // overlapping events are merged so shared time is subtracted once
   const merged: [number, number][] = [];
   for (const { a, b } of timed) { const last = merged[merged.length - 1]; if (last && a <= last[1]) last[1] = Math.max(last[1], b); else merged.push([a, b]); }
@@ -45,9 +52,9 @@ export function freeTime(S: State, k: string, events: UiEvent[], sessions = S.se
   const mins = (w: [number, number][]) => w.reduce((t, [a, b]) => t + (b - a), 0) / 6e4;
   const windows = windowsBetween(start, fullEnd);
   const blockers = timed
-    .map(({ e, a, b }) => ({ title: e.title, s: e.s, e: e.e, ext: !!e.ext, min: Math.max(0, Math.min(b, fullEnd) - Math.max(a, start)) / 6e4 }))
+    .map(({ e, a, b }) => ({ ...e, min: Math.max(0, Math.min(b, fullEnd) - Math.max(a, start)) / 6e4 }))
     .filter(x => x.min > 0);
-  const daySessions = sessions.filter(s => s.t >= d0 && s.t < d0 + DAY);
+  const daySessions = sessions.filter(s => s.t >= d0 && s.t < d1);
   return {
     free: mins(windowsBetween(start, end)),    // free so far (whole day for past days)
     freeDay: mins(windows),                    // free in the whole planned day

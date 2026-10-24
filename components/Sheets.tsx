@@ -93,10 +93,12 @@ export function SheetHost() {
       </>
     );
   } else {
-    const spec = forms(st)[sheet.key];
-    if (!spec) return null;
+    const base = forms(st)[sheet.key];
+    if (!base) return null;
+    const init = sheet.init || {};
+    const spec = { ...base, f: base.f.map(f => (f.k in init ? { ...f, val: init[f.k] } : f)) };
     title = spec.t;
-    body = <FormBody key={sheet.key} spec={spec} close={close} />;
+    body = <FormBody key={sheet.key + JSON.stringify(init)} spec={spec} close={close} />;
   }
   return (
     <div className="sheet" onClick={e => { if (e.target === e.currentTarget) close(); }}>

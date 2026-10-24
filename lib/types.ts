@@ -18,6 +18,8 @@ export type Invoice = { id: number; no: string; client: string; amt: number; iss
 export type Member = { id: number; name: string; role: string; load: number; demo?: 1 };
 /** sid: start time of the session the current focus run is written to (0 when nothing is logged yet). */
 export type Timer = { mode: 'focus' | 'break'; left: number; running: boolean; endAt: number; task: string; sid?: number };
+/** A daily meal that takes time out of the free hours. s/e are 'HH:MM'. */
+export type Meal = { key: 'breakfast' | 'lunch' | 'dinner'; label: string; s: string; e: string; on: boolean };
 export type Mode = 'me' | 'co';
 export type Theme = 'system' | 'light' | 'dark';
 
@@ -28,6 +30,7 @@ export type State = {
   noteList: Note[]; moods: MoodEntry[];
   /** Waking day used to count free hours when no wake/bed time is logged. */
   dayStart: string; dayEnd: string;
+  meals: Meal[];
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;

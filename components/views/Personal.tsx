@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { Note, UiEvent } from '@/lib/types';
+import type { MoodEntry, Note, UiEvent } from '@/lib/types';
 import { dayMood, ENERGY, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { goalStep, liveSessions, useStore } from '@/lib/store';
-import { addD, AREAS, CATS, COLORS, daysInMonth, daysTo, DN, fmt, fmtN, hhmm, hmPlain, MON, MONTHN, money, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { addD, AREAS, DAY, CATS, COLORS, daysInMonth, daysTo, DN, fmt, fmtN, hhmm, hmPlain, MON, MONTHN, money, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Bars, Radar } from '../charts';
-import { avg, CatBars, DelBtn, habStreak, LifeTiles, monthTx, sumT } from '../shared';
+import { avg, CatBars, DelBtn, habStreak, lanes, LifeTiles, monthTx, sumT } from '../shared';
 
 /* ---------------- Focus ---------------- */
 export function Focus() {
@@ -148,16 +148,21 @@ export function Habits() {
 }
 
 /* ---------------- Health ---------------- */
-function MoodForm() {
-  const { A } = useStore();
+/** New mood check-in, or editing an existing one when `edit` is given. */
+function MoodForm({ edit, onDone }: { edit?: MoodEntry | null; onDone?: () => void }) {
+  const { S, A } = useStore();
   const blank = () => ({ date: TK(), time: hhmm(new Date()), v: 7, energy: 3, tags: [] as string[], note: '' });
-  const [m, setM] = useState(blank);
+  const [m, setM] = useState(() => (edit ? { date: ymd(new Date(edit.t)), time: hhmm(new Date(edit.t)), v: edit.v, energy: edit.energy, tags: [...edit.tags], note: edit.note } : blank()));
+  const [custom, setCustom] = useState('');
+  // own tags used before come back as buttons
+  const ownTags = [...new Set(S.moods.flatMap(x => x.tags))].filter(t => !MOOD_TAGS.includes(t));
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    A.addMood({ t: new Date(`${m.date}T${m.time || '12:00'}`).getTime(), v: m.v, energy: m.energy, tags: m.tags, note: m.note });
-    setM(blank());
+    const v = { t: new Date(`${m.date}T${m.time || '12:00'}`).getTime(), v: m.v, energy: m.energy, tags: m.tags, note: m.note };
+    if (edit) { A.updateMood(edit.id, v); onDone?.(); } else { A.addMood(v); setM(blank()); }
   };
   const toggleTag = (t: string) => setM({ ...m, tags: m.tags.includes(t) ? m.tags.filter(x => x !== t) : [...m.tags, t] });
+  const addCustom = () => { const t = custom.trim(); if (t && !m.tags.includes(t)) setM({ ...m, tags: [...m.tags, t] }); setCustom(''); };
   return (
     <form className="moodform" onSubmit={submit}>
       <div className="row">
@@ -178,12 +183,19 @@ function MoodForm() {
       </div>
       <div className="field">
         <span>Що відчуваєш</span>
-        <div className="tags">{MOOD_TAGS.map(t => <button type="button" key={t} aria-pressed={m.tags.includes(t)} onClick={() => toggleTag(t)}>{t}</button>)}</div>
+        <div className="tags">
+          {[...MOOD_TAGS, ...ownTags, ...m.tags.filter(t => !MOOD_TAGS.includes(t) && !ownTags.includes(t))].map(t => <button type="button" key={t} aria-pressed={m.tags.includes(t)} onClick={() => toggleTag(t)}>{t}</button>)}
+          <input className="tagin" value={custom} placeholder="+ свій тег" aria-label="Додати свій тег" onChange={e => setCustom(e.target.value)} onBlur={addCustom}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }} />
+        </div>
       </div>
       <label className="field" htmlFor="mdNote">Що сталося, про що думаєш
         <textarea id="mdNote" rows={3} placeholder="Необовʼязково: що вплинуло на настрій" value={m.note} onChange={e => setM({ ...m, note: e.target.value })} />
       </label>
-      <button className="btn acc" style={{ alignSelf: 'flex-start' }}>Записати настрій</button>
+      <div className="row">
+        <button className="btn acc">{edit ? 'Зберегти зміни' : 'Записати настрій'}</button>
+        {edit && <button type="button" className="btn ghost" onClick={onDone}>Скасувати</button>}
+      </div>
     </form>
   );
 }
@@ -202,9 +214,8 @@ function MoodDay({ k }: { k: string }) {
   );
 }
 
-function MoodLog() {
+function MoodLog({ k, setK, onEdit }: { k: string; setK: (k: string) => void; onEdit: (m: MoodEntry) => void }) {
   const { S, A } = useStore();
-  const [k, setK] = useState(TK());
   const list = [...moodsOn(S, k)].reverse(), dt = new Date(k + 'T00:00'), avgV = dayMood(S, k);
   return (
     <>
@@ -225,6 +236,7 @@ function MoodLog() {
               {m.tags.length > 0 && <div className="tags small">{m.tags.map(t => <span key={t}>{t}</span>)}</div>}
               {m.note && <div className="muted" style={{ fontSize: 13, marginTop: 4, whiteSpace: 'pre-wrap' }}>{m.note}</div>}
             </div>
+            <button className="sqb" onClick={() => onEdit(m)} aria-label="Змінити запис настрою">Змінити</button>
             <DelBtn label="Видалити запис настрою" onDelete={() => A.delMood(m.id)} />
           </div>
         ))}
@@ -233,8 +245,75 @@ function MoodLog() {
   );
 }
 
+/** Five weeks of daily mood as coloured cells; a tap opens that day in the log. */
+function MoodMonth({ k, setK }: { k: string; setK: (k: string) => void }) {
+  const { S } = useStore();
+  const today = TK(), start = addD(wStart(), -28);
+  const days = [...Array(35)].map((_, i) => ymd(addD(start, i)));
+  return (
+    <>
+      <div className="ch"><div><h3>Настрій за 5 тижнів</h3><p>Колір = середній настрій дня. Натисни на день, щоб відкрити записи.</p></div></div>
+      <div className="moodcal">
+        {DN.map(d => <span key={d}>{d}</span>)}
+        {days.map(d => {
+          const v = dayMood(S, d), dt = new Date(d + 'T00:00'), future = d > today;
+          return (
+            <button key={d} disabled={future} aria-pressed={d === k} className={d === today ? 'today' : ''} style={{ background: v ? moodColor(v) : undefined, color: v ? '#fff' : undefined }}
+              title={`${dt.getDate()} ${MON[dt.getMonth()]}: ${v ? v.toFixed(1) + '/10' : 'не відмічено'}`} onClick={() => setK(d)}>
+              {dt.getDate()}
+            </button>
+          );
+        })}
+      </div>
+      <div className="moodlegend">{[2, 4, 6, 8, 10].map(v => <span key={v}><i style={{ background: moodColor(v) }} />{moodWord(v)}</span>)}</div>
+    </>
+  );
+}
+
+/** Patterns from the last 30 days: trend, time of day, tags and energy. */
+function MoodInsights() {
+  const { S, now } = useStore();
+  const since = now - 30 * DAY, list = S.moods.filter(m => m.t >= since);
+  if (list.length < 3) return <><div className="ch"><div><h3>Закономірності</h3><p>Що впливає на твій настрій</p></div></div><p className="muted">Запиши настрій хоча б кілька разів, і тут зʼявляться закономірності: коли тобі найкраще, що піднімає й опускає настрій.</p></>;
+  const all = avg(list.map(m => m.v));
+  const span = (a: number, b: number) => avg(S.moods.filter(m => m.t >= now - a * DAY && m.t < now - b * DAY).map(m => m.v));
+  const wk = span(7, 0), prev = span(14, 7), delta = wk && prev ? wk - prev : 0;
+  const PARTS: [string, (h: number) => boolean][] = [['Ранок', h => h >= 5 && h < 12], ['День', h => h >= 12 && h < 17], ['Вечір', h => h >= 17 && h < 22], ['Ніч', h => h >= 22 || h < 5]];
+  const parts = PARTS.map(([l, f]) => { const v = list.filter(m => f(new Date(m.t).getHours())).map(m => m.v); return { l, v: avg(v), n: v.length }; });
+  const best = [...parts].filter(p => p.n).sort((a, b) => b.v - a.v)[0];
+  const byTag = new Map<string, number[]>();
+  list.forEach(m => m.tags.forEach(t => byTag.set(t, [...(byTag.get(t) || []), m.v])));
+  const tags = [...byTag].filter(([, v]) => v.length >= 2).map(([t, v]) => ({ t, d: avg(v) - all, n: v.length })).sort((a, b) => b.d - a.d);
+  const up = tags.filter(x => x.d >= 0.3).slice(0, 3), down = tags.filter(x => x.d <= -0.3).slice(-3).reverse();
+  const energy = ENERGY.map((l, i) => { const v = list.filter(m => m.energy === i + 1).map(m => m.v); return { l, v: avg(v), n: v.length }; }).filter(e => e.n);
+  return (
+    <>
+      <div className="ch"><div><h3>Закономірності</h3><p>За останні 30 днів · {list.length} {plural(list.length, 'запис', 'записи', 'записів')}</p></div></div>
+      <div className="kv">
+        <div><div className="muted" style={{ fontSize: 12 }}>Середній настрій</div><div className="num" style={{ fontSize: 24, fontWeight: 600, color: moodColor(all) }}>{all.toFixed(1)}<small className="muted" style={{ fontSize: 13 }}>/10</small></div></div>
+        <div><div className="muted" style={{ fontSize: 12 }}>Цей тиждень</div><div className="num" style={{ fontSize: 24, fontWeight: 600 }}>{wk ? wk.toFixed(1) : '—'}{delta !== 0 && <span className={`delta ${delta > 0 ? 'up' : 'dn'}`} style={{ marginLeft: 8 }}>{delta > 0 ? '↑' : '↓'} {Math.abs(delta).toFixed(1)}</span>}</div></div>
+        <div><div className="muted" style={{ fontSize: 12 }}>Найкращий час</div><div style={{ fontSize: 20, fontWeight: 600 }}>{best ? best.l : '—'}</div></div>
+      </div>
+      <div className="cats" style={{ marginTop: 16 }}>
+        {parts.map(p => <div className="catrow" key={p.l}><span>{p.l}</span><div className="bar"><i style={{ width: (p.v / 10) * 100 + '%', background: moodColor(p.v) }} /></div><span className="num" style={{ textAlign: 'right' }}>{p.n ? p.v.toFixed(1) : '—'}</span></div>)}
+      </div>
+      {(up.length > 0 || down.length > 0) && (
+        <div className="moodtags">
+          {up.length > 0 && <div><div className="muted" style={{ fontSize: 12 }}>Піднімає настрій</div><div className="tags small">{up.map(x => <span key={x.t} className="up">{x.t} +{x.d.toFixed(1)}</span>)}</div></div>}
+          {down.length > 0 && <div><div className="muted" style={{ fontSize: 12 }}>Опускає настрій</div><div className="tags small">{down.map(x => <span key={x.t} className="dn">{x.t} {x.d.toFixed(1)}</span>)}</div></div>}
+        </div>
+      )}
+      {energy.length > 1 && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>Енергія і настрій: {energy.map(e => `${e.l.toLowerCase()} → ${e.v.toFixed(1)}`).join(' · ')}</p>}
+    </>
+  );
+}
+
 export function Health() {
   const { S } = useStore();
+  const [moodDay, setMoodDay] = useState(TK);
+  const [editing, setEditing] = useState<MoodEntry | null>(null);
+  const formCard = useRef<HTMLDivElement>(null);
+  const startEdit = (m: MoodEntry) => { setEditing(m); setTimeout(() => formCard.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0); };
   const keys = [...Array(14)].map((_, i) => ymd(addD(new Date(), i - 13)));
   const days = keys.map(k => S.health[k]);
   const ser = (f: 'sleep') => days.map(d => (d ? d[f] : 0));
@@ -251,8 +330,13 @@ export function Health() {
       <div className="vh"><div><h2>Здоровʼя</h2><p>Відмічай щодня. Настрій можна записувати кілька разів на день. Графіки показують останні 14 днів.</p></div></div>
       <div className="card" style={{ marginTop: 18 }}><LifeTiles full /></div>
       <div className="grid" style={{ marginTop: 18 }}>
-        <div className="card s5"><div className="ch"><div><h3>Як ти зараз?</h3><p>Запиши настрій з часом і деталями</p></div></div><MoodForm /></div>
-        <div className="card s7"><MoodLog /></div>
+        <div className="card s5" ref={formCard}>
+          <div className="ch"><div><h3>{editing ? 'Змінити запис' : 'Як ти зараз?'}</h3><p>{editing ? `Запис від ${new Date(editing.t).getDate()} ${MON[new Date(editing.t).getMonth()]}, ${hhmm(new Date(editing.t))}` : 'Запиши настрій з часом і деталями'}</p></div></div>
+          <MoodForm key={editing?.id ?? 'new'} edit={editing} onDone={() => setEditing(null)} />
+        </div>
+        <div className="card s7"><MoodLog k={moodDay} setK={setMoodDay} onEdit={startEdit} /></div>
+        <div className="card s5"><MoodMonth k={moodDay} setK={setMoodDay} /></div>
+        <div className="card s7"><MoodInsights /></div>
         <div className="card s6"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {moodAv.toFixed(1)} з 10</p></div></div><Bars vals={moods.map(v => Math.round(v * 10) / 10)} max={10} color={v => moodColor(v)} unit="/10" /></div>
         <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>      </div>
     </section>
@@ -394,23 +478,6 @@ export function Goals() {
 /* ---------------- Schedule ---------------- */
 type CalView = 'day' | 'week' | 'month';
 const HOUR = 44;
-
-/** Puts overlapping events side by side: each gets a lane and the number of lanes in its group. */
-function lanes(evs: UiEvent[]) {
-  const out: { e: UiEvent; lane: number; of: number }[] = [];
-  let group: typeof out = [], ends: number[] = [], groupEnd = -1;
-  const close = () => { for (const g of group) g.of = ends.length; group = []; ends = []; };
-  for (const e of [...evs].sort((a, b) => toMin(a.s) - toMin(b.s) || toMin(b.e) - toMin(a.e))) {
-    const s0 = toMin(e.s), e0 = Math.max(toMin(e.e), s0 + 15);
-    if (s0 >= groupEnd) close();
-    let lane = ends.findIndex(x => x <= s0);
-    if (lane < 0) { lane = ends.length; ends.push(e0); } else ends[lane] = e0;
-    groupEnd = Math.max(groupEnd, e0);
-    const item = { e, lane, of: 1 }; group.push(item); out.push(item);
-  }
-  close();
-  return out;
-}
 
 export function Schedule() {
   const { S, A, eventsOn, cal, refreshCal, go, now } = useStore();

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { ExtEvent, HealthField, Mode, State, UiEvent } from './types';
+import type { ExtEvent, HealthField, Meal, Mode, State, UiEvent } from './types';
 import { makeState } from './seed';
 import { addD, hhmm, money, STAGES, sod, TK, toMin, ymd } from './util';
 
@@ -23,7 +23,8 @@ const CO_ONLY = ['co', 'deals', 'projects', 'invoices', 'team'];
 const ME_ONLY = ['home', 'focus', 'habits', 'health', 'money', 'goals'];
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
-export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'form'; key: string } | null;
+/** init pre-fills form fields by key, e.g. { date, s, e } when adding an event at a picked time. */
+export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'form'; key: string; init?: Record<string, string> } | null;
 export type CalStatus = { state: 'idle' | 'loading' | 'ok' | 'none' | 'error'; at?: number; errors?: string[]; count?: number };
 
 const durOf = (s: State, m: 'focus' | 'break') => (m === 'focus' ? s.focusMin : s.breakMin) * 60;
@@ -386,7 +387,12 @@ function useStoreValue(dbOn: boolean) {
         update(s => { s.moods.push({ id: s.nextId++, ...v, note: v.note.trim() }); s.moods.sort((a, b) => a.t - b.t); });
         toast('Настрій записано');
       },
+      updateMood(id: number, v: { t: number; v: number; energy: number; tags: string[]; note: string }) {
+        update(s => { const m = s.moods.find(x => x.id === id); if (!m) return; Object.assign(m, v, { note: v.note.trim() }); delete m.demo; s.moods.sort((a, b) => a.t - b.t); });
+        toast('Запис настрою оновлено');
+      },
       delMood(id: number) { update(s => { s.moods = s.moods.filter(x => x.id !== id); }); },
+      setMeal(key: Meal['key'], v: Partial<Pick<Meal, 's' | 'e' | 'on'>>) { update(s => { const m = s.meals.find(x => x.key === key); if (m) Object.assign(m, v); }); },
       /** Bed and wake time for the night that ended on day k. Sleep hours follow from them. */
       setSleepTimes(bed: string, wake: string, k = TK()) {
         update(s => {

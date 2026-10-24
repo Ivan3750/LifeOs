@@ -133,7 +133,7 @@ function exportFocus(S: State) {
 }
 
 export function Prefs() {
-  const { S, update, toast } = useStore();
+  const { S, A, update, toast } = useStore();
   return (
     <section className="view">
       <div className="vh"><div><h2>Налаштування</h2><p>Дані зберігаються лише в цьому браузері.</p></div></div>
@@ -156,6 +156,20 @@ export function Prefs() {
               <option value="system">Як у системі</option><option value="light">Світла</option><option value="dark">Темна</option>
             </select>
           </label>
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>Прийоми їжі</div>
+          <p className="help" style={{ marginBottom: 10 }}>Цей час віднімається від вільних годин так само, як події з календаря, і показується на календарі на головній.</p>
+          <div className="meals">
+            {S.meals.map(m => (
+              <div className="mealrow" key={m.key}>
+                <label className="mealon"><input type="checkbox" checked={m.on} onChange={e => A.setMeal(m.key, { on: e.target.checked })} />{m.label}</label>
+                <input type="time" aria-label={`${m.label}: початок`} value={m.s} disabled={!m.on} onChange={e => e.target.value && A.setMeal(m.key, { s: e.target.value })} />
+                <span className="muted">–</span>
+                <input type="time" aria-label={`${m.label}: кінець`} value={m.e} disabled={!m.on} onChange={e => e.target.value && A.setMeal(m.key, { e: e.target.value })} />
+              </div>
+            ))}
+          </div>
         </div>
         <div className="row">
           <button className="btn ghost" disabled={!S.demo} onClick={() => { update(stripDemo); toast('Демо-дані прибрано'); }}>Прибрати демо-дані</button>
