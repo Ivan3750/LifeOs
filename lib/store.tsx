@@ -27,6 +27,28 @@ export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'form'; key: str
 export type CalStatus = { state: 'idle' | 'loading' | 'ok' | 'none' | 'error'; at?: number; errors?: string[]; count?: number };
 
 const durOf = (s: State, m: 'focus' | 'break') => (m === 'focus' ? s.focusMin : s.breakMin) * 60;
+const leftOf = (t: State['timer'], at = Date.now()) => (t.running ? Math.max(0, Math.round((t.endAt - at) / 1000)) : t.left);
+
+/** Focus seconds already spent in the current run of the timer. */
+export const focusSpent = (s: State, at = Date.now()) => (s.timer.mode === 'focus' ? Math.max(0, durOf(s, 'focus') - leftOf(s.timer, at)) : 0);
+
+/** Writes the focus time spent so far into the session log. The same run keeps updating one session (timer.sid),
+    so pausing, resuming and reloading the page never lose minutes or create duplicates. Returns logged minutes. */
+export function logFocus(s: State, at = Date.now()): number {
+  const sec = focusSpent(s, at), m = Math.round(sec / 60);
+  if (m < 1) return 0;
+  const cur = s.timer.sid ? s.sessions.find(x => x.t === s.timer.sid) : undefined;
+  if (cur) cur.m = m;
+  else { const t = at - sec * 1000; s.sessions.push({ t, m }); s.timer.sid = t; }
+  return m;
+}
+
+/** Session log including the minutes of a run that is still going. */
+export function liveSessions(s: State, at = Date.now()) {
+  const c = { ...s, sessions: s.sessions.map(x => ({ ...x })), timer: { ...s.timer } };
+  logFocus(c, at);
+  return c.sessions.map(x => (s.timer.running && x.t === c.timer.sid ? { ...x, live: true } : x));
+}
 
 /** Fills fields that were added in later versions. */
 function fill(s: State): State {
@@ -161,9 +183,11 @@ function useStoreValue(dbOn: boolean) {
     const t = setInterval(() => { if (document.visibilityState === 'visible') pull(); }, 15000);
     const onFocus = () => pull();
     const onHide = () => { if (document.visibilityState === 'hidden' && meta.current.dirty) { clearTimeout(pushTimer.current); pushRef.current(true); } };
+    const onLeave = () => { if (meta.current.dirty) { clearTimeout(pushTimer.current); pushRef.current(true); } };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onHide);
-    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onHide); };
+    window.addEventListener('pagehide', onLeave);
+    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onHide); window.removeEventListener('pagehide', onLeave); };
   }, [dbOn, adopt, pull]);
 
   const flush = useCallback(async () => { clearTimeout(pushTimer.current); if (meta.current.dirty) await push(); else await pull(); }, [push, pull]);
@@ -195,7 +219,7 @@ function useStoreValue(dbOn: boolean) {
   const setMode = useCallback((m: Mode) => go(m === 'co' ? 'co' : 'home'), [go]);
 
   /* ---------- timer ---------- */
-  const timerLeft = S ? (S.timer.running ? Math.max(0, Math.round((S.timer.endAt - now) / 1000)) : S.timer.left) : 0;
+  const timerLeft = S ? leftOf(S.timer, now) : 0;
 
   const beep = useCallback(() => {
     try {
@@ -213,18 +237,20 @@ function useStoreValue(dbOn: boolean) {
 
   const completeTimer = useCallback((skipped: boolean) => {
     if (!S) return;
-    const T = S.timer, dur = durOf(S, T.mode);
-    const done = T.mode === 'focus' ? (skipped ? Math.round((dur - timerLeft) / 60) : dur / 60) : 0;
+    const T = S.timer, at = Date.now();
+    // a run that ran out while the page was closed ends at endAt, not at the moment the page was reopened
+    const end = !skipped && T.running ? Math.min(at, T.endAt) : at;
+    const done = logFocus(structuredClone(S), end);
     update(s => {
       const t = s.timer;
-      if (t.mode === 'focus') { if (done >= 1) s.sessions.push({ t: Date.now() - done * 6e4, m: done }); t.mode = 'break'; }
-      else t.mode = 'focus';
-      t.running = false; t.left = durOf(s, t.mode);
+      logFocus(s, end);
+      t.mode = t.mode === 'focus' ? 'break' : 'focus';
+      t.running = false; t.left = durOf(s, t.mode); t.sid = 0;
     });
     if (T.mode === 'focus' && done >= 1) notify(`Сесію фокусу завершено: ${done} хв${T.task ? ' · ' + T.task : ''}`);
     else if (T.mode === 'break' && !skipped) notify('Перерва скінчилась. Повертаємось до роботи');
     if (!skipped) beep();
-  }, [S, timerLeft, update, notify, beep]);
+  }, [S, update, notify, beep]);
 
   const completing = useRef(false);
   useEffect(() => {
@@ -239,13 +265,25 @@ function useStoreValue(dbOn: boolean) {
     if (!audio.current) try { audio.current = new AudioContext(); } catch {}
     update(s => {
       const t = s.timer;
-      if (t.running) { t.left = Math.max(0, Math.round((t.endAt - Date.now()) / 1000)); t.running = false; }
+      if (t.running) { logFocus(s); t.left = leftOf(t); t.running = false; }
       else { t.running = true; t.endAt = Date.now() + t.left * 1000; }
     });
   }, [update]);
 
-  const resetTimer = useCallback(() => update(s => { s.timer.running = false; s.timer.left = durOf(s, s.timer.mode); }), [update]);
-  const setTimerMode = useCallback((m: 'focus' | 'break') => update(s => { s.timer.mode = m; s.timer.running = false; s.timer.left = durOf(s, m); }), [update]);
+  /** Ends the current run early: the focus time spent so far stays in the log. */
+  const stopRun = (s: State, mode: 'focus' | 'break') => {
+    const m = logFocus(s);
+    s.timer.mode = mode; s.timer.running = false; s.timer.left = durOf(s, mode); s.timer.sid = 0;
+    return m;
+  };
+  const resetTimer = useCallback(() => {
+    if (S && logFocus(structuredClone(S)) >= 1) toast(`Зараховано ${Math.round(focusSpent(S) / 60)} хв фокусу`);
+    update(s => { stopRun(s, s.timer.mode); });
+  }, [S, update, toast]);
+  const setTimerMode = useCallback((m: 'focus' | 'break') => {
+    if (S && S.timer.mode !== m && logFocus(structuredClone(S)) >= 1) toast(`Зараховано ${Math.round(focusSpent(S) / 60)} хв фокусу`);
+    update(s => { stopRun(s, m); });
+  }, [S, update, toast]);
 
   /* ---------- calendar (iCal) ---------- */
   const urlsKey = S ? S.icalUrls.join('|') : null;

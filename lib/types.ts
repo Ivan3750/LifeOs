@@ -11,7 +11,8 @@ export type Deal = { id: number; title: string; client: string; amt: number; sta
 export type Project = { id: number; name: string; client: string; due: string; progress: number; status: 'active' | 'paused' | 'done'; budget: number; demo?: 1 };
 export type Invoice = { id: number; no: string; client: string; amt: number; issued: string; due: string; paid: boolean; paidAt: string; demo?: 1 };
 export type Member = { id: number; name: string; role: string; load: number; demo?: 1 };
-export type Timer = { mode: 'focus' | 'break'; left: number; running: boolean; endAt: number; task: string };
+/** sid: start time of the session the current focus run is written to (0 when nothing is logged yet). */
+export type Timer = { mode: 'focus' | 'break'; left: number; running: boolean; endAt: number; task: string; sid?: number };
 export type Mode = 'me' | 'co';
 export type Theme = 'system' | 'light' | 'dark';
 
