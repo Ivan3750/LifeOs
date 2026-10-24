@@ -38,6 +38,7 @@ const I = {
   more: S(18, '<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>', 'fill="currentColor"'),
   plus: S(22, '<path d="M12 5v14M5 12h14"/>', 'fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"'),
   refresh: S(16, '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'),
+  pin: S(16, '<path d="M9 4h6l-1 6 4 3v2H6v-2l4-3zM12 15v6"/>'),
   link: S(16, '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
 };
 
