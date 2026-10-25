@@ -28,6 +28,23 @@ function NextEvent() {
   );
 }
 
+/** Today at a glance inside the hero: score, focus so far and habits. Each chip opens its section. */
+function HeroStats() {
+  const { S, eventsOn, now, go } = useStore();
+  const k = TK(), live = liveSessions(S, now);
+  const sc = dayScore(S, k, eventsOn(k), live, now);
+  const focus = sc.ft.worked, hDone = S.habits.filter(h => h.days[k]).length;
+  return (
+    <div className="herostats">
+      <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+        <i style={{ background: scoreColor(sc.total) }} /><span>Оцінка</span><b className="num">{sc.total ?? '—'}</b>
+      </button>
+      <button onClick={() => go('focus')}><span>Фокус</span><b className="num">{focus >= 60 ? `${Math.floor(focus / 60)}г ${Math.round(focus % 60)}хв` : `${Math.round(focus)} хв`}</b></button>
+      {S.habits.length > 0 && <button onClick={() => go('habits')}><span>Звички</span><b className="num">{hDone}/{S.habits.length}</b></button>}
+    </div>
+  );
+}
+
 function Hero() {
   const { S, go } = useStore();
   const [qi, setQi] = useState(0);
@@ -39,7 +56,7 @@ function Hero() {
       <svg className="hills" viewBox="0 0 800 160" preserveAspectRatio="none"><path d="M0 120 L90 80 L170 110 L260 60 L360 105 L430 85 L520 118 L610 70 L700 100 L800 80 L800 160 L0 160Z" fill="#170C07" opacity=".55" /><path d="M0 140 L120 110 L220 135 L330 100 L450 140 L560 115 L680 140 L800 120 L800 160 L0 160Z" fill="#0F0805" /></svg>
       <div className="eyebrow">{greet(S.name)}{S.demo && <span className="demo">Демо-дані</span>}</div>
       <h1>Зроби сьогодні вартим</h1>
-      <p>Фокус, звички, здоровʼя, гроші й цілі в одному місці. Все рахується наживо.</p>
+      <HeroStats />
       <NextEvent />
       <button className="cta" onClick={() => go('focus')}>Почати фокус <Icon n="arrow" /></button>
       <div className="glass g-cap" aria-hidden="true"><Icon n="cap" /></div>
@@ -214,8 +231,9 @@ function ScoreCard() {
   const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : dayScore(S, d, eventsOn(d), live, now).total }));
   const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
   const to: Record<string, string> = { focus: 'focus', sleep: 'health', habits: 'habits', mood: 'health', money: 'money' };
+  const [how, setHow] = useState(false);
   return (
-    <div className="card s5">
+    <div className="card s5" id="score-card">
       <div className="ch">
         <Icon n="trophy" className="ic" />
         <div><h3>Оцінка дня</h3><p>{isToday ? 'Сьогодні, рахується наживо' : `${WD[dt.getDay()]}, ${dt.getDate()} ${MON[dt.getMonth()]}`}</p></div>
@@ -226,7 +244,7 @@ function ScoreCard() {
       </div>
       <div className="score">
         <div className="scorebig" style={{ ['--sc' as string]: scoreColor(sc.total) }}>
-          <b className="num">{sc.total}</b><small>/100</small>
+          <b className="num">{sc.total ?? '—'}</b><small>{sc.total === null ? '' : '/100'}</small>
           <span>{scoreWord(sc.total)}</span>
         </div>
         <div className="scoreparts">
@@ -237,20 +255,35 @@ function ScoreCard() {
               <em className="num">{Math.round(p.got)}/{p.max}</em>
             </button>
           ))}
+          {sc.skipped.map(p => (
+            <button key={p.key} className="sp off" onClick={() => go(to[p.key])} title={p.why}>
+              <span>{p.label}</span><small>{p.why}</small>
+            </button>
+          ))}
         </div>
       </div>
-      {!sc.parts.length && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>За цей день нічого не записано.</p>}
       {weak && weak.got < weak.max && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>{isToday ? 'Найбільше балів можна додати' : 'Найбільше балів втрачено'}: <b style={{ color: 'var(--ink)' }}>{weak.label.toLowerCase()}</b> ({weak.hint})</p>}
       <div className="scorehist">
         {hist.map(h => {
-          const d = new Date(h.d + 'T00:00');
+          const d = new Date(h.d + 'T00:00'), label = h.v === null ? 'нема даних' : `${h.v}/100`;
           return (
-            <button key={h.d} className={`${h.d === today ? 'today' : ''}`} aria-pressed={h.d === k} onClick={() => setK(h.d)} title={`${d.getDate()} ${MON[d.getMonth()]}: ${h.v}/100`} aria-label={`Оцінка за ${d.getDate()} ${MON[d.getMonth()]}: ${h.v}`}>
-              <i style={{ height: Math.max(3, h.v * 0.44), background: scoreColor(h.v) }} /><span>{DN[weekdayIdx(d)]} {d.getDate()}</span><b className="num">{h.v}</b>
+            <button key={h.d} className={`${h.d === today ? 'today' : ''}`} aria-pressed={h.d === k} onClick={() => setK(h.d)} title={`${d.getDate()} ${MON[d.getMonth()]}: ${label}`} aria-label={`Оцінка за ${d.getDate()} ${MON[d.getMonth()]}: ${label}`}>
+              <i style={{ height: Math.max(3, (h.v ?? 0) * 0.44), background: scoreColor(h.v) }} /><span>{DN[weekdayIdx(d)]} {d.getDate()}</span><b className="num">{h.v ?? '—'}</b>
             </button>
           );
         })}
       </div>
+      <button className="howbtn" aria-expanded={how} onClick={() => setHow(!how)}>{how ? 'Сховати, як рахується' : 'Як рахується оцінка?'}</button>
+      {how && (
+        <ul className="howlist">
+          <li><b>Фокус, 30 балів.</b> Тижнева ціль ділиться на робочі дні, але не більше 60% вільного від подій і їжі часу. Сьогодні очікується лише та частина, що вже минула. У вихідний фокус не очікується, а робота йде в плюс.</li>
+          <li><b>Сон, 15.</b> 7–9 годин дає повний бал. Рахується, коли записано.</li>
+          <li><b>Звички, 15.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора.</li>
+          <li><b>Настрій, 10.</b> 7/10 і краще дає повний бал, «нормально» (5/10) приблизно 60%. Рахується, коли записано.</li>
+          <li><b>Витрати, 10.</b> Житло віднімається від місячного бюджету, решта ділиться на денний ліміт. У межах ліміту дає повний бал, удвічі більше дає нуль.</li>
+          <li>Частина, яку не можна оцінити (не записано, вихідний, ще рано), не дає нуля: її просто немає, а решта перераховується до 100.</li>
+        </ul>
+      )}
     </div>
   );
 }
@@ -271,36 +304,12 @@ export function Home() {
         <Hero />
         <SchedCard />
 
-        <div className="card s12">
-          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
-          <LifeTiles full={false} />
-        </div>
-
         <ScoreCard />
         <FreeTimeCard />
 
-        <div className="card s4">
-          <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div><span className="sel">Цей тиждень</span></div>
-          <div className="bigstat"><span className="v num">{Math.floor(tot / 60) > 0 && <>{Math.floor(tot / 60)}<small>год</small></>}{tot % 60}<small>хв</small></span><span className={`delta ${pct >= 0 ? 'up' : 'dn'}`}>{pct >= 0 ? '↑ ' : '↓ '}{Math.abs(pct)}%</span></div>
-          <div className="muted" style={{ fontSize: 12 }}>порівняно з минулим тижнем</div>
-          <FocusArea week={w} today={ti} />
-        </div>
-        <div className="card s8">
-          <div className="ch"><Icon n="wave" className="ic" /><div><h3>Ритм навчання</h3><p>Фокус по 4-годинних блоках, лінія = години за день</p></div><span className="sel">Цей тиждень</span></div>
-          <div className="hscroll"><Rhythm blocks={blocks} today={ti} /></div>
-        </div>
-
-        <div className="card s7">
-          <div className="ch"><Icon n="map" className="ic" /><div><h3>Карта фокусу</h3><p>Кожна точка = година тижня. Коли ти найбільш зосереджений</p></div><span className="sel">Цей тиждень</span></div>
-          <HeatMap />
-        </div>
-        <div className="card s5">
-          <div className="ch"><Icon n="trend" className="ic" /><div><h3>Результати</h3><p>Баланс твоєї активності</p></div><span className="sel">Цей тиждень</span></div>
-          <div className="rings">
-            <div><Ring pct={tot / goalMin} color="var(--good)" label="Ціль тижня" value={Math.round((tot / goalMin) * 100) + '%'} /></div>
-            <div><Ring pct={tdone / tall} color="var(--ink)" label="Задачі" value={Math.round((tdone / tall) * 100) + '%'} /></div>
-            <div><Ring pct={st / 7} color="var(--accent)" label="Серія" value={st + ' дн'} /></div>
-          </div>
+        <div className="card s12">
+          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
+          <LifeTiles full={false} />
         </div>
 
         <div className="card s4">
@@ -328,6 +337,30 @@ export function Home() {
             </div>
           ))}
           {!gs.length && <p className="muted">Постав першу ціль у розділі «Цілі».</p>}
+        </div>
+
+        <div className="card s4">
+          <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div><span className="sel">Цей тиждень</span></div>
+          <div className="bigstat"><span className="v num">{Math.floor(tot / 60) > 0 && <>{Math.floor(tot / 60)}<small>год</small></>}{tot % 60}<small>хв</small></span><span className={`delta ${pct >= 0 ? 'up' : 'dn'}`}>{pct >= 0 ? '↑ ' : '↓ '}{Math.abs(pct)}%</span></div>
+          <div className="muted" style={{ fontSize: 12 }}>порівняно з минулим тижнем</div>
+          <FocusArea week={w} today={ti} />
+        </div>
+        <div className="card s8">
+          <div className="ch"><Icon n="wave" className="ic" /><div><h3>Ритм навчання</h3><p>Фокус по 4-годинних блоках, лінія = години за день</p></div><span className="sel">Цей тиждень</span></div>
+          <div className="hscroll"><Rhythm blocks={blocks} today={ti} /></div>
+        </div>
+
+        <div className="card s7">
+          <div className="ch"><Icon n="map" className="ic" /><div><h3>Карта фокусу</h3><p>Кожна точка = година тижня. Коли ти найбільш зосереджений</p></div><span className="sel">Цей тиждень</span></div>
+          <HeatMap />
+        </div>
+        <div className="card s5">
+          <div className="ch"><Icon n="trend" className="ic" /><div><h3>Результати</h3><p>Баланс твоєї активності</p></div><span className="sel">Цей тиждень</span></div>
+          <div className="rings">
+            <div><Ring pct={tot / goalMin} color="var(--good)" label="Ціль тижня" value={Math.round((tot / goalMin) * 100) + '%'} /></div>
+            <div><Ring pct={tdone / tall} color="var(--ink)" label="Задачі" value={Math.round((tdone / tall) * 100) + '%'} /></div>
+            <div><Ring pct={st / 7} color="var(--accent)" label="Серія" value={st + ' дн'} /></div>
+          </div>
         </div>
 
         <div className="card s12 streak">

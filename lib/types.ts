@@ -34,6 +34,8 @@ export type State = {
   /** Waking day used to count free hours when no wake/bed time is logged. */
   dayStart: string; dayEnd: string;
   meals: Meal[];
+  /** Work days Mon..Sun. Focus is expected only on these days; the weekly goal is split between them. */
+  workDays: boolean[];
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;

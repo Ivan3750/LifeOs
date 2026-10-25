@@ -1,5 +1,5 @@
 import type { State, UiEvent } from './types';
-import { addD, daysInMonth, sod, toMin, ymd } from './util';
+import { addD, sod, toMin, ymd } from './util';
 
 export const MOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність', 'Втома', 'Стрес', 'Тривога', 'Сум', 'Злість', 'Нудьга', 'Самотність'];
 export const ACT_KINDS = ['Магазин', 'Дорога', 'Справи', 'Спорт', 'Готування', 'Прибирання', 'Відпочинок', 'Інше'];
@@ -66,39 +66,75 @@ export function freeTime(S: State, k: string, events: UiEvent[], sessions = S.se
 }
 
 export type ScorePart = { key: string; label: string; got: number; max: number; hint: string };
+/** A part that is not counted on this day, with the reason shown to the user. */
+export type ScoreSkip = { key: string; label: string; why: string };
 
-/** Day score 0–100. Every part gives points from 0 to its weight; parts that do not apply are left out
-    and the rest is scaled to 100, so the score is fair also without habits or a budget. */
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+/** Monthly bills that are paid on one day and should not make that day look like overspending. */
+const FIXED_CATS = ['Житло'];
+export const isWorkDay = (S: State, k: string) => (S.workDays || [true, true, true, true, true, false, false])[(new Date(k + 'T00:00').getDay() + 6) % 7];
+
+/** Day score 0–100, or null when nothing on the day can be judged yet.
+    Rules that keep it fair:
+    - A part counts only when it applies: nothing logged, a rest day or "too early today" leaves it out
+      instead of giving zero. The parts that are left are scaled to 100.
+    - Today is judged against what was possible so far, not against the whole day.
+    - Focus is expected only on work days; the weekly goal is split between them.
+    - Spending is judged by the month so far (a rent day is not a bad day) and only when you track money. */
 export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.sessions, now = Date.now()) {
-  const h = S.health[k], parts: ScorePart[] = [];
+  const h = S.health[k], parts: ScorePart[] = [], skipped: ScoreSkip[] = [];
   const ft = freeTime(S, k, events, sessions, now);
-  const add = (key: string, label: string, max: number, ratio: number, hint: string) => parts.push({ key, label, max, got: Math.round(Math.max(0, Math.min(1, ratio)) * max * 10) / 10, hint });
+  const isToday = ymd(new Date(now)) === k;
+  // share of the waking day that has passed (1 for past days)
+  const elapsed = isToday ? clamp01((now - ft.start) / Math.max(1, ft.fullEnd - ft.start)) : 1;
+  const add = (key: string, label: string, max: number, ratio: number, hint: string) => parts.push({ key, label, max, got: Math.round(clamp01(ratio) * max * 10) / 10, hint });
+  const skip = (key: string, label: string, why: string) => skipped.push({ key, label, why });
 
-  // focus: 60% of free time (or at least the daily share of the weekly goal) counts as a full day of work
-  const dailyGoal = (S.goal * 60) / 5;
-  const target = Math.max(30, Math.min(dailyGoal, ft.free * 0.6 || dailyGoal));
-  add('focus', 'Фокус', 30, ft.worked / target, `${Math.round(ft.worked)} з ${Math.round(target)} хв`);
+  // Focus: the day's share of the weekly goal, but never more than 60% of the free time the day had.
+  // Today only the part of that free time that has already passed is expected.
+  const work = isWorkDay(S, k), days = Math.max(1, (S.workDays || []).filter(Boolean).length || 5);
+  const dailyGoal = (S.goal * 60) / days;
+  const fullTarget = Math.min(dailyGoal, ft.freeDay * 0.6);
+  const target = fullTarget * (isToday && ft.freeDay ? ft.free / ft.freeDay : 1);
+  if (!work && ft.worked < 1) skip('focus', 'Фокус', 'вихідний, роботу не очікуємо');
+  else if (!work) add('focus', 'Фокус', 30, 1, `${Math.round(ft.worked)} хв у вихідний, це плюс`);
+  else if (target < 20 && ft.worked < 20) skip('focus', 'Фокус', isToday ? 'ще рано: вільного часу майже не було' : 'вільного часу майже не було');
+  else add('focus', 'Фокус', 30, ft.worked / Math.max(20, target), `${Math.round(ft.worked)} з ${Math.round(Math.max(20, target))} хв${isToday ? ' на цей час' : ''}`);
 
-  // Sleep and mood count only once they are logged: an empty field is "not yet known", not a bad day.
+  // Sleep and mood count only once they are logged.
   const sl = h?.sleep || 0;
   if (sl) add('sleep', 'Сон', 15, sl >= 7 && sl <= 9 ? 1 : sl < 7 ? (sl - 4) / 3 : (12 - sl) / 3, `${sl} год (норма 7–9)`);
+  else skip('sleep', 'Сон', 'не записано');
 
-  if (S.habits.length) { const done = S.habits.filter(x => x.days[k]).length; add('habits', 'Звички', 15, done / S.habits.length, `${done} з ${S.habits.length}`); }
-
-  const mood = dayMood(S, k);
-  if (mood) add('mood', 'Настрій', 10, (mood - 1) / 9, `${mood.toFixed(1)} з 10`);
-
-  if (S.money.budget > 0) {
-    const lim = S.money.budget / daysInMonth(), spent = S.money.tx.filter(t => t.date === k && t.type === 'out').reduce((a, t) => a + t.amt, 0);
-    add('money', 'Витрати', 10, spent <= lim ? 1 : 1 - (spent - lim) / lim, spent <= lim ? 'у межах ліміту' : 'понад денний ліміт');
+  // Habits: today the expected number grows through the day; before midday they count only once something is done.
+  if (S.habits.length) {
+    const done = S.habits.filter(x => x.days[k]).length, total = S.habits.length;
+    if (isToday && done === 0 && elapsed < 0.5) skip('habits', 'Звички', 'ще є час, рахуються з середини дня');
+    else add('habits', 'Звички', 15, done / (total * Math.max(elapsed, 0.5)), `${done} з ${total}${isToday && elapsed < 1 ? ', день ще триває' : ''}`);
   }
 
+  // Mood: 7/10 and better is a full score, 5/10 ("нормально") still gives more than half.
+  const mood = dayMood(S, k);
+  if (mood) add('mood', 'Настрій', 10, (mood - 2) / 5, `${mood.toFixed(1)} з 10`);
+  else skip('mood', 'Настрій', 'не записано');
+
+  // Spending: fixed bills (housing) come off the month budget first; the rest is split into a daily limit.
+  // A day within the limit is full marks, twice the limit or more is zero.
+  const mk = k.slice(0, 7), monthTx = S.money.tx.filter(t => t.date.slice(0, 7) === mk && t.type === 'out');
+  if (S.money.budget > 0 && monthTx.length) {
+    const d = new Date(k + 'T00:00'), dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+    const fixed = monthTx.filter(t => FIXED_CATS.includes(t.cat)).reduce((a, t) => a + t.amt, 0);
+    const lim = Math.max(0, S.money.budget - fixed) / dim;
+    const spent = monthTx.filter(t => t.date === k && !FIXED_CATS.includes(t.cat)).reduce((a, t) => a + t.amt, 0);
+    add('money', 'Витрати', 10, !lim ? (spent ? 0 : 1) : spent <= lim ? 1 : 2 - spent / lim, `${Math.round(spent)} з ${Math.round(lim)} kr. денного ліміту${fixed ? ', без житла' : ''}`);
+  } else skip('money', 'Витрати', S.money.budget > 0 ? 'цього місяця витрат не записано' : 'бюджет не задано');
+
   const max = parts.reduce((a, p) => a + p.max, 0), got = parts.reduce((a, p) => a + p.got, 0);
-  return { total: max ? Math.round((got / max) * 100) : 0, parts, ft };
+  return { total: max ? Math.round((got / max) * 100) : null, parts, skipped, ft };
 }
 
-export const scoreWord = (n: number) => (n >= 85 ? 'Чудовий день' : n >= 70 ? 'Добрий день' : n >= 50 ? 'Непогано' : n >= 30 ? 'Слабко' : 'Дуже погано');
-export const scoreColor = (n: number) => (n >= 70 ? 'var(--good)' : n >= 50 ? 'var(--accent-2)' : n >= 30 ? 'var(--accent)' : 'var(--m1)');
+export const scoreWord = (n: number | null) => (n === null ? 'Ще нема що оцінювати' : n >= 85 ? 'Чудовий день' : n >= 70 ? 'Добрий день' : n >= 50 ? 'Непогано' : n >= 30 ? 'Слабко' : 'Дуже погано');
+export const scoreColor = (n: number | null) => (n === null ? 'var(--bar)' : n >= 70 ? 'var(--good)' : n >= 50 ? 'var(--accent-2)' : n >= 30 ? 'var(--accent)' : 'var(--m1)');
 
 /** Keys of the last n days, oldest first. */
 export const lastDays = (n: number) => [...Array(n)].map((_, i) => ymd(addD(sod(new Date()), i - n + 1)));

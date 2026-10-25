@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
-import { TK } from '@/lib/util';
+import { DN, TK } from '@/lib/util';
 import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
 import { CalStatusChip } from './Personal';
@@ -156,6 +156,15 @@ export function Prefs() {
               <option value="system">Як у системі</option><option value="light">Світла</option><option value="dark">Темна</option>
             </select>
           </label>
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>Робочі дні</div>
+          <p className="help" style={{ marginBottom: 10 }}>Тижнева ціль фокусу ділиться між цими днями. У вихідні фокус в оцінці дня не очікується.</p>
+          <div className="seg wdays">
+            {DN.map((d, i) => (
+              <button key={d} aria-pressed={!!S.workDays?.[i]} onClick={() => update(s => { const w = s.workDays ? [...s.workDays] : [true, true, true, true, true, false, false]; w[i] = !w[i]; s.workDays = w; })}>{d}</button>
+            ))}
+          </div>
         </div>
         <div>
           <div style={{ fontWeight: 600, marginBottom: 2 }}>Прийоми їжі</div>
