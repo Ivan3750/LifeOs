@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { AccId, Account, ExtEvent, HealthField, Meal, Mode, State, Tx, UiEvent } from './types';
+import type { AccId, Account, ExtEvent, Goal, HealthField, Meal, Mode, State, Tx, UiEvent } from './types';
 import { makeState } from './seed';
 import { DEFAULT_ACCOUNTS, XFER_CAT, account, fmtCur } from './money';
 import { addD, hhmm, money, STAGES, sod, TK, toMin, ymd } from './util';
@@ -40,8 +40,8 @@ export function logFocus(s: State, at = Date.now()): number {
   const sec = focusSpent(s, at), m = Math.round(sec / 60);
   if (m < 1) return 0;
   const cur = s.timer.sid ? s.sessions.find(x => x.t === s.timer.sid) : undefined;
-  if (cur) cur.m = m;
-  else { const t = at - sec * 1000; s.sessions.push({ t, m }); s.timer.sid = t; }
+  if (cur) { cur.m = m; if (s.timer.task) cur.task = s.timer.task; }
+  else { const t = at - sec * 1000; s.sessions.push({ t, m, ...(s.timer.task ? { task: s.timer.task } : {}) }); s.timer.sid = t; }
   return m;
 }
 
@@ -362,7 +362,8 @@ function useStoreValue(dbOn: boolean) {
     return {
       setH(f: HealthField, v: number) { update(s => { const h = hday(s); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },
       addH(f: HealthField, d: number) { update(s => { const h = hday(s); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round((h[f] + d) * 10) / 10)); delete h.demo; }); },
-      addTask(text: string, p: 'hi' | 'lo' = 'lo') { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false }); }); toast('Задачу додано'); },
+      addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}) }); }); toast('Задачу додано'); },
+      setTaskGoal(id: number, goal?: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; if (goal) t.goal = goal; else delete t.goal; }); },
       toggleTask(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; t.d = !t.d; if (t.d && s.timer.task === t.t) s.timer.task = ''; }); },
       delTask(id: number) { update(s => { s.tasks = s.tasks.filter(x => x.id !== id); }); },
       addTx(type: 'in' | 'out', amt: number, cat: string, note: string, date: string, acc: AccId = 'dk') {
@@ -460,7 +461,18 @@ function useStoreValue(dbOn: boolean) {
           if (bed && wake) h.sleep = Math.round((((toMin(wake) - toMin(bed)) + 1440) % 1440) / 6) / 10;
         });
       },
-      addGoal(v: { title: string; area: string; target: number; unit: string; due: string }) { update(s => { s.goals.push({ id: s.nextId++, cur: 0, ...v }); }); toast('Ціль додано'); },
+      addGoal(v: { title: string; area: string; target: number; unit: string; due: string; steps?: string[] }) {
+        update(s => { const { steps, ...rest } = v; s.goals.push({ id: s.nextId++, cur: 0, ...rest, ...(steps?.length ? { steps: steps.map(t => ({ id: s.nextId++, t, d: false })) } : {}) }); });
+        toast('Ціль додано');
+      },
+      updateGoal(id: number, v: Partial<Pick<Goal, 'title' | 'area' | 'target' | 'unit' | 'due'>>) { update(s => { const g = s.goals.find(x => x.id === id); if (g) { Object.assign(g, v); delete g.demo; } }); },
+      addStep(gid: number, t: string) { t = t.trim(); if (!t) return; update(s => { const g = s.goals.find(x => x.id === gid); if (g) (g.steps ||= []).push({ id: s.nextId++, t, d: false }); }); },
+      toggleStep(gid: number, sid: number) {
+        const g = S.goals.find(x => x.id === gid), st = g?.steps?.find(x => x.id === sid);
+        update(s => { const x = s.goals.find(y => y.id === gid)?.steps?.find(y => y.id === sid); if (x) x.d = !x.d; });
+        if (g && st && !st.d && g.steps!.every(x => x.id === sid || x.d)) notify('Ціль досягнуто: ' + g.title);
+      },
+      delStep(gid: number, sid: number) { update(s => { const g = s.goals.find(x => x.id === gid); if (g?.steps) g.steps = g.steps.filter(x => x.id !== sid); }); },
       stepGoal(id: number, dir: number) {
         if (!S) return;
         const g = S.goals.find(x => x.id === id); if (!g) return;

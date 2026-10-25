@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { liveSessions, useStore } from '@/lib/store';
-import { dayScore, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score';
+import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
+import { dayPlan, dayScore, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { FocusArea, Rhythm, Ring } from '../charts';
@@ -34,7 +35,7 @@ function HeroStats() {
   const { S, eventsOn, now, go } = useStore();
   const k = TK(), live = liveSessions(S, now);
   const sc = dayScore(S, k, eventsOn(k), live, now);
-  const focus = sc.ft.worked, hDone = S.habits.filter(h => h.days[k]).length;
+  const focus = sc.ft.worked, hDone = S.habits.filter(h => h.days[k]).length, gMin = goalFocusOn(S, k, live);
   return (
     <div className="herostats">
       <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
@@ -42,6 +43,7 @@ function HeroStats() {
       </button>
       <button onClick={() => go('focus')}><span>Фокус</span><b className="num">{focus >= 60 ? `${Math.floor(focus / 60)}г ${Math.round(focus % 60)}хв` : `${Math.round(focus)} хв`}</b></button>
       {S.habits.length > 0 && <button onClick={() => go('habits')}><span>Звички</span><b className="num">{hDone}/{S.habits.length}</b></button>}
+      {goalTasks(S).length > 0 && <button onClick={() => go('focus')} title="Сесія фокусу на крок до цілі"><span>Для цілі</span><b className="num">{gMin >= 20 ? '✓ ' + Math.round(gMin) + ' хв' : gMin ? Math.round(gMin) + ' хв' : 'ще ні'}</b></button>}
     </div>
   );
 }
@@ -77,9 +79,9 @@ export function SchedCard() {
   const dt = new Date(day + 'T00:00'), today = TK(), isToday = day === today;
   const week = [...Array(7)].map((_, i) => ymd(addD(wStart(dt), i)));
   const all = eventsOn(day), allDay = all.filter(e => e.allDay), timed = all.filter(e => !e.allDay);
-  const meals = S.meals.filter(m => m.on);
-  const h0 = Math.min(Math.floor(toMin(S.dayStart) / 60), ...timed.map(e => Math.floor(toMin(e.s) / 60)));
-  const h1 = Math.max(Math.ceil(toMin(S.dayEnd) / 60), ...timed.map(e => Math.ceil(toMin(e.e) / 60)));
+  const plan = dayPlan(S, day), meals = plan.meals;
+  const h0 = Math.min(Math.floor(toMin(plan.start) / 60), ...timed.map(e => Math.floor(toMin(e.s) / 60)));
+  const h1 = Math.max(Math.ceil(toMin(plan.end) / 60), ...timed.map(e => Math.ceil(toMin(e.e) / 60)));
   const y = (min: number) => ((min - h0 * 60) / 60) * DV_HOUR;
   const n = new Date(now), nowMin = n.getHours() * 60 + n.getMinutes();
   const ft = freeTime(S, day, all, S.sessions, now);
@@ -88,7 +90,7 @@ export function SchedCard() {
   // open each day at "now" (today) or at its first event
   useEffect(() => {
     const el = scroller.current; if (!el) return;
-    const first = timed[0] ? toMin(timed[0].s) : toMin(S.dayStart);
+    const first = timed[0] ? toMin(timed[0].s) : toMin(plan.start);
     el.scrollTop = Math.max(0, y(isToday ? nowMin : first) - 50);
   }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -195,10 +197,10 @@ function FreeTimeCard() {
   const maxFree = Math.max(60, ...week.map(w => w.free));
   return (
     <div className="card s7">
-      <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з годин, вільних від подій і їжі, ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {S.dayStart}–{S.dayEnd}</button></div>
+      <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з годин, вільних від подій і їжі, ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {hhmm(new Date(t.start))}–{hhmm(new Date(t.fullEnd))}</button></div>
       <div className="bigstat"><span className="v num">{hrs(t.worked)}<small>/</small>{hrs(t.free)}<small>год</small></span><span className={`delta ${pct >= 60 ? 'up' : 'dn'}`}>{pct}%</span></div>
       <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
-        День {hhmm(new Date(t.start))}–{hhmm(new Date(t.fullEnd))}{S.health[k]?.wake ? ' (від часу, коли прокинувся)' : ''}.{' '}
+        День {hhmm(new Date(t.start))}–{hhmm(new Date(t.fullEnd))}{(() => { const p = dayPlan(S, k); return p.wakeLogged ? ' (від часу, коли прокинувся)' : p.fromSleep && p.rhythm?.wake != null ? ' (за твоїм типовим сном)' : ''; })()}.{' '}
         {t.blockers.length > 0 && <>Події та їжа забирають {hrs(t.busyDay)} год.{' '}</>}
         {evBlock.length ? <>Події: {evBlock.map(b => `${b.title} ${b.s}–${b.e}`).join(', ')}. </> : 'Подій у календарі на цей час немає. '}
         {mealBlock.length > 0 && <>Їжа: {mealBlock.map(b => `${b.title.toLowerCase()} ${b.s}–${b.e}`).join(', ')}.</>}
@@ -298,7 +300,7 @@ export function Home() {
   const goalMin = S.goal * 60, tdone = S.tasks.filter(t => t.d).length, tall = S.tasks.length || 1, st = streak(S);
   const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
   const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S);
-  const gs = [...S.goals].sort((a, c) => c.cur / c.target - a.cur / a.target).slice(0, 4);
+  const gs = [...S.goals].sort((a, c) => goalProgress(c) - goalProgress(a)).slice(0, 4);
   return (
     <section className="view">
       <div className="grid">
@@ -336,8 +338,8 @@ export function Home() {
           <div className="ch"><Icon n="goals" className="ic" /><div><h3>Цілі</h3><p>Прогрес до великого</p></div><button className="sel" onClick={() => go('goals')}>Усі</button></div>
           {gs.map(g => (
             <div key={g.id} style={{ marginBottom: 14 }}>
-              <div className="row" style={{ justifyContent: 'space-between', fontSize: 13, flexWrap: 'nowrap' }}><span className="t" style={{ minWidth: 0 }}>{g.title}</span><span className="num muted">{Math.round(Math.min(1, g.cur / g.target) * 100)}%</span></div>
-              <div className="bar" style={{ marginTop: 6 }}><i style={{ width: pctW(g.cur, g.target) + '%', background: g.cur >= g.target ? 'var(--good)' : 'var(--ink)' }} /></div>
+              <div className="row" style={{ justifyContent: 'space-between', fontSize: 13, flexWrap: 'nowrap' }}><span className="t" style={{ minWidth: 0 }}>{g.title}</span><span className="num muted">{Math.round(goalProgress(g) * 100)}%</span></div>
+              <div className="bar" style={{ marginTop: 6 }}><i style={{ width: goalProgress(g) * 100 + '%', background: goalProgress(g) >= 1 ? 'var(--good)' : 'var(--ink)' }} /></div>
             </div>
           ))}
           {!gs.length && <p className="muted">Постав першу ціль у розділі «Цілі».</p>}

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import type { State, Tx, UiEvent } from '@/lib/types';
 import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
-import { dayMood, moodColor, moodsOn, moodWord } from '@/lib/score';
+import { dayMood, ENERGY3, energyWord, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { budgetDKK, monthOf, sumIn, txDKK } from '@/lib/money';
 
 export const today = () => TK();
@@ -30,13 +30,23 @@ const QUICK_MOODS: [number, string][] = [[2, 'Погано'], [4, 'Так соб
 /** Quick mood check-in: one tap saves the mood at the current time. Details are added on the Health page. */
 function MoodTile() {
   const { S, A, go } = useStore();
+  const [askEnergy, setAskEnergy] = useState(false);
   const list = moodsOn(S, TK()), last = list[list.length - 1], avgV = dayMood(S, TK());
+  // after a quick mood tap, ask once for the energy of that same check-in
+  const setEnergy = (e: number) => { if (last) A.updateMood(last.id, { t: last.t, v: last.v, energy: e, tags: last.tags, note: last.note }); setAskEnergy(false); };
   return (
     <div className="tile">
-      <div className="lab"><span>Настрій</span><span>{last ? `${last.v}/10 о ${hhmm(new Date(last.t))}` : 'не відмічено'}</span></div>
-      <div className="moods">
-        {QUICK_MOODS.map(([v, m]) => <button key={v} title={m} aria-label={`Настрій зараз: ${m}`} style={{ ['--mc' as string]: moodColor(v) }} onClick={() => A.addMood({ t: Date.now(), v, energy: 0, tags: [], note: '' })}>{v / 2}</button>)}
-      </div>
+      <div className="lab"><span>Настрій</span><span>{last ? `${last.v}/10 о ${hhmm(new Date(last.t))}${last.energy ? ' · ' + energyWord(last.energy).toLowerCase() : ''}` : 'не відмічено'}</span></div>
+      {askEnergy && last ? (
+        <div className="energyask">
+          <span>А сил скільки?</span>
+          <div>{ENERGY3.map(x => <button key={x.v} title={x.hint} onClick={() => setEnergy(x.v)}>{x.l}</button>)}</div>
+        </div>
+      ) : (
+        <div className="moods">
+          {QUICK_MOODS.map(([v, m]) => <button key={v} title={m} aria-label={`Настрій зараз: ${m}`} style={{ ['--mc' as string]: moodColor(v) }} onClick={() => { A.addMood({ t: Date.now(), v, energy: 0, tags: [], note: '' }); setAskEnergy(true); }}>{v / 2}</button>)}
+        </div>
+      )}
       <div className="muted" style={{ fontSize: 11, marginTop: 'auto', display: 'flex', justifyContent: 'space-between', gap: 6 }}>
         <span>{list.length ? `${list.length} ${list.length === 1 ? 'запис' : 'записи'} · ${moodWord(avgV).toLowerCase()}` : 'як ти зараз?'}</span>
         <button style={{ textDecoration: 'underline', color: 'inherit' }} onClick={() => go('health')}>Детально</button>

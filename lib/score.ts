@@ -3,8 +3,16 @@ import { addD, sod, toMin, ymd } from './util';
 import { budgetDKK, monthOf, txDKK } from './money';
 
 export const MOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність', 'Втома', 'Стрес', 'Тривога', 'Сум', 'Злість', 'Нудьга', 'Самотність'];
-export const ACT_KINDS = ['Магазин', 'Дорога', 'Справи', 'Спорт', 'Готування', 'Прибирання', 'Відпочинок', 'Інше'];
-export const ENERGY = ['Без сил', 'Мало', 'Нормально', 'Бадьоро', 'Повно енергії'];
+export const ACT_KINDS = ['Wolt', 'Магазин', 'Дорога', 'Справи', 'Спорт', 'Готування', 'Прибирання', 'Відпочинок', 'Інше'];
+/** Energy is one of three levels, stored as 1, 3 or 5 so records from the older 1–5 scale still fit.
+    level(): 0 not set, 1 low (1–2), 2 normal (3), 3 high (4–5). */
+export const ENERGY3 = [
+  { v: 1, l: 'Мало сил', hint: 'втомлений, хочеться лягти' },
+  { v: 3, l: 'Нормально', hint: 'звичайний робочий стан' },
+  { v: 5, l: 'Багато сил', hint: 'бадьорий, можу братися за важке' },
+];
+export const energyLevel = (e: number) => (!e ? 0 : e <= 2 ? 1 : e === 3 ? 2 : 3);
+export const energyWord = (e: number) => (energyLevel(e) ? ENERGY3[energyLevel(e) - 1].l : '');
 export const moodWord = (v: number) => (v >= 9 ? 'Чудово' : v >= 7 ? 'Добре' : v >= 5 ? 'Нормально' : v >= 3 ? 'Так собі' : v > 0 ? 'Погано' : 'не відмічено');
 export const moodColor = (v: number) => (v ? `var(--m${Math.min(5, Math.max(1, Math.ceil(v / 2)))})` : 'var(--bar)');
 
@@ -23,11 +31,38 @@ export function dayMood(S: State, k: string) {
     (23 or 25 hours long) still put 08:00 at 08:00. '23:59' and '24:00' style ends are kept as given. */
 const at = (k: string, hm: string) => { const m = toMin(hm); const d = new Date(k + 'T00:00'); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return d.getTime(); };
 
-/** Waking window of a day: from the logged wake time (or dayStart) to dayEnd, with the end cut at "now" for today. */
+const hm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+const median = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : null; };
+
+/** Typical wake and bed time from the last 14 logged nights (before day k), as minutes after midnight.
+    A bedtime after midnight counts as e.g. 25:00, so 23:30 and 01:00 average out properly. */
+export function sleepRhythm(S: State, k = ymd(new Date())) {
+  const days = [...Array(14)].map((_, i) => S.health[ymd(addD(new Date(k + 'T00:00'), -i - 1))]).filter(Boolean);
+  const wake = median(days.filter(d => d!.wake).map(d => toMin(d!.wake!)));
+  const bed = median(days.filter(d => d!.bed).map(d => { const m = toMin(d!.bed!); return m < 12 * 60 ? m + 1440 : m; }));
+  return { wake, bed, nights: days.filter(d => d!.wake || d!.bed).length };
+}
+
+/** The planned day: when it starts and ends, and the meals in it.
+    With dayFromSleep the start is today's logged wake time (or the typical one), the end is the
+    typical bedtime (cut at midnight), and breakfast moves to half an hour after waking. */
+export function dayPlan(S: State, k: string) {
+  const fromSleep = S.dayFromSleep !== false, h = S.health[k], r = fromSleep ? sleepRhythm(S, k) : null;
+  const startMin = h?.wake ? toMin(h.wake) : r?.wake ?? toMin(S.dayStart);
+  let endMin = r?.bed != null ? Math.min(r.bed, 23 * 60 + 59) : toMin(S.dayEnd);
+  if (endMin <= startMin) endMin = Math.max(toMin(S.dayEnd), startMin);
+  const meals = (S.meals || []).filter(m => m.on).map(m => {
+    if (fromSleep && m.key === 'breakfast') { const len = Math.max(10, toMin(m.e) - toMin(m.s)); return { ...m, s: hm(startMin + 30), e: hm(startMin + 30 + len) }; }
+    return m;
+  });
+  return { start: hm(startMin), end: endMin >= 1439 ? '23:59' : hm(endMin), meals, fromSleep, rhythm: r, wakeLogged: !!h?.wake };
+}
+
+/** Waking window of a day (see dayPlan), with the end cut at "now" for today. */
 export function wakingWindow(S: State, k: string, now = Date.now()) {
-  const h = S.health[k];
-  const start = at(k, h?.wake || S.dayStart);
-  let end = at(k, S.dayEnd);
+  const p = dayPlan(S, k);
+  const start = at(k, p.start);
+  let end = at(k, p.end);
   if (end <= start) end = start;
   return { start, end: Math.min(end, Math.max(start, now)), fullEnd: end };
 }
@@ -39,7 +74,7 @@ export function freeTime(S: State, k: string, events: UiEvent[], sessions = S.se
   const d0 = new Date(k + 'T00:00').getTime(), d1 = addD(new Date(d0), 1).getTime();
   const timed = [
     ...events.filter(e => !e.allDay).map(e => ({ title: e.title, s: e.s, e: e.e, ext: !!e.ext, meal: false })),
-    ...(S.meals || []).filter(m => m.on).map(m => ({ title: m.label, s: m.s, e: m.e, ext: false, meal: true })),
+    ...dayPlan(S, k).meals.map(m => ({ title: m.label, s: m.s, e: m.e, ext: false, meal: true })),
   ].map(e => ({ e, a: at(k, e.s), b: at(k, e.e) })).filter(x => x.b > x.a).sort((x, y) => x.a - y.a);
   // overlapping events are merged so shared time is subtracted once
   const merged: [number, number][] = [];

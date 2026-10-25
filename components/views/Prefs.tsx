@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
 import { DN, TK } from '@/lib/util';
+import { dayPlan, sleepRhythm } from '@/lib/score';
 import { account, accOf, txDKK } from '@/lib/money';
 import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
@@ -136,6 +137,35 @@ function exportFocus(S: State) {
   download(`pulse-os-fokus-${TK()}.csv`, 'text/csv;charset=utf-8', csv([['Дата', 'Початок', 'Хвилин'], ...rows]));
 }
 
+/** Day start, end and breakfast follow the sleep you log, or fixed hours. */
+function SleepDaySetting() {
+  const { S, update } = useStore();
+  const on = S.dayFromSleep !== false, r = sleepRhythm(S), p = dayPlan(S, TK());
+  const fmt = (m: number | null) => (m == null ? '—' : `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  return (
+    <div>
+      <div style={{ fontWeight: 600, marginBottom: 2 }}>День за твоїм сном</div>
+      <p className="help" style={{ marginBottom: 10 }}>
+        {on
+          ? <>Початок дня береться з часу, коли ти прокинувся сьогодні (або з типового), кінець — з типового часу засинання, а сніданок — через 30 хв після пробудження. Так вільні години відповідають твоєму реальному ритму.</>
+          : <>Зараз день рахується за фіксованими годинами нижче.</>}
+      </p>
+      <div className="seg" style={{ marginBottom: 10 }}>
+        <button aria-pressed={on} onClick={() => update(s => { s.dayFromSleep = true; })}>За сном</button>
+        <button aria-pressed={!on} onClick={() => update(s => { s.dayFromSleep = false; })}>Фіксовано</button>
+      </div>
+      {on && (
+        <p className="help">
+          За останні 2 тижні ({r.nights} {r.nights === 1 ? 'ніч' : r.nights < 5 && r.nights > 1 ? 'ночі' : 'ночей'} зі сном): зазвичай прокидаєшся о <b>{fmt(r.wake)}</b>, засинаєш о <b>{fmt(r.bed)}</b>.
+          {' '}Сьогодні день: <b>{p.start}–{p.end}</b>{p.wakeLogged ? ' (від записаного пробудження)' : ''}.
+          {r.nights < 3 && ' Запиши сон ще кілька ночей у плитці «Сон», щоб ритм став точнішим.'}
+          {r.bed != null && r.bed >= 24 * 60 && ' Кінець дня обрізається на півночі.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function Prefs() {
   const { S, A, update, toast } = useStore();
   return (
@@ -149,10 +179,10 @@ export function Prefs() {
           <NumField id="pBreak" label="Тривалість перерви, хв" value={S.breakMin} min={1} max={60} onSave={n => update(s => { s.breakMin = n; if (!s.timer.running && s.timer.mode === 'break') s.timer.left = n * 60; })} />
           <TextField id="pCo" label="Назва компанії" value={S.co.name} fallback="Моя компанія" onSave={v => update(s => { s.co.name = v; })} />
           <NumField id="pCoGoal" label="Ціль виручки на місяць, kr." value={S.co.goal} min={1000} max={100000000} onSave={n => update(s => { s.co.goal = n; })} />
-          <label className="field" htmlFor="pDayStart">Початок дня (для вільного часу)
+          <label className="field" htmlFor="pDayStart">{S.dayFromSleep !== false ? 'Початок дня, якщо сну ще не записано' : 'Початок дня (для вільного часу)'}
             <input id="pDayStart" type="time" value={S.dayStart} onChange={e => e.target.value && update(s => { s.dayStart = e.target.value; })} />
           </label>
-          <label className="field" htmlFor="pDayEnd">Кінець дня
+          <label className="field" htmlFor="pDayEnd">{S.dayFromSleep !== false ? 'Кінець дня, якщо сну ще не записано' : 'Кінець дня'}
             <input id="pDayEnd" type="time" value={S.dayEnd} onChange={e => e.target.value && update(s => { s.dayEnd = e.target.value; })} />
           </label>
           <label className="field" htmlFor="pTheme">Тема
@@ -161,6 +191,7 @@ export function Prefs() {
             </select>
           </label>
         </div>
+        <SleepDaySetting />
         <div>
           <div style={{ fontWeight: 600, marginBottom: 2 }}>Робочі дні</div>
           <p className="help" style={{ marginBottom: 10 }}>Тижнева ціль фокусу ділиться між цими днями. У вихідні фокус в оцінці дня не очікується.</p>

@@ -1,5 +1,7 @@
-export type Session = { t: number; m: number; demo?: 1 };
-export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; demo?: 1 };
+/** task: what the focus run was for (the task title), when one was picked. */
+export type Session = { t: number; m: number; task?: string; demo?: 1 };
+/** goal: id of the goal this task moves forward. */
+export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; demo?: 1 };
 export type LocalEvent = { id: number; date: string; s: string; e: string; title: string; c: string; demo?: 1 };
 export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 1 };
 /** One day, keyed by the date you woke up. bed/wake are 'HH:MM'; sleep hours are derived from them when both are set.
@@ -18,7 +20,9 @@ export type Account = { id: AccId; name: string; cur: Cur; opening: number; budg
 /** amt is in the currency of its account (acc, 'dk' for records saved before accounts existed).
     xfer links the two halves of a transfer between accounts; transfers are not income or spending. */
 export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; demo?: 1 };
-export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; demo?: 1 };
+export type GoalStep = { id: number; t: string; d: boolean };
+/** A goal is measured either by a number (cur of target) or, when it has steps, by the share of steps done. */
+export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; steps?: GoalStep[]; demo?: 1 };
 export type Stage = 'lead' | 'talk' | 'proposal' | 'won' | 'lost';
 export type Deal = { id: number; title: string; client: string; amt: number; stage: Stage; demo?: 1 };
 export type Project = { id: number; name: string; client: string; due: string; progress: number; status: 'active' | 'paused' | 'done'; budget: number; demo?: 1 };
@@ -39,6 +43,8 @@ export type State = {
   activities: Activity[]; act: { kind: string; title: string; start: number } | null;
   /** Waking day used to count free hours when no wake/bed time is logged. */
   dayStart: string; dayEnd: string;
+  /** Take the day start, end and breakfast from logged sleep instead of dayStart/dayEnd (default on). */
+  dayFromSleep?: boolean;
   meals: Meal[];
   /** Work days Mon..Sun. Focus is expected only on these days; the weekly goal is split between them. */
   workDays: boolean[];

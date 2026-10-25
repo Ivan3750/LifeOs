@@ -1,15 +1,39 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { MoodEntry, Note, UiEvent } from '@/lib/types';
-import { ACT_KINDS, dayMood, ENERGY, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
+import type { Goal, MoodEntry, Note, UiEvent } from '@/lib/types';
+import { ACT_KINDS, dayMood, ENERGY3, energyLevel, energyWord, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { goalStep, liveSessions, useStore } from '@/lib/store';
-import { addD, AREAS, DAY, COLORS, daysTo, DN, fmt, fmtN, hhmm, hmPlain, MON, MONTHN, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
+import { WoltCard } from '../Wolt';
+import { addD, AREAS, DAY, COLORS, daysTo, DN, fmt, fmtN, hhmm, hmPlain, MON, MONTHN, pad2, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Bars, Radar } from '../charts';
 import { avg, DelBtn, habStreak, lanes, LifeTiles } from '../shared';
 
 /* ---------------- Focus ---------------- */
+/** One focus session a day goes to a goal: suggests the most important goal task until that is done. */
+export function GoalSessionBanner({ compact = false }: { compact?: boolean }) {
+  const { S, update, now, go, toggleTimer, setTimerMode } = useStore();
+  const k = TK(), mins = goalFocusOn(S, k, liveSessions(S, now)), next = goalTasks(S)[0];
+  const goal = next ? S.goals.find(g => g.id === next.goal) : null;
+  if (mins >= 20) return <div className={`goalbanner ok${compact ? ' compact' : ''}`}><Icon n="check" /><span>Сьогодні вже {Math.round(mins)} хв фокусу на кроки до цілей.</span></div>;
+  if (!next || !goal) {
+    if (compact || !S.goals.length) return null;
+    return <div className="goalbanner"><span>Привʼяжи задачі до цілей у «Задачах» або «Цілях», і тут зʼявиться крок, з якого варто почати день.</span><button className="sqb" onClick={() => go('goals')}>До цілей</button></div>;
+  }
+  const start = () => { update(s => { s.timer.task = next.t; }); if (!S.timer.running) { if (S.timer.mode !== 'focus') setTimerMode('focus'); toggleTimer(); } go('focus'); };
+  return (
+    <div className={`goalbanner${compact ? ' compact' : ''}`}>
+      <div style={{ minWidth: 0 }}>
+        <small>{mins > 0 ? `Для цілей сьогодні ${Math.round(mins)} хв, ще трохи` : 'Перша сесія дня — для цілі'} «{goal.title}»</small>
+        <b>{next.t}</b>
+      </div>
+      <button className="btn acc" onClick={start}><Icon n="play" />Почати</button>
+    </div>
+  );
+}
+
 export function Focus() {
   const { S, A, update, now, timerLeft, toggleTimer, resetTimer, setTimerMode, completeTimer, durOf } = useStore();
   const T = S.timer, dur = durOf(T.mode), C = 552.9;
@@ -24,6 +48,7 @@ export function Focus() {
   return (
     <section className="view">
       <div className="vh"><div><h2>Фокус</h2><p>Таймер Помодоро. У статистику йде весь час фокусу, навіть якщо зупинився раніше. Пробіл: старт і пауза.</p></div></div>
+      <GoalSessionBanner />
       <div className="grid" style={{ marginTop: 18 }}>
         <div className="card s7">
           <div className="row" style={{ justifyContent: 'center' }}>
@@ -51,7 +76,8 @@ export function Focus() {
           <label className="field" htmlFor="tTaskSel">Над чим працюєш
             <select id="tTaskSel" value={T.task} onChange={e => update(s => { s.timer.task = e.target.value; })}>
               <option value="">Без задачі</option>
-              {S.tasks.filter(t => !t.d).map(t => <option key={t.id} value={t.t}>{t.t}</option>)}
+              {goalTasks(S).length > 0 && <optgroup label="Кроки до цілей">{goalTasks(S).map(t => <option key={t.id} value={t.t}>{t.t}</option>)}</optgroup>}
+              <optgroup label="Інші задачі">{S.tasks.filter(t => !t.d && !goalTasks(S).includes(t)).map(t => <option key={t.id} value={t.t}>{t.t}</option>)}</optgroup>
             </select>
           </label>
           <div className="kv">
@@ -67,6 +93,7 @@ export function Focus() {
         <ActTimer />
         <ManualTime />
         <ActLog />
+        <WoltCard />
       </div>
     </section>
   );
@@ -178,9 +205,11 @@ export function Tasks() {
   const [f, setF] = useState<'open' | 'done' | 'all'>('open');
   const [text, setText] = useState('');
   const [pri, setPri] = useState<'hi' | 'lo'>('lo');
+  const [goal, setGoal] = useState('');
   const open = S.tasks.filter(t => !t.d).length;
+  const goalName = (id?: number) => S.goals.find(g => g.id === id)?.title;
   const list = S.tasks.filter(t => f === 'all' || (f === 'done' ? t.d : !t.d)).sort((a, b) => (a.p === 'hi' ? 0 : 1) - (b.p === 'hi' ? 0 : 1));
-  const submit = (e: FormEvent) => { e.preventDefault(); A.addTask(text, pri); setText(''); };
+  const submit = (e: FormEvent) => { e.preventDefault(); A.addTask(text, pri, +goal || undefined); setText(''); };
   return (
     <section className="view">
       <div className="vh"><div><h2>Задачі</h2><p>{open} відкритих із {S.tasks.length}</p></div></div>
@@ -188,6 +217,7 @@ export function Tasks() {
         <form className="row" onSubmit={submit}>
           <label className="field" htmlFor="taskIn" style={{ flex: '1 1 240px' }}>Нова задача<input id="taskIn" value={text} onChange={e => setText(e.target.value)} placeholder="Напр. Підготувати презентацію" autoComplete="off" /></label>
           <label className="field" htmlFor="taskPri">Пріоритет<select id="taskPri" value={pri} onChange={e => setPri(e.target.value as 'hi' | 'lo')}><option value="hi">Важливо</option><option value="lo">Звичайно</option></select></label>
+          {S.goals.length > 0 && <label className="field" htmlFor="taskGoal" style={{ flex: '1 1 180px' }}>Для цілі<select id="taskGoal" value={goal} onChange={e => { setGoal(e.target.value); if (e.target.value) setPri('hi'); }}><option value="">Без цілі</option>{S.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>}
           <button className="btn" style={{ alignSelf: 'flex-end' }}>Додати</button>
         </form>
         <div className="row" style={{ margin: '18px 0 6px' }}>
@@ -198,6 +228,7 @@ export function Tasks() {
             <div key={t.id} className={`item ${t.d ? 'done' : ''}`}>
               <button className="chk" aria-label="Позначити" onClick={() => { A.toggleTask(t.id); }}>{t.d && <Icon n="check" />}</button>
               <span className="t">{t.t}</span>
+              {t.goal && goalName(t.goal) && <button className="tag goaltag" title="Ця задача веде до цілі" onClick={() => go('goals')}>→ {goalName(t.goal)}</button>}
               {t.p === 'hi' && <span className="tag">Важливо</span>}
               <button className="x" title="Фокус на задачі" aria-label="Фокус на задачі" onClick={() => { update(s => { s.timer.task = t.t; }); go('focus'); }}><Icon n="focus" /></button>
               <button className="x" aria-label="Видалити" onClick={() => A.delTask(t.id)}><Icon n="x" /></button>
@@ -279,9 +310,12 @@ function MoodForm({ edit, onDone }: { edit?: MoodEntry | null; onDone?: () => vo
         </div>
       </div>
       <div className="field">
-        <span>Енергія</span>
-        <div className="seg" style={{ alignSelf: 'flex-start' }}>
-          {ENERGY.map((l, i) => <button type="button" key={l} aria-pressed={m.energy === i + 1} onClick={() => setM({ ...m, energy: m.energy === i + 1 ? 0 : i + 1 })}>{l}</button>)}
+        <span>Скільки в тебе сил зараз? <em className="opt">необовʼязково</em></span>
+        <div className="energy3">
+          {ENERGY3.map(x => {
+            const on = energyLevel(m.energy) === energyLevel(x.v);
+            return <button type="button" key={x.v} aria-pressed={on} onClick={() => setM({ ...m, energy: on ? 0 : x.v })}><b>{x.l}</b><small>{x.hint}</small></button>;
+          })}
         </div>
       </div>
       <div className="field">
@@ -335,7 +369,7 @@ function MoodLog({ k, setK, onEdit }: { k: string; setK: (k: string) => void; on
           <div className="item" key={m.id} style={{ alignItems: 'flex-start' }}>
             <span className="moodval num" style={{ background: moodColor(m.v) }}>{m.v}</span>
             <div className="t">
-              <div><b className="num">{hhmm(new Date(m.t))}</b> · {moodWord(m.v)}{m.energy > 0 && <span className="muted"> · енергія: {ENERGY[m.energy - 1].toLowerCase()}</span>}</div>
+              <div><b className="num">{hhmm(new Date(m.t))}</b> · {moodWord(m.v)}{m.energy > 0 && <span className="muted"> · {energyWord(m.energy).toLowerCase()}</span>}</div>
               {m.tags.length > 0 && <div className="tags small">{m.tags.map(t => <span key={t}>{t}</span>)}</div>}
               {m.note && <div className="muted" style={{ fontSize: 13, marginTop: 4, whiteSpace: 'pre-wrap' }}>{m.note}</div>}
             </div>
@@ -388,7 +422,7 @@ function MoodInsights() {
   list.forEach(m => m.tags.forEach(t => byTag.set(t, [...(byTag.get(t) || []), m.v])));
   const tags = [...byTag].filter(([, v]) => v.length >= 2).map(([t, v]) => ({ t, d: avg(v) - all, n: v.length })).sort((a, b) => b.d - a.d);
   const up = tags.filter(x => x.d >= 0.3).slice(0, 3), down = tags.filter(x => x.d <= -0.3).slice(-3).reverse();
-  const energy = ENERGY.map((l, i) => { const v = list.filter(m => m.energy === i + 1).map(m => m.v); return { l, v: avg(v), n: v.length }; }).filter(e => e.n);
+  const energy = ENERGY3.map((x, i) => { const v = list.filter(m => energyLevel(m.energy) === i + 1).map(m => m.v); return { l: x.l, v: avg(v), n: v.length }; }).filter(e => e.n);
   return (
     <>
       <div className="ch"><div><h3>Закономірності</h3><p>За останні 30 днів · {list.length} {plural(list.length, 'запис', 'записи', 'записів')}</p></div></div>
@@ -447,14 +481,80 @@ export function Health() {
 }
 
 /* ---------------- Goals ---------------- */
+/** One goal: progress, its steps or number, the tasks that move it, and editing. */
+function GoalItem({ g }: { g: Goal }) {
+  const { S, A, update, go } = useStore();
+  const [edit, setEdit] = useState(false);
+  const [e, setE] = useState({ title: g.title, target: String(g.target || ''), unit: g.unit, due: g.due, area: g.area });
+  const [step, setStep] = useState('');
+  const [task, setTask] = useState('');
+  const steps = g.steps || [], bySteps = steps.length > 0 || !g.target;
+  const prog = goalProgress(g), done = prog >= 1 && (steps.length > 0 || g.target > 0), left = g.due ? daysTo(g.due) : null;
+  const tasks = S.tasks.filter(t => t.goal === g.id && !t.d);
+  const save = () => { A.updateGoal(g.id, { title: e.title.trim() || g.title, target: Math.max(0, +e.target || 0), unit: e.unit.trim(), due: e.due, area: e.area }); setEdit(false); };
+  return (
+    <div className="goal">
+      <div className="row" style={{ flexWrap: 'nowrap' }}><b className="t" style={{ flex: 1, minWidth: 0 }}>{g.title}</b><span className={`tag ${done ? 'ok' : ''}`}>{done ? 'Досягнуто' : g.area}</span></div>
+      <div className="bar"><i style={{ width: prog * 100 + '%', background: done ? 'var(--good)' : 'var(--accent)' }} /></div>
+      <div className="row">
+        <span className="num">{bySteps ? `${steps.filter(s => s.d).length} з ${steps.length} кроків` : `${fmtN(g.cur)} / ${fmtN(g.target)} ${g.unit}`}</span>
+        <span className="muted" style={{ fontSize: 12 }}>{left === null ? 'без дедлайну' : left < 0 ? 'термін минув' : left === 0 ? 'дедлайн сьогодні' : 'ще ' + left + ' дн'}</span>
+        <span className="row" style={{ marginLeft: 'auto', gap: 6 }}>
+          {!bySteps && <><button className="sqb" aria-label="Зменшити прогрес" onClick={() => A.stepGoal(g.id, -1)}>−</button><button className="sqb" onClick={() => A.stepGoal(g.id, 1)}>+{fmtN(goalStep(g.target))}</button></>}
+          <button className="sqb" onClick={() => setEdit(!edit)}>{edit ? 'Закрити' : 'Змінити'}</button>
+          <DelBtn label="Видалити ціль" onDelete={() => A.delGoal(g.id)} />
+        </span>
+      </div>
+      {(bySteps || edit) && (
+        <div className="gsteps">
+          {steps.map(s => (
+            <div className={`item ${s.d ? 'done' : ''}`} key={s.id}>
+              <button className={`chk ${s.d ? 'on' : ''}`} aria-pressed={s.d} aria-label={`Крок: ${s.t}`} onClick={() => A.toggleStep(g.id, s.id)}>{s.d && <Icon n="check" />}</button>
+              <span className="t">{s.t}</span>
+              <button className="x" aria-label="Видалити крок" onClick={() => A.delStep(g.id, s.id)}><Icon n="x" /></button>
+            </div>
+          ))}
+          <input className="gin" placeholder="+ крок, напр. «написати їй у неділю»" value={step} onChange={x => setStep(x.target.value)} onKeyDown={x => { if (x.key === 'Enter') { x.preventDefault(); A.addStep(g.id, step); setStep(''); } }} aria-label="Додати крок до цілі" />
+        </div>
+      )}
+      <div className="gtasks">
+        <span className="muted" style={{ fontSize: 12 }}>Задачі для цілі{tasks.length ? '' : ': поки немає'}</span>
+        {tasks.map(t => (
+          <div className="item" key={t.id}>
+            <button className="chk" aria-label="Виконано" onClick={() => A.toggleTask(t.id)} />
+            <span className="t">{t.t}</span>{t.p === 'hi' && <span className="tag">Важливо</span>}
+            <button className="x" title="Фокус на задачі" aria-label="Фокус на задачі" onClick={() => { update(s => { s.timer.task = t.t; }); go('focus'); }}><Icon n="focus" /></button>
+          </div>
+        ))}
+        <input className="gin" placeholder="+ задача, напр. «написати 5 бізнесам»" value={task} onChange={x => setTask(x.target.value)} onKeyDown={x => { if (x.key === 'Enter') { x.preventDefault(); A.addTask(task, 'hi', g.id); setTask(''); } }} aria-label="Додати задачу для цілі" />
+      </div>
+      {edit && (
+        <div className="gedit">
+          <label className="field" htmlFor={`gt${g.id}`}>Назва<input id={`gt${g.id}`} value={e.title} onChange={x => setE({ ...e, title: x.target.value })} /></label>
+          <div className="row">
+            <label className="field" htmlFor={`gn${g.id}`} style={{ flex: '1 1 90px' }}>Скільки (0 = по кроках)<input id={`gn${g.id}`} type="number" min="0" value={e.target} onChange={x => setE({ ...e, target: x.target.value })} /></label>
+            <label className="field" htmlFor={`gu${g.id}`} style={{ flex: '1 1 90px' }}>Одиниця<input id={`gu${g.id}`} value={e.unit} onChange={x => setE({ ...e, unit: x.target.value })} /></label>
+            <label className="field" htmlFor={`gd${g.id}`} style={{ flex: '1 1 140px' }}>Дедлайн<input id={`gd${g.id}`} type="date" value={e.due} onChange={x => setE({ ...e, due: x.target.value })} /></label>
+            <label className="field" htmlFor={`ga${g.id}`} style={{ flex: '1 1 120px' }}>Сфера<select id={`ga${g.id}`} value={e.area} onChange={x => setE({ ...e, area: x.target.value })}>{AREAS.map(a => <option key={a}>{a}</option>)}</select></label>
+          </div>
+          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={save}>Зберегти</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Goals() {
   const { S, A, update } = useStore();
-  const [v, setV] = useState({ title: '', target: '', unit: '', area: AREAS[0], due: '' });
+  const [v, setV] = useState({ title: '', target: '', unit: '', area: AREAS[0], due: '', steps: '' });
+  const [how, setHow] = useState<'num' | 'steps'>('steps');
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const t = +v.target; if (!v.title.trim() || !(t > 0)) return;
-    A.addGoal({ title: v.title.trim(), area: v.area, target: t, unit: v.unit.trim(), due: v.due });
-    setV({ ...v, title: '', target: '', unit: '' });
+    if (!v.title.trim()) return;
+    const steps = how === 'steps' ? v.steps.split('\n').map(s => s.trim()).filter(Boolean) : [];
+    const t = how === 'num' ? +v.target : 0; if (how === 'num' && !(t > 0)) return;
+    A.addGoal({ title: v.title.trim(), area: v.area, target: t, unit: how === 'num' ? v.unit.trim() : '', due: v.due, steps });
+    setV({ ...v, title: '', target: '', unit: '', steps: '' });
   };
   const weakest = AREAS[S.wheel.indexOf(Math.min(...S.wheel))];
   return (
@@ -463,34 +563,31 @@ export function Goals() {
       <div className="grid" style={{ marginTop: 18 }}>
         <div className="card s7">
           <form style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={submit}>
-            <label className="field" htmlFor="gTitle">Нова ціль<input id="gTitle" required placeholder="Напр. Пробігти напівмарафон" autoComplete="off" value={v.title} onChange={e => setV({ ...v, title: e.target.value })} /></label>
+            <label className="field" htmlFor="gTitle">Нова ціль<input id="gTitle" required placeholder="Напр. Перший клієнт для WebHjerte" autoComplete="off" value={v.title} onChange={e => setV({ ...v, title: e.target.value })} /></label>
+            <div className="field"><span>Як міряти прогрес</span>
+              <div className="seg" style={{ alignSelf: 'flex-start' }}>
+                <button type="button" aria-pressed={how === 'steps'} onClick={() => setHow('steps')}>Кроками</button>
+                <button type="button" aria-pressed={how === 'num'} onClick={() => setHow('num')}>Числом</button>
+              </div>
+            </div>
+            {how === 'steps' ? (
+              <label className="field" htmlFor="gSteps">Кроки, по одному в рядку
+                <textarea id="gSteps" rows={3} placeholder={'Скласти список 20 потенційних клієнтів\nНаписати 5 бізнесам\nВідправити пропозицію'} value={v.steps} onChange={e => setV({ ...v, steps: e.target.value })} />
+              </label>
+            ) : (
+              <div className="row">
+                <label className="field" htmlFor="gTarget" style={{ flex: '1 1 90px' }}>Скільки<input id="gTarget" type="number" min="1" required placeholder="21" value={v.target} onChange={e => setV({ ...v, target: e.target.value })} /></label>
+                <label className="field" htmlFor="gUnit" style={{ flex: '1 1 90px' }}>Одиниця<input id="gUnit" placeholder="км" autoComplete="off" value={v.unit} onChange={e => setV({ ...v, unit: e.target.value })} /></label>
+              </div>
+            )}
             <div className="row">
-              <label className="field" htmlFor="gTarget" style={{ flex: '1 1 90px' }}>Скільки<input id="gTarget" type="number" min="1" required placeholder="21" value={v.target} onChange={e => setV({ ...v, target: e.target.value })} /></label>
-              <label className="field" htmlFor="gUnit" style={{ flex: '1 1 90px' }}>Одиниця<input id="gUnit" placeholder="км" autoComplete="off" value={v.unit} onChange={e => setV({ ...v, unit: e.target.value })} /></label>
               <label className="field" htmlFor="gArea" style={{ flex: '1 1 120px' }}>Сфера<select id="gArea" value={v.area} onChange={e => setV({ ...v, area: e.target.value })}>{AREAS.map(a => <option key={a}>{a}</option>)}</select></label>
               <label className="field" htmlFor="gDue" style={{ flex: '1 1 140px' }}>Дедлайн<input id="gDue" type="date" value={v.due} onChange={e => setV({ ...v, due: e.target.value })} /></label>
             </div>
             <button className="btn" style={{ alignSelf: 'flex-start' }}>Додати ціль</button>
           </form>
           <div style={{ marginTop: 12 }}>
-            {S.goals.map(g => {
-              const done = g.cur >= g.target, left = g.due ? daysTo(g.due) : null;
-              return (
-                <div className="goal" key={g.id}>
-                  <div className="row" style={{ flexWrap: 'nowrap' }}><b className="t" style={{ flex: 1, minWidth: 0 }}>{g.title}</b><span className={`tag ${done ? 'ok' : ''}`}>{done ? 'Досягнуто' : g.area}</span></div>
-                  <div className="bar"><i style={{ width: pctW(g.cur, g.target) + '%', background: done ? 'var(--good)' : 'var(--accent)' }} /></div>
-                  <div className="row">
-                    <span className="num">{fmtN(g.cur)} / {fmtN(g.target)} {g.unit}</span>
-                    <span className="muted" style={{ fontSize: 12 }}>{left === null ? '' : left < 0 ? 'термін минув' : left === 0 ? 'дедлайн сьогодні' : 'ще ' + left + ' дн'}</span>
-                    <span className="row" style={{ marginLeft: 'auto', gap: 6 }}>
-                      <button className="sqb" aria-label="Зменшити прогрес" onClick={() => A.stepGoal(g.id, -1)}>−</button>
-                      <button className="sqb" onClick={() => A.stepGoal(g.id, 1)}>+{fmtN(goalStep(g.target))}</button>
-                      <DelBtn label="Видалити ціль" onDelete={() => A.delGoal(g.id)} />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+            {S.goals.map(g => <GoalItem key={g.id} g={g} />)}
             {!S.goals.length && <p className="muted">Цілей поки немає. Додай першу вище.</p>}
           </div>
         </div>
