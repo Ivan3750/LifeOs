@@ -8,6 +8,8 @@ export type HealthDay = { water: number; sleep: number; mood: number; steps: num
 export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake'>;
 /** A mood check-in at a moment of the day. v: 1–10, energy: 1–5 (0 = not set). */
 export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
+/** Time spent on errands and other non-work things (shop, commute…). start/end are timestamps. */
+export type Activity = { id: number; kind: string; title: string; start: number; end: number; demo?: 1 };
 export type Note = { id: number; title: string; text: string; created: number; updated: number; pinned?: boolean; demo?: 1 };
 export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; demo?: 1 };
 export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; demo?: 1 };
@@ -28,6 +30,7 @@ export type State = {
   name: string; goal: number; focusMin: number; breakMin: number;
   demo: boolean; notes: string; theme: Theme;
   noteList: Note[]; moods: MoodEntry[];
+  activities: Activity[]; act: { kind: string; title: string; start: number } | null;
   /** Waking day used to count free hours when no wake/bed time is logged. */
   dayStart: string; dayEnd: string;
   meals: Meal[];
@@ -46,6 +49,8 @@ export type State = {
 export type UiEvent = {
   id: string; date: string; s: string; e: string; title: string; c: string;
   ext?: boolean; allDay?: boolean; location?: string; localId?: number;
+  /** Id of a logged activity (0 for the one still running). */
+  act?: number;
 };
 
 /** Shape returned by /api/calendar. */

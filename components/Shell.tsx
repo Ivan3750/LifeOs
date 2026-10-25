@@ -77,6 +77,7 @@ function TopBar() {
       <div className="spacer" />
       <div id="pillSlot">
         {showPill && <button className="pill" onClick={() => go('focus')}>{T.running ? <span className="dot" /> : <Icon n="pause" />}<span className="num">{fmt(timerLeft)}</span></button>}
+        {S.act && <button className="pill act" title={`${S.act.kind}: відлік іде`} onClick={() => go('focus')}><span className="dot" />{S.act.kind}<span className="num">{(sec => (sec >= 3600 ? `${Math.floor(sec / 3600)}:${pad2(Math.floor(sec / 60) % 60)}` : fmt(sec)))(Math.max(0, Math.round((now - S.act.start) / 1000)))}</span></button>}
       </div>
       <div className="clock"><span className="d">{WD[n.getDay()]}, {n.getDate()} {MON[n.getMonth()]} · </span><b>{pad2(n.getHours())}:{pad2(n.getMinutes())}</b></div>
       <div style={{ position: 'relative' }}>

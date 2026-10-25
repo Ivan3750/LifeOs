@@ -2,6 +2,7 @@ import type { State, UiEvent } from './types';
 import { addD, daysInMonth, sod, toMin, ymd } from './util';
 
 export const MOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність', 'Втома', 'Стрес', 'Тривога', 'Сум', 'Злість', 'Нудьга', 'Самотність'];
+export const ACT_KINDS = ['Магазин', 'Дорога', 'Справи', 'Спорт', 'Готування', 'Прибирання', 'Відпочинок', 'Інше'];
 export const ENERGY = ['Без сил', 'Мало', 'Нормально', 'Бадьоро', 'Повно енергії'];
 export const moodWord = (v: number) => (v >= 9 ? 'Чудово' : v >= 7 ? 'Добре' : v >= 5 ? 'Нормально' : v >= 3 ? 'Так собі' : v > 0 ? 'Погано' : 'не відмічено');
 export const moodColor = (v: number) => (v ? `var(--m${Math.min(5, Math.max(1, Math.ceil(v / 2)))})` : 'var(--bar)');
