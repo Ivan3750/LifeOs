@@ -11,7 +11,13 @@ export type MoodEntry = { id: number; t: number; v: number; energy: number; tags
 /** Time spent on errands and other non-work things (shop, commute…). start/end are timestamps. */
 export type Activity = { id: number; kind: string; title: string; start: number; end: number; demo?: 1 };
 export type Note = { id: number; title: string; text: string; created: number; updated: number; pinned?: boolean; demo?: 1 };
-export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; demo?: 1 };
+export type Cur = 'DKK' | 'UAH';
+export type AccId = 'dk' | 'ua';
+/** A money account. opening: balance before the first record; budget: monthly spending budget in its currency. */
+export type Account = { id: AccId; name: string; cur: Cur; opening: number; budget: number };
+/** amt is in the currency of its account (acc, 'dk' for records saved before accounts existed).
+    xfer links the two halves of a transfer between accounts; transfers are not income or spending. */
+export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; demo?: 1 };
 export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; demo?: 1 };
 export type Stage = 'lead' | 'talk' | 'proposal' | 'won' | 'lost';
 export type Deal = { id: number; title: string; client: string; amt: number; stage: Stage; demo?: 1 };
@@ -40,7 +46,9 @@ export type State = {
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;
   habits: Habit[]; health: Record<string, HealthDay>;
-  money: { budget: number; tx: Tx[] };
+  /** budget is kept only for data from before accounts; the budgets now live on the accounts.
+      uahPerDkk: how many hryvnias one krone costs (from NBU or typed in), rateAt: when it was set. */
+  money: { budget: number; tx: Tx[]; accounts: Account[]; uahPerDkk: number; rateAt: number; rateSrc: 'nbu' | 'manual' };
   goals: Goal[]; wheel: number[];
   mode: Mode; view: string;
   co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[] };

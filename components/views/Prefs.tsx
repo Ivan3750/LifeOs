@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
 import { DN, TK } from '@/lib/util';
+import { account, accOf, txDKK } from '@/lib/money';
 import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
 import { CalStatusChip } from './Personal';
@@ -123,8 +124,11 @@ function exportJson(S: State) {
 
 function exportMoney(S: State) {
   const rows = [...S.money.tx].sort((a, b) => a.date.localeCompare(b.date))
-    .map(t => [t.date, t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, t.note]);
-  download(`pulse-os-finansy-${TK()}.csv`, 'text/csv;charset=utf-8', csv([['Дата', 'Тип', 'Категорія', 'Сума, kr.', 'Нотатка'], ...rows]));
+    .map(t => {
+      const a = account(S, accOf(t));
+      return [t.date, a.name, a.cur, t.xfer ? 'Переказ' : t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, Math.round((t.type === 'in' ? 1 : -1) * txDKK(S, t) * 100) / 100, t.note];
+    });
+  download(`pulse-os-finansy-${TK()}.csv`, 'text/csv;charset=utf-8', csv([['Дата', 'Рахунок', 'Валюта', 'Тип', 'Категорія', 'Сума', 'Сума, kr. за курсом', 'Нотатка'], ...rows]));
 }
 
 function exportFocus(S: State) {

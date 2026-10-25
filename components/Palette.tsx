@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, VIEWS } from '@/lib/store';
-import { GUESS, money, TK } from '@/lib/util';
+import { GUESS, TK } from '@/lib/util';
+import { fmtCur } from '@/lib/money';
 
 type Cmd = { l: string; k: string; run: () => void };
 
@@ -34,10 +35,12 @@ function PaletteDialog() {
       ...S.habits.filter(h => !h.days[TK()]).map(h => ({ l: 'Відмітити звичку: ' + h.name, k: 'Звичка', run: () => A.toggleHabit(h.id) })),
     ];
     const t = q.trim(), ql = t.toLowerCase();
-    const mm = t.match(/^-\s*(\d+(?:[.,]\d+)?)\s*(.*)$/);
+    // -45 кава → krone account; -250 ₴ таксі, -250 грн таксі or -250uah → hryvnia account
+    const mm = t.match(/^-\s*(\d+(?:[.,]\d+)?)\s*(₴|грн\.?|uah|kr\.?|dkk)?\s*(.*)$/i);
     if (mm) {
-      const amt = +mm[1].replace(',', '.'), note = mm[2] || '', cat = (GUESS.find(([re]) => re.test(note)) || [null, 'Інше'])[1];
-      return [{ l: `Записати витрату ${money(amt)} · ${cat}${note ? ' · ' + note : ''}`, k: 'Enter', run: () => A.addTx('out', amt, cat, note, TK()) }];
+      const amt = +mm[1].replace(',', '.'), acc = mm[2] && /₴|грн|uah/i.test(mm[2]) ? 'ua' : 'dk', note = mm[3] || '';
+      const cat = (GUESS.find(([re]) => re.test(note)) || [null, 'Інше'])[1];
+      return [{ l: `Записати витрату ${fmtCur(amt, acc === 'ua' ? 'UAH' : 'DKK')} · ${cat}${note ? ' · ' + note : ''}`, k: 'Enter', run: () => A.addTx('out', amt, cat, note, TK(), acc) }];
     }
     let r = ql ? base.filter(c => c.l.toLowerCase().includes(ql)) : base;
     if (t.startsWith('+')) r = [{ l: 'Додати задачу: ' + t.slice(1).trim(), k: 'Enter', run: () => A.addTask(t.slice(1)) }, ...r];

@@ -4,10 +4,10 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { MoodEntry, Note, UiEvent } from '@/lib/types';
 import { ACT_KINDS, dayMood, ENERGY, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { goalStep, liveSessions, useStore } from '@/lib/store';
-import { addD, AREAS, DAY, CATS, COLORS, daysInMonth, daysTo, DN, fmt, fmtN, hhmm, hmPlain, MON, MONTHN, money, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { addD, AREAS, DAY, COLORS, daysTo, DN, fmt, fmtN, hhmm, hmPlain, MON, MONTHN, pad2, pctW, plural, sod, sum, TK, toMin, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Bars, Radar } from '../charts';
-import { avg, CatBars, DelBtn, habStreak, lanes, LifeTiles, monthTx, sumT } from '../shared';
+import { avg, DelBtn, habStreak, lanes, LifeTiles } from '../shared';
 
 /* ---------------- Focus ---------------- */
 export function Focus() {
@@ -442,72 +442,6 @@ export function Health() {
         <div className="card s7"><MoodInsights /></div>
         <div className="card s6"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {moodAv.toFixed(1)} з 10</p></div></div><Bars vals={moods.map(v => Math.round(v * 10) / 10)} max={10} color={v => moodColor(v)} unit="/10" /></div>
         <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>      </div>
-    </section>
-  );
-}
-
-/* ---------------- Money ---------------- */
-export function Money() {
-  const { S, A, update } = useStore();
-  const [type, setType] = useState<'out' | 'in'>('out');
-  const [amt, setAmt] = useState('');
-  const [cat, setCat] = useState(CATS.out[0]);
-  const [note, setNote] = useState('');
-  const [date, setDate] = useState(TK());
-  const [budget, setBudget] = useState(String(S.money.budget));
-  const n = new Date(), mt = monthTx(S), inc = sumT(mt, 'in'), out = sumT(mt, 'out'), b = S.money.budget, dl = daysInMonth() - n.getDate() + 1;
-  const submit = (e: FormEvent) => { e.preventDefault(); A.addTx(type, +amt.replace(',', '.'), cat, note, date || TK()); setAmt(''); setNote(''); };
-  return (
-    <section className="view">
-      <div className="vh"><div><h2>Фінанси</h2><p>{MONTHN[n.getMonth()]} {n.getFullYear()} · до кінця місяця {dl} дн · суми в данських кронах</p></div></div>
-      <div className="grid" style={{ marginTop: 18 }}>
-        {([['Дохід', money(inc), 'var(--good)'], ['Витрати', money(out), 'var(--ink)'], ['Баланс', money(inc - out), inc - out >= 0 ? 'var(--good)' : 'var(--m1)']] as const).map(([k, v, c]) => (
-          <div key={k} className="card s3 stat"><div className="k">{k}</div><div className="v num" style={{ color: c }}>{v}</div></div>
-        ))}
-        <div className="card s3 stat">
-          <div className="k">Залишок бюджету</div>
-          <div className="v num" style={{ color: b - out < 0 ? 'var(--m1)' : 'var(--ink)' }}>{money(b - out)}</div>
-          <div className="bar" style={{ marginTop: 10 }}><i style={{ width: pctW(out, b) + '%' }} /></div>
-          <div className="k" style={{ marginTop: 6 }}>≈ {money(Math.max(0, b - out) / dl)} на день</div>
-        </div>
-      </div>
-      <div className="grid" style={{ marginTop: 18 }}>
-        <form className="card s5" style={{ display: 'flex', flexDirection: 'column', gap: 12 }} onSubmit={submit}>
-          <div className="seg" style={{ alignSelf: 'flex-start' }}>
-            {([['out', 'Витрата'], ['in', 'Дохід']] as const).map(([k, l]) => <button type="button" key={k} aria-pressed={type === k} onClick={() => { setType(k); setCat(CATS[k][0]); }}>{l}</button>)}
-          </div>
-          <div className="row">
-            <label className="field" htmlFor="txAmt" style={{ flex: '1 1 120px' }}>Сума, kr.<input id="txAmt" type="number" min="1" step="any" inputMode="decimal" required placeholder="120" value={amt} onChange={e => setAmt(e.target.value)} /></label>
-            <label className="field" htmlFor="txCat" style={{ flex: '1 1 140px' }}>Категорія<select id="txCat" value={cat} onChange={e => setCat(e.target.value)}>{CATS[type].map(c => <option key={c}>{c}</option>)}</select></label>
-          </div>
-          <label className="field" htmlFor="txNote">Коментар<input id="txNote" placeholder="Кава з друзями" autoComplete="off" value={note} onChange={e => setNote(e.target.value)} /></label>
-          <div className="row">
-            <label className="field" htmlFor="txDate" style={{ flex: '1 1 140px' }}>Дата<input id="txDate" type="date" required value={date} onChange={e => setDate(e.target.value)} /></label>
-            <label className="field" htmlFor="budget" style={{ flex: '1 1 140px' }}>Бюджет на місяць, kr.<input id="budget" type="number" min="0" step="100" value={budget} onChange={e => setBudget(e.target.value)} onBlur={() => update(s => { s.money.budget = Math.max(0, +budget || 0); })} /></label>
-          </div>
-          <button className="btn" style={{ alignSelf: 'flex-start' }}>Записати</button>
-          <p className="muted" style={{ margin: 0, fontSize: 12 }}>Швидше: Ctrl K і введи «-45 кава».</p>
-        </form>
-        <div className="card s7"><div className="ch"><div><h3>Куди йдуть гроші</h3><p>Витрати за категоріями цього місяця</p></div></div><div className="cats"><CatBars tx={mt} limit={8} /></div></div>
-        <div className="card s12">
-          <div className="ch"><div><h3>Записи місяця</h3></div></div>
-          <div className="list">
-            {[...mt].sort((a, c) => c.date.localeCompare(a.date) || c.id - a.id).map(t => {
-              const d = new Date(t.date + 'T00:00');
-              return (
-                <div className="item" key={t.id}>
-                  <span className={`sw ${t.type === 'in' ? 'c3' : 'c1'}`} />
-                  <span className="muted num" style={{ fontSize: 12, minWidth: 48 }}>{d.getDate()} {MON[d.getMonth()].slice(0, 3)}</span>
-                  <span className="t">{t.cat}{t.note && <span className="muted"> · {t.note}</span>}</span>
-                  <span className="num" style={{ fontWeight: 600, whiteSpace: 'nowrap', color: t.type === 'in' ? 'var(--good)' : 'var(--ink)' }}>{t.type === 'in' ? '+' : '−'}{money(t.amt)}</span>
-                  <button className="x" aria-label="Видалити запис" onClick={() => A.delTx(t.id)}><Icon n="x" /></button>
-                </div>
-              );
-            })}
-            {!mt.length && <p className="muted">Записів цього місяця немає.</p>}
-          </div>
-        </div>
-      </div>
     </section>
   );
 }

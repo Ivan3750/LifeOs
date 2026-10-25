@@ -1,5 +1,6 @@
 import type { State, Invoice } from './types';
 import { addD, rng, sod, wStart, ymd } from './util';
+import { DEFAULT_ACCOUNTS, DEFAULT_UAH_PER_DKK } from './money';
 
 /** Fresh state. With demo=true it is filled with clearly marked example data (amounts in DKK). */
 export function makeState(demo: boolean): State {
@@ -66,6 +67,10 @@ export function makeState(demo: boolean): State {
     tx.push({ id: id(), type: 'in', amt: 6800, cat: 'SU / стипендія', note: 'SU', date: ymd(new Date(y, m, 1)), demo: 1 });
     if (now.getDate() >= 10) tx.push({ id: id(), type: 'in', amt: 4500, cat: 'Фриланс', note: 'Лендінг для клієнта', date: ymd(new Date(y, m, 10)), demo: 1 });
     tx.push({ id: id(), type: 'out', amt: 3900, cat: 'Житло', note: 'Husleje', date: ymd(new Date(y, m, Math.min(2, now.getDate()))), demo: 1 });
+    // the Ukrainian account, amounts in hryvnias
+    tx.push({ id: id(), type: 'in', amt: 12000, cat: 'Фриланс', note: 'Сайт для клієнта з Києва', date: ymd(new Date(y, m, Math.min(5, now.getDate()))), acc: 'ua', demo: 1 });
+    tx.push({ id: id(), type: 'out', amt: 250, cat: 'Інше', note: 'Мобільний звʼязок', date: ymd(new Date(y, m, Math.min(3, now.getDate()))), acc: 'ua', demo: 1 });
+    tx.push({ id: id(), type: 'out', amt: 1800, cat: 'Покупки', note: 'Подарунок мамі', date: ymd(new Date(y, m, Math.min(12, now.getDate()))), acc: 'ua', demo: 1 });
     for (let d = 1; d <= now.getDate(); d++) {
       const k = 1 + Math.floor(r() * 2);
       for (let j = 0; j < k; j++) {
@@ -137,7 +142,8 @@ export function makeState(demo: boolean): State {
       : [],
     timer: { mode: 'focus', left: 25 * 60, running: false, endAt: 0, task: '' },
     log: [], unread: false, nextId,
-    habits, health, money: { budget: 9000, tx }, goals,
+    habits, health, goals,
+    money: { budget: 9000, tx, accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a, budget: a.id === 'ua' && demo ? 3000 : a.budget, opening: demo ? (a.id === 'dk' ? 4200 : 8500) : 0 })), uahPerDkk: DEFAULT_UAH_PER_DKK, rateAt: 0, rateSrc: 'manual' },
     wheel: demo ? [7, 6, 5, 8, 6, 4, 7, 6] : [5, 5, 5, 5, 5, 5, 5, 5],
     mode: 'me', view: 'home', co, icalUrls: [],
   };

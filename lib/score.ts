@@ -1,5 +1,6 @@
 import type { State, UiEvent } from './types';
 import { addD, sod, toMin, ymd } from './util';
+import { budgetDKK, monthOf, txDKK } from './money';
 
 export const MOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність', 'Втома', 'Стрес', 'Тривога', 'Сум', 'Злість', 'Нудьга', 'Самотність'];
 export const ACT_KINDS = ['Магазин', 'Дорога', 'Справи', 'Спорт', 'Готування', 'Прибирання', 'Відпочинок', 'Інше'];
@@ -120,14 +121,15 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
 
   // Spending: fixed bills (housing) come off the month budget first; the rest is split into a daily limit.
   // A day within the limit is full marks, twice the limit or more is zero.
-  const mk = k.slice(0, 7), monthTx = S.money.tx.filter(t => t.date.slice(0, 7) === mk && t.type === 'out');
-  if (S.money.budget > 0 && monthTx.length) {
+  // Both accounts count, hryvnias converted to kroner; transfers between own accounts are not spending.
+  const mk = k.slice(0, 7), monthTx = monthOf(S, mk).filter(t => t.type === 'out'), budget = budgetDKK(S);
+  if (budget > 0 && monthTx.length) {
     const d = new Date(k + 'T00:00'), dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-    const fixed = monthTx.filter(t => FIXED_CATS.includes(t.cat)).reduce((a, t) => a + t.amt, 0);
-    const lim = Math.max(0, S.money.budget - fixed) / dim;
-    const spent = monthTx.filter(t => t.date === k && !FIXED_CATS.includes(t.cat)).reduce((a, t) => a + t.amt, 0);
+    const fixed = monthTx.filter(t => FIXED_CATS.includes(t.cat)).reduce((a, t) => a + txDKK(S, t), 0);
+    const lim = Math.max(0, budget - fixed) / dim;
+    const spent = monthTx.filter(t => t.date === k && !FIXED_CATS.includes(t.cat)).reduce((a, t) => a + txDKK(S, t), 0);
     add('money', 'Витрати', 10, !lim ? (spent ? 0 : 1) : spent <= lim ? 1 : 2 - spent / lim, `${Math.round(spent)} з ${Math.round(lim)} kr. денного ліміту${fixed ? ', без житла' : ''}`);
-  } else skip('money', 'Витрати', S.money.budget > 0 ? 'цього місяця витрат не записано' : 'бюджет не задано');
+  } else skip('money', 'Витрати', budget > 0 ? 'цього місяця витрат не записано' : 'бюджет не задано');
 
   const max = parts.reduce((a, p) => a + p.max, 0), got = parts.reduce((a, p) => a + p.got, 0);
   return { total: max ? Math.round((got / max) * 100) : null, parts, skipped, ft };

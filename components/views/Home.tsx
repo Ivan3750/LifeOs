@@ -6,6 +6,7 @@ import { dayScore, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { FocusArea, Rhythm, Ring } from '../charts';
+import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
 import { CatBars, dayMinutes, habStreak, lanes, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
 
 const QUOTES: [string, string, string][] = [['Маленькі кроки', 'щодня', 'дають великий результат.'], ['Фокус —', 'це вміння', 'сказати «ні» зайвому.'], ['Краще', 'зроблено,', 'ніж ідеально.'], ['Сьогоднішня', 'робота —', 'завтрашня свобода.']];
@@ -296,7 +297,7 @@ export function Home() {
   S.sessions.forEach(s => { const i = Math.floor((sod(s.t).getTime() - ws) / DAY); if (i >= 0 && i < 7) blocks[i][Math.floor(new Date(s.t).getHours() / 4)] += s.m; });
   const goalMin = S.goal * 60, tdone = S.tasks.filter(t => t.d).length, tall = S.tasks.length || 1, st = streak(S);
   const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
-  const mt = monthTx(S), out = sumT(mt, 'out'), b = S.money.budget;
+  const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S);
   const gs = [...S.goals].sort((a, c) => c.cur / c.target - a.cur / a.target).slice(0, 4);
   return (
     <section className="view">
@@ -323,9 +324,12 @@ export function Home() {
           </div>
         </div>
         <div className="card s4">
-          <div className="ch"><Icon n="money" className="ic" /><div><h3>Фінанси</h3><p>{MONTHN[new Date().getMonth()]}, витрати</p></div><button className="sel" onClick={() => go('money')}>Деталі</button></div>
+          <div className="ch"><Icon n="money" className="ic" /><div><h3>Фінанси</h3><p>{MONTHN[new Date().getMonth()]}, витрати обох рахунків у кронах</p></div><button className="sel" onClick={() => go('money')}>Деталі</button></div>
           <div className="bigstat"><span className="v num" style={{ fontSize: 28 }}>{money(out)}</span><span className="muted">з {money(b)}</span></div>
-          <div className="bar" style={{ margin: '10px 0 16px' }}><i style={{ width: pctW(out, b) + '%', background: out > b ? 'var(--m1)' : 'var(--accent)' }} /></div>
+          <div className="bar" style={{ margin: '10px 0 10px' }}><i style={{ width: pctW(out, b) + '%', background: out > b ? 'var(--m1)' : 'var(--accent)' }} /></div>
+          <div className="accmini">
+            {(['dk', 'ua'] as const).map(id => { const a = account(S, id); return <button key={id} onClick={() => go('money')}><span className={`curtag ${a.cur}`}>{CUR_SIGN[a.cur]}</span><b className="num">{fmtCur(balance(S, id), a.cur)}</b></button>; })}
+          </div>
           <div className="cats"><CatBars tx={mt} limit={4} /></div>
         </div>
         <div className="card s4">

@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { ExtEvent, HealthField, Meal, Mode, State, UiEvent } from './types';
+import type { AccId, Account, ExtEvent, HealthField, Meal, Mode, State, Tx, UiEvent } from './types';
 import { makeState } from './seed';
+import { DEFAULT_ACCOUNTS, XFER_CAT, account, fmtCur } from './money';
 import { addD, hhmm, money, STAGES, sod, TK, toMin, ymd } from './util';
 
 const KEY = 'pulse-os-next-v1';
@@ -60,6 +61,10 @@ function fill(s: State): State {
     const text = (s.notes || '').trim();
     out.noteList = text ? [{ id: 1, title: 'Мої нотатки', text, created: Date.now(), updated: Date.now() }] : [];
     out.notes = '';
+  }
+  // money used to be one account in kroner: its budget moves onto the Danish account
+  if (!s.money?.accounts) {
+    out.money.accounts = DEFAULT_ACCOUNTS.map(a => (a.id === 'dk' ? { ...a, budget: s.money?.budget ?? a.budget } : { ...a }));
   }
   return out;
 }
@@ -360,12 +365,36 @@ function useStoreValue(dbOn: boolean) {
       addTask(text: string, p: 'hi' | 'lo' = 'lo') { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false }); }); toast('Задачу додано'); },
       toggleTask(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; t.d = !t.d; if (t.d && s.timer.task === t.t) s.timer.task = ''; }); },
       delTask(id: number) { update(s => { s.tasks = s.tasks.filter(x => x.id !== id); }); },
-      addTx(type: 'in' | 'out', amt: number, cat: string, note: string, date: string) {
+      addTx(type: 'in' | 'out', amt: number, cat: string, note: string, date: string, acc: AccId = 'dk') {
         if (!(amt > 0)) return;
-        update(s => { s.money.tx.push({ id: s.nextId++, type, amt, cat, note: (note || '').trim(), date }); });
-        toast((type === 'out' ? 'Витрату' : 'Дохід') + ' записано: ' + money(amt));
+        update(s => { s.money.tx.push({ id: s.nextId++, type, amt, cat, note: (note || '').trim(), date, acc }); });
+        toast((type === 'out' ? 'Витрату' : 'Дохід') + ' записано: ' + fmtCur(amt, account(S, acc).cur));
       },
-      delTx(id: number) { update(s => { s.money.tx = s.money.tx.filter(x => x.id !== id); }); },
+      /** Changes a record; for one half of a transfer only the note and date follow to the other half. */
+      updateTx(id: number, v: Partial<Pick<Tx, 'type' | 'amt' | 'cat' | 'note' | 'date' | 'acc'>>) {
+        update(s => {
+          const t = s.money.tx.find(x => x.id === id); if (!t) return;
+          Object.assign(t, v, v.note !== undefined ? { note: v.note.trim() } : {}); delete t.demo;
+          if (t.xfer) s.money.tx.filter(x => x.xfer === t.xfer && x.id !== id).forEach(o => { o.date = t.date; o.note = t.note; });
+        });
+        toast('Запис оновлено');
+      },
+      /** Moves money between own accounts: one record out of `from`, one into `to` (received may differ after conversion). */
+      addTransfer(from: AccId, to: AccId, amt: number, received: number, date: string, note: string) {
+        if (!(amt > 0) || !(received > 0) || from === to) return;
+        update(s => {
+          const x = s.nextId++;
+          s.money.tx.push({ id: s.nextId++, type: 'out', amt, cat: XFER_CAT, note: note.trim(), date, acc: from, xfer: x });
+          s.money.tx.push({ id: s.nextId++, type: 'in', amt: received, cat: XFER_CAT, note: note.trim(), date, acc: to, xfer: x });
+        });
+        toast(`Переказ: ${fmtCur(amt, account(S, from).cur)} → ${fmtCur(received, account(S, to).cur)}`);
+      },
+      setAccount(id: AccId, v: Partial<Pick<Account, 'name' | 'opening' | 'budget'>>) { update(s => { const a = s.money.accounts.find(x => x.id === id); if (a) Object.assign(a, v); }); },
+      setRate(uahPerDkk: number, src: 'nbu' | 'manual') { if (!(uahPerDkk > 0)) return; update(s => { s.money.uahPerDkk = uahPerDkk; s.money.rateAt = Date.now(); s.money.rateSrc = src; }); },
+      /** Deleting one half of a transfer removes both halves. */
+      delTx(id: number) {
+        update(s => { const t = s.money.tx.find(x => x.id === id); s.money.tx = s.money.tx.filter(x => x.id !== id && !(t?.xfer && x.xfer === t.xfer)); });
+      },
       addEvent(v: { title: string; date: string; s: string; e: string; c: string }) {
         if (toMin(v.e) <= toMin(v.s)) { toast('Кінець має бути пізніше за початок'); return false; }
         update(s => { s.events.push({ id: s.nextId++, ...v }); }); toast('Подію додано'); return true;

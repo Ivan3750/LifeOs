@@ -3,7 +3,8 @@
 import { StoreProvider, useStore } from '@/lib/store';
 import { Shell } from './Shell';
 import { Home } from './views/Home';
-import { Focus, Goals, Habits, Health, Money, Notes, Schedule, Tasks } from './views/Personal';
+import { Focus, Goals, Habits, Health, Notes, Schedule, Tasks } from './views/Personal';
+import { Money } from './views/Money';
 import { CoOverview, Deals, Invoices, Projects, Team } from './views/Company';
 import { Prefs } from './views/Prefs';
 

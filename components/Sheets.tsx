@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type FormEvent } from 'react';
 import { NAV, useStore, vinfo, type Store } from '@/lib/store';
+import type { AccId } from '@/lib/types';
 import { addD, CATS, COLORS, STAGES, TK, ymd } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { ModeSeg } from './Shell';
@@ -14,8 +15,8 @@ function forms(st: Store): Record<string, FormSpec> {
   const num = (v: string) => +v.replace(',', '.') || 0;
   return {
     task: { t: 'Нова задача', f: [{ k: 'text', label: 'Що зробити', req: true, ph: 'Напр. Подзвонити клієнту' }, { k: 'pri', label: 'Пріоритет', type: 'select', opts: [['lo', 'Звичайно'], ['hi', 'Важливо']], val: 'lo' }], ok: v => A.addTask(v.text, v.pri as 'hi' | 'lo') },
-    out: { t: 'Нова витрата', f: [{ k: 'amt', label: 'Сума, kr.', type: 'number', req: true, half: true, ph: '120' }, { k: 'cat', label: 'Категорія', type: 'select', half: true, opts: CATS.out.map(c => [c, c] as const) }, { k: 'note', label: 'Коментар', ph: 'Кава з друзями' }, { k: 'date', label: 'Дата', type: 'date', val: TK() }], ok: v => A.addTx('out', num(v.amt), v.cat, v.note, v.date || TK()) },
-    in: { t: 'Новий дохід', f: [{ k: 'amt', label: 'Сума, kr.', type: 'number', req: true, half: true, ph: '5000' }, { k: 'cat', label: 'Категорія', type: 'select', half: true, opts: CATS.in.map(c => [c, c] as const) }, { k: 'note', label: 'Коментар', ph: 'Звідки гроші' }, { k: 'date', label: 'Дата', type: 'date', val: TK() }], ok: v => A.addTx('in', num(v.amt), v.cat, v.note, v.date || TK()) },
+    out: { t: 'Нова витрата', f: [{ k: 'acc', label: 'Рахунок', type: 'select', opts: [['dk', 'Данський · kr.'], ['ua', 'Український · ₴']], val: 'dk' }, { k: 'amt', label: 'Сума', type: 'number', req: true, half: true, ph: '120' }, { k: 'cat', label: 'Категорія', type: 'select', half: true, opts: CATS.out.map(c => [c, c] as const) }, { k: 'note', label: 'Коментар', ph: 'Кава з друзями' }, { k: 'date', label: 'Дата', type: 'date', val: TK() }], ok: v => A.addTx('out', num(v.amt), v.cat, v.note, v.date || TK(), v.acc as AccId) },
+    in: { t: 'Новий дохід', f: [{ k: 'acc', label: 'Рахунок', type: 'select', opts: [['dk', 'Данський · kr.'], ['ua', 'Український · ₴']], val: 'dk' }, { k: 'amt', label: 'Сума', type: 'number', req: true, half: true, ph: '5000' }, { k: 'cat', label: 'Категорія', type: 'select', half: true, opts: CATS.in.map(c => [c, c] as const) }, { k: 'note', label: 'Коментар', ph: 'Звідки гроші' }, { k: 'date', label: 'Дата', type: 'date', val: TK() }], ok: v => A.addTx('in', num(v.amt), v.cat, v.note, v.date || TK(), v.acc as AccId) },
     event: { t: 'Нова подія', f: [{ k: 'title', label: 'Назва', req: true, ph: 'Зустріч, лекція, спорт…' }, { k: 'date', label: 'Дата', type: 'date', val: TK(), half: true }, { k: 'c', label: 'Колір', type: 'select', opts: COLORS, half: true }, { k: 's', label: 'Початок', type: 'time', val: '10:00', half: true }, { k: 'e', label: 'Кінець', type: 'time', val: '11:00', half: true }], ok: v => A.addEvent({ title: v.title, date: v.date || TK(), s: v.s, e: v.e, c: v.c }) },
     habit: { t: 'Нова звичка', f: [{ k: 'name', label: 'Звичка', req: true, ph: '10 хвилин медитації' }], ok: v => A.addHabit(v.name) },
     note: { t: 'Швидка нотатка', f: [{ k: 'text', label: 'Текст', type: 'textarea', req: true, ph: 'Ідея, думка, список…' }], ok: v => { A.addNote(v.text); } },
