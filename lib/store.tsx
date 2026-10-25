@@ -339,7 +339,15 @@ function useStoreValue(dbOn: boolean) {
         }
       }
     }
-    return [...mine, ...theirs].sort((a, b) => Number(!a.allDay) - Number(!b.allDay) || a.s.localeCompare(b.s));
+    // errands and other logged activities take time too; the running one counts up to now
+    const acts: UiEvent[] = [];
+    const runs = S.act ? [{ id: 0, kind: S.act.kind, title: S.act.title, start: S.act.start, end: Date.now() }] : [];
+    for (const a of [...S.activities, ...runs]) {
+      const st = new Date(a.start), en = new Date(a.end);
+      if (ymd(st) !== date) continue;
+      acts.push({ id: 'a' + a.id, date, s: hhmm(st), e: ymd(en) === date ? hhmm(en) : '23:59', title: a.title ? `${a.kind}: ${a.title}` : a.kind, c: 'c2', act: a.id });
+    }
+    return [...mine, ...theirs, ...acts].sort((a, b) => Number(!a.allDay) - Number(!b.allDay) || a.s.localeCompare(b.s));
   }, [S, ext]);
 
   /* ---------- actions ---------- */
@@ -383,6 +391,29 @@ function useStoreValue(dbOn: boolean) {
       dropEmptyNote(id: number) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id || x.title.trim() || x.text.trim()); }); },
       pinNote(id: number) { update(s => { const n = s.noteList.find(x => x.id === id); if (n) n.pinned = !n.pinned; }); },
       delNote(id: number, quiet = false) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id); }); if (!quiet) toast('Нотатку видалено'); },
+      startAct(kind: string, title: string) { update(s => { s.act = { kind, title: title.trim(), start: Date.now() }; }); },
+      /** Saves the running activity; runs shorter than a minute are dropped. */
+      stopAct() {
+        if (!S?.act) return;
+        const a = S.act, end = Date.now(), m = Math.round((end - a.start) / 6e4);
+        update(s => { if (m >= 1) s.activities.push({ id: s.nextId++, ...a, end }); s.act = null; });
+        toast(m >= 1 ? `${a.kind}: ${m} хв записано` : 'Менше хвилини, не записано');
+      },
+      cancelAct() { update(s => { s.act = null; }); },
+      addActivity(v: { kind: string; title: string; start: number; end: number }) {
+        if (v.end <= v.start) { toast('Кінець має бути пізніше за початок'); return false; }
+        update(s => { s.activities.push({ id: s.nextId++, ...v, title: v.title.trim() }); s.activities.sort((a, b) => a.start - b.start); });
+        toast(`${v.kind}: ${Math.round((v.end - v.start) / 6e4)} хв записано`); return true;
+      },
+      delActivity(id: number) { update(s => { s.activities = s.activities.filter(x => x.id !== id); }); },
+      /** Focus time entered by hand, e.g. work done away from the timer. */
+      addFocus(start: number, end: number) {
+        const m = Math.round((end - start) / 6e4);
+        if (m < 1) { toast('Кінець має бути пізніше за початок'); return false; }
+        update(s => { s.sessions.push({ t: start, m }); s.sessions.sort((a, b) => a.t - b.t); });
+        toast(`Фокус ${m} хв додано`); return true;
+      },
+      delSession(t: number) { update(s => { s.sessions = s.sessions.filter(x => x.t !== t); if (s.timer.sid === t) s.timer.sid = 0; }); },
       addMood(v: { t: number; v: number; energy: number; tags: string[]; note: string }) {
         update(s => { s.moods.push({ id: s.nextId++, ...v, note: v.note.trim() }); s.moods.sort((a, b) => a.t - b.t); });
         toast('Настрій записано');

@@ -110,7 +110,7 @@ export function makeState(demo: boolean): State {
 
   return {
     v: 1, name: 'Друже', goal: 20, focusMin: 25, breakMin: 5, demo, notes: '', theme: 'system',
-    noteList, moods, dayStart: '08:00', dayEnd: '22:00',
+    noteList, moods, dayStart: '08:00', dayEnd: '22:00', activities: [], act: null,
     meals: [
       { key: 'breakfast', label: 'Сніданок', s: '08:00', e: '08:30', on: true },
       { key: 'lunch', label: 'Обід', s: '12:30', e: '13:15', on: true },
@@ -148,6 +148,7 @@ export function stripDemo(s: State) {
   s.tasks = s.tasks.filter(x => !x.demo);
   s.events = s.events.filter(x => !x.demo);
   s.moods = s.moods.filter(x => !x.demo);
+  s.activities = s.activities.filter(x => !x.demo);
   s.noteList = s.noteList.filter(x => !x.demo);
   s.habits = s.habits.filter(x => !x.demo);
   s.goals = s.goals.filter(x => !x.demo);
