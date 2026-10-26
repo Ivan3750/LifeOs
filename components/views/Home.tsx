@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { liveSessions, useStore } from '@/lib/store';
 import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
-import { dayPlan, dayScore, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score';
+import { dayPlan, dayScore, SCORE_GROUPS, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { FocusArea, Rhythm, Ring } from '../charts';
@@ -233,7 +233,7 @@ function ScoreCard() {
   const endK = ymd(addD(dt, 3)) > today ? today : ymd(addD(dt, 3));
   const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : dayScore(S, d, eventsOn(d), live, now).total }));
   const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
-  const to: Record<string, string> = { focus: 'focus', sleep: 'health', habits: 'habits', mood: 'health', money: 'money' };
+  const to: Record<string, string> = { focus: 'focus', goals: 'goals', biz: 'schedule', sleep: 'health', water: 'health', move: 'health', habits: 'habits', mood: 'health', money: 'money' };
   const [how, setHow] = useState(false);
   return (
     <div className="card s5" id="score-card">
@@ -251,12 +251,17 @@ function ScoreCard() {
           <span>{scoreWord(sc.total)}</span>
         </div>
         <div className="scoreparts">
-          {sc.parts.map(p => (
-            <button key={p.key} className="sp" onClick={() => go(to[p.key])} title={p.hint}>
-              <span>{p.label}</span>
-              <div className="bar"><i style={{ width: (p.got / p.max) * 100 + '%', background: p.got / p.max >= 0.7 ? 'var(--good)' : p.got / p.max >= 0.4 ? 'var(--accent-2)' : 'var(--m1)' }} /></div>
-              <em className="num">{Math.round(p.got)}/{p.max}</em>
-            </button>
+          {sc.groups.map(g => (
+            <div key={g.key} className="sg">
+              <div className="sgh"><b>{g.label}</b><em className="num">{Math.round(g.got)}/{g.max}</em></div>
+              {sc.parts.filter(p => p.group === g.key).map(p => (
+                <button key={p.key} className="sp" onClick={() => go(to[p.key])} title={p.hint}>
+                  <span>{p.label}</span>
+                  <div className="bar"><i style={{ width: (p.got / p.max) * 100 + '%', background: p.got / p.max >= 0.7 ? 'var(--good)' : p.got / p.max >= 0.4 ? 'var(--accent-2)' : 'var(--m1)' }} /></div>
+                  <em className="num">{Math.round(p.got)}/{p.max}</em>
+                </button>
+              ))}
+            </div>
           ))}
           {sc.skipped.map(p => (
             <button key={p.key} className="sp off" onClick={() => go(to[p.key])} title={p.why}>
@@ -279,11 +284,12 @@ function ScoreCard() {
       <button className="howbtn" aria-expanded={how} onClick={() => setHow(!how)}>{how ? 'Сховати, як рахується' : 'Як рахується оцінка?'}</button>
       {how && (
         <ul className="howlist">
-          <li><b>Фокус, 30 балів.</b> Тижнева ціль ділиться на робочі дні, але не більше 60% вільного від подій і їжі часу. Сьогодні очікується лише та частина, що вже минула. У вихідний фокус не очікується, а робота йде в плюс.</li>
-          <li><b>Сон, 15.</b> 7–9 годин дає повний бал. Рахується, коли записано.</li>
-          <li><b>Звички, 15.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора.</li>
-          <li><b>Настрій, 10.</b> 7/10 і краще дає повний бал, «нормально» (5/10) приблизно 60%. Рахується, коли записано.</li>
-          <li><b>Витрати, 10.</b> Житло віднімається від місячного бюджету, решта ділиться на денний ліміт. У межах ліміту дає повний бал, удвічі більше дає нуль.</li>
+          <li>Оцінка складається з великих пунктів: <b>Робота й цілі</b> (фокус 20, час на цілі 10, час на бізнес 10), <b>Тіло</b> (сон 12, вода 4, рух 4), <b>Настрій</b> (10), <b>Звички</b> (20), <b>Гроші</b> (10).</li>
+          <li><b>Фокус.</b> Тижнева ціль ділиться на робочі дні, але не більше 60% вільного часу. Сьогодні очікується лише та частина, що вже минула. У вихідний робота йде в плюс.</li>
+          <li><b>Цілі й бізнес.</b> Рахується час фокусу на задачах, прив’язаних до цілі, та час із типом активності «Бізнес» (повний бал за 60 хв).</li>
+          <li><b>Тіло.</b> Сон 7–9 годин, 8 склянок води, 30 хв руху дають повні бали.</li>
+          <li><b>Звички.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора.</li>
+          <li><b>Настрій і гроші.</b> 7/10 і краще дає повний бал. Житло віднімається від місячного бюджету, решта ділиться на денний ліміт.</li>
           <li>Частина, яку не можна оцінити (не записано, вихідний, ще рано), не дає нуля: її просто немає, а решта перераховується до 100.</li>
         </ul>
       )}

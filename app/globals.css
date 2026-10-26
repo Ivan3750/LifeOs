@@ -698,3 +698,9 @@ main{min-width:0;display:flex;flex-direction:column;gap:18px}
 .woltbar{display:flex;height:10px;border-radius:99px;overflow:hidden;margin-top:12px;background:var(--bar)}
 .woltbar .w{background:#00C2E8}.woltbar .f{background:var(--accent)}
 @media (max-width:760px){.woltstats{grid-template-columns:repeat(2,minmax(0,1fr))}.goalbanner{flex-wrap:wrap}.energy3 small{display:none}}
+
+.sg{display:flex;flex-direction:column;gap:6px}
+.sg+.sg{margin-top:6px}
+.sgh{display:flex;justify-content:space-between;font-size:12px}
+.sgh em{font-style:normal;color:var(--muted)}
+.hnav{display:flex;align-items:center;gap:6px;margin-left:auto}
