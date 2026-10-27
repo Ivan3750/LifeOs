@@ -122,6 +122,8 @@ export const OFF_KINDS: Record<OffKind, { label: string; icon: string; why: stri
   rest: { label: 'Відпочинок', icon: '🌴', why: 'день відпочинку', habits: 1, money: true, move: true, sleepMax: 10, hint: 'Робота, цілі й бізнес не очікуються (але що зробив, те плюс). Решта як зазвичай.' },
   trip: { label: 'Поїздка', icon: '✈️', why: 'поїздка', habits: 0.5, money: true, move: false, sleepMax: 9, hint: 'Робота, цілі, бізнес і рух не очікуються. Достатньо половини звичок.' },
 };
+export const waterGoal = (S: State) => S.waterGoal || 8;
+export const moveGoal = (S: State) => S.moveGoal || 30;
 export const offOn = (S: State, k: string) => S.offDays?.[k];
 
 /** First day with any record at all. Earlier days have nothing to judge. */
@@ -194,11 +196,11 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   // A finished day that was otherwise tracked counts an empty water or movement log as zero:
   // otherwise leaving out the bad numbers would always be the best move. Today there is still time.
   const tracked = !isToday && !!(sl || dayMood(S, k) || ft.worked > 0 || S.habits.some(x => x.days[k]));
-  if (h?.water) add('water', 'Вода', 4, h.water / 8, `${h.water} з 8 склянок`, 'body');
+  if (h?.water) add('water', 'Вода', 4, h.water / waterGoal(S), `${h.water} з ${waterGoal(S)} склянок`, 'body');
   else if (tracked) add('water', 'Вода', 4, 0, 'не записано, рахується як 0', 'body');
   else skip('water', 'Вода', 'не записано');
   if (O && !O.move && !h?.workout) skip('move', 'Рух', O.why);
-  else if (h?.workout) add('move', 'Рух', 4, h.workout / 30, `${h.workout} з 30 хв руху`, 'body');
+  else if (h?.workout) add('move', 'Рух', 4, h.workout / moveGoal(S), `${h.workout} з ${moveGoal(S)} хв руху`, 'body');
   else if (tracked) add('move', 'Рух', 4, 0, 'не записано, рахується як 0', 'body');
   else skip('move', 'Рух', 'не записано');
 

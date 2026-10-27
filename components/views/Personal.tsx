@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { Goal, MoodEntry, Note, UiEvent } from '@/lib/types';
 import { scoreColor } from '@/lib/score';
-import { ACT_KINDS, dayMood, ENERGY3, energyLevel, energyWord, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
+import { ACT_KINDS, dayMood, moveGoal, waterGoal, ENERGY3, energyLevel, energyWord, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { goalStep, liveSessions, useStore } from '@/lib/store';
 import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
 import { WoltCard } from '../Wolt';
@@ -472,12 +472,16 @@ function MoodInsights() {
 export function Health() {
   const { S } = useStore();
   const [moodDay, setMoodDay] = useState(TK);
+  const [healthDay, setHealthDay] = useState(TK);
   const [editing, setEditing] = useState<MoodEntry | null>(null);
   const formCard = useRef<HTMLDivElement>(null);
   const startEdit = (m: MoodEntry) => { setEditing(m); setTimeout(() => formCard.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0); };
   const keys = [...Array(14)].map((_, i) => ymd(addD(new Date(), i - 13)));
   const days = keys.map(k => S.health[k]);
-  const ser = (f: 'sleep') => days.map(d => (d ? d[f] : 0));
+  const ser = (f: 'sleep' | 'water' | 'workout') => days.map(d => (d ? d[f] : 0));
+  const hday = S.health[healthDay];
+  const dd = new Date(healthDay + 'T00:00'), isT = healthDay === TK();
+  const wts = keys.map(k => S.health[k]?.weight || 0).filter(x => x > 0);
   const av = (f: Parameters<typeof ser>[0]) => avg(ser(f).filter(x => x > 0));
   const moods = keys.map(k => dayMood(S, k)), moodAv = avg(moods.filter(x => x > 0));
   // average clock time; times after noon count as the evening before so 23:30 and 00:30 average to midnight
@@ -489,7 +493,17 @@ export function Health() {
   return (
     <section className="view">
       <div className="vh"><div><h2>Здоровʼя</h2><p>Відмічай щодня. Настрій можна записувати кілька разів на день. Графіки показують останні 14 днів.</p></div></div>
-      <div className="card" style={{ marginTop: 18 }}><LifeTiles full /></div>
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="ch">
+          <div><h3>{isT ? 'Сьогодні' : `${WD[dd.getDay()]}, ${dd.getDate()} ${MON[dd.getMonth()]}`}</h3><p>{isT ? 'Сон, вода, рух і вага. Минулі дні можна доповнити стрілками' : 'Доповнюєш минулий день. Ці дані йдуть в оцінку того дня'}{hday?.demo ? ' · демо-дані' : ''}</p></div>
+          <div className="row" style={{ marginLeft: 'auto', gap: 6, flexWrap: 'nowrap' }}>
+            {!isT && <button className="btn ghost" onClick={() => setHealthDay(TK())}>Сьогодні</button>}
+            <button className="btn ghost cal-nav" aria-label="Попередній день" onClick={() => setHealthDay(ymd(addD(dd, -1)))}>‹</button>
+            <button className="btn ghost cal-nav" aria-label="Наступний день" disabled={isT} onClick={() => setHealthDay(ymd(addD(dd, 1)))}>›</button>
+          </div>
+        </div>
+        <LifeTiles full k={healthDay} />
+      </div>
       <div className="grid" style={{ marginTop: 18 }}>
         <div className="card s5" ref={formCard}>
           <div className="ch"><div><h3>{editing ? 'Змінити запис' : 'Як ти зараз?'}</h3><p>{editing ? `Запис від ${new Date(editing.t).getDate()} ${MON[new Date(editing.t).getMonth()]}, ${hhmm(new Date(editing.t))}` : 'Запиши настрій з часом і деталями'}</p></div></div>
@@ -499,7 +513,11 @@ export function Health() {
         <div className="card s5"><MoodMonth k={moodDay} setK={setMoodDay} /></div>
         <div className="card s7"><MoodInsights /></div>
         <div className="card s6"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {moodAv.toFixed(1)} з 10</p></div></div><Bars vals={moods.map(v => Math.round(v * 10) / 10)} max={10} color={v => moodColor(v)} unit="/10" /></div>
-        <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>      </div>
+        <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
+        <div className="card s6"><div className="ch"><div><h3>Вода</h3><p>{av('water') ? `У середньому ${av('water').toFixed(1)} склянки на день · ціль ${waterGoal(S)}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('water')} max={Math.max(12, waterGoal(S) + 2)} color={v => (v >= waterGoal(S) ? 'var(--good)' : 'var(--accent-2)')} target={waterGoal(S)} unit=" склянок" /></div>
+        <div className="card s6"><div className="ch"><div><h3>Рух</h3><p>{av('workout') ? `У середньому ${Math.round(av('workout'))} хв на день · ціль ${moveGoal(S)}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('workout')} max={Math.max(90, moveGoal(S) * 2)} color={v => (v >= moveGoal(S) ? 'var(--good)' : 'var(--accent)')} target={moveGoal(S)} unit=" хв" /></div>
+        {wts.length > 1 && <div className="card s12"><div className="ch"><div><h3>Вага</h3><p>{wts[0]} → {wts[wts.length - 1]} кг за 14 днів ({wts[wts.length - 1] - wts[0] >= 0 ? '+' : ''}{(Math.round((wts[wts.length - 1] - wts[0]) * 10) / 10)} кг)</p></div></div></div>}
+      </div>
     </section>
   );
 }

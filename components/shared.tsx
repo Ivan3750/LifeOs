@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import type { State, Tx, UiEvent } from '@/lib/types';
 import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
-import { dayMood, ENERGY3, energyWord, moodColor, moodsOn, moodWord } from '@/lib/score';
+import { dayMood, moveGoal, waterGoal, ENERGY3, energyWord, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { budgetDKK, monthOf, sumIn, txDKK } from '@/lib/money';
 
 export const today = () => TK();
@@ -68,47 +68,94 @@ function MoodTile() {
   );
 }
 
-/** Bed and wake time of last night; the hours of sleep are counted from them. */
-function SleepTile() {
+/** Bed and wake time of the night that ended on day k; the hours of sleep are counted from them (or typed in). */
+function SleepTile({ k }: { k: string }) {
   const { S, A } = useStore();
-  const h = hdayOf(S);
+  const h = hdayOf(S, k);
   return (
     <div className="tile">
       <div className="lab"><span>Сон</span><span>ціль 8 год</span></div>
       <div className="tv num">{h.sleep || '—'}<small>{h.sleep ? 'год' : ''}</small></div>
       <div className="bar"><i style={{ width: pctW(h.sleep, 8) + '%', background: 'var(--sleep)' }} /></div>
       <div className="sleeptimes">
-        <label>Заснув<input type="time" value={h.bed || ''} onChange={e => A.setSleepTimes(e.target.value, h.wake || '')} aria-label="Коли заснув" /></label>
-        <label>Прокинувся<input type="time" value={h.wake || ''} onChange={e => A.setSleepTimes(h.bed || '', e.target.value)} aria-label="Коли прокинувся" /></label>
+        <label>Заснув<input type="time" value={h.bed || ''} onChange={e => A.setSleepTimes(e.target.value, h.wake || '', k)} aria-label="Коли заснув" /></label>
+        <label>Прокинувся<input type="time" value={h.wake || ''} onChange={e => A.setSleepTimes(h.bed || '', e.target.value, k)} aria-label="Коли прокинувся" /></label>
       </div>
+      {!(h.bed && h.wake) && <NumBox key={k + 'sl'} label="Або годин сну" value={h.sleep} step={0.5} max={16} onSave={n => A.setH('sleep', n, k)} />}
     </div>
   );
 }
 
-function WeightTile() {
+/** A small number field that saves when you leave it, so typing "7,5" does not save "7" first. */
+function NumBox({ label, value, step, max, onSave }: { label: string; value: number; step: number; max: number; onSave: (n: number) => void }) {
+  const [v, setV] = useState(value ? String(value) : '');
+  return (
+    <label className="field" style={{ fontSize: 11 }}>{label}
+      <input type="number" min="0" max={max} step={step} inputMode="decimal" value={v} placeholder="0" onChange={e => setV(e.target.value)}
+        onBlur={() => { const n = +v.replace(',', '.') || 0; onSave(n); setV(n ? String(Math.min(max, Math.max(0, n))) : ''); }} />
+    </label>
+  );
+}
+
+/** Water in glasses (250 ml). Tap a glass to fill up to it; tap the last full glass again to take one away. */
+function WaterTile({ k }: { k: string }) {
   const { S, A } = useStore();
-  const h = hdayOf(S);
+  const w = hdayOf(S, k).water, goal = waterGoal(S), n = Math.max(goal, Math.min(20, Math.ceil(w)));
+  return (
+    <div className="tile">
+      <div className="lab"><span>Вода</span><span>ціль {goal} · {goal * 0.25} л</span></div>
+      <div className="tv num">{w}<small>з {goal} · {Math.round(w * 250) / 1000} л</small></div>
+      <div className="glasses" role="group" aria-label="Склянки води">
+        {[...Array(n)].map((_, i) => <button key={i} className={i < w ? 'on' : ''} aria-pressed={i < w} aria-label={`${i + 1} склянка`} onClick={() => A.setH('water', i + 1 === w ? i : i + 1, k)} />)}
+      </div>
+      {k === TK() && (() => { const h = new Date().getHours() + new Date().getMinutes() / 60, due = Math.round(goal * Math.min(1, Math.max(0, (h - 8) / 14))); return <div className="muted" style={{ fontSize: 11 }}>{w >= goal ? 'Норму виконано' : w >= due ? `Не відстаєш (до цього часу ≈ ${due})` : `До цього часу варто ≈ ${due}, ще ${due - Math.floor(w)}`}</div>; })()}
+      <div className="step"><button className="sq" aria-label="Мінус склянка" disabled={!w} onClick={() => A.addH('water', -1, k)}>−</button><button onClick={() => A.addH('water', 1, k)}>+ склянка</button></div>
+    </div>
+  );
+}
+
+/** Minutes of movement (walk, sport, workout) for the day. */
+function MoveTile({ k }: { k: string }) {
+  const { S, A } = useStore();
+  const m = hdayOf(S, k).workout, goal = moveGoal(S);
+  return (
+    <div className="tile">
+      <div className="lab"><span>Рух</span><span>ціль {goal} хв</span></div>
+      <div className="tv num">{m}<small>хв</small></div>
+      <div className="bar"><i style={{ width: pctW(m, goal) + '%', background: m >= goal ? 'var(--good)' : 'var(--accent)' }} /></div>
+      <div className="step"><button className="sq" aria-label="Мінус 10 хвилин" disabled={!m} onClick={() => A.addH('workout', -10, k)}>−10</button><button onClick={() => A.addH('workout', 10, k)}>+10</button><button onClick={() => A.addH('workout', 30, k)}>+30</button></div>
+    </div>
+  );
+}
+
+function WeightTile({ k }: { k: string }) {
+  const { S, A } = useStore();
+  const h = hdayOf(S, k);
   const [v, setV] = useState(h.weight ? String(h.weight) : '');
   return (
     <div className="tile">
       <div className="lab"><span>Вага</span><span>кг</span></div>
       <div className="tv num">{h.weight || '—'}<small>{h.weight ? 'кг' : ''}</small></div>
-      <label className="field" htmlFor="hWeight" style={{ marginTop: 'auto' }}>Записати сьогодні
-        <input id="hWeight" type="number" step="0.1" min="0" inputMode="decimal" value={v} placeholder="65.0" onChange={e => setV(e.target.value)} onBlur={() => A.setH('weight', +v.replace(',', '.') || 0)} />
+      <label className="field" htmlFor="hWeight" style={{ marginTop: 'auto' }}>Записати вагу
+        <input id="hWeight" type="number" step="0.1" min="0" inputMode="decimal" value={v} placeholder="65.0" onChange={e => setV(e.target.value)} onBlur={() => A.setH('weight', +v.replace(',', '.') || 0, k)} />
       </label>
     </div>
   );
 }
 
-export function LifeTiles({ full }: { full: boolean }) {
+/** Tiles for one day (today unless k is given). Mood check-ins are only for the present moment. */
+export function LifeTiles({ full, k = TK() }: { full: boolean; k?: string }) {
   const { S, go } = useStore();
+  const isToday = k === TK();
   const spent = sumT(S, monthTx(S).filter(x => x.date === TK()), 'out'), lim = budgetDKK(S) / daysInMonth();
   return (
     <div className="life">
-      <SleepTile />
-      <MoodTile />
+      <SleepTile k={k} />
+      {isToday && <MoodTile />}
+      <WaterTile k={k} />
+      <MoveTile k={k} />
       {full ? (
-        <WeightTile />
+        <WeightTile key={k} k={k} />
       ) : (
         <div className="tile">
           <div className="lab"><span>Витрати</span><span>ліміт {money(lim)}</span></div>

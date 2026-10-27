@@ -59,6 +59,8 @@ export type State = {
   workDays: boolean[];
   /** Days marked as not normal (sick, emergency…), keyed by date. */
   offDays?: Record<string, DayOff>;
+  /** Daily goals for the body: glasses of water (default 8) and minutes of movement (default 30). */
+  waterGoal?: number; moveGoal?: number;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;

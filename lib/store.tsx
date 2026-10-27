@@ -364,8 +364,8 @@ function useStoreValue(dbOn: boolean) {
     const hday = (s: State, k = TK()) => s.health[k] || (s.health[k] = { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0 });
     const LIM: Record<HealthField, [number, number]> = { water: [0, 20], sleep: [0, 16], steps: [0, 80000], workout: [0, 600], weight: [0, 350], mood: [0, 5] };
     return {
-      setH(f: HealthField, v: number) { update(s => { const h = hday(s); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },
-      addH(f: HealthField, d: number) { update(s => { const h = hday(s); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round((h[f] + d) * 10) / 10)); delete h.demo; }); },
+      setH(f: HealthField, v: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },
+      addH(f: HealthField, d: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round((h[f] + d) * 10) / 10)); delete h.demo; }); },
       addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}) }); }); toast('Задачу додано'); },
       setTaskGoal(id: number, goal?: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; if (goal) t.goal = goal; else delete t.goal; }); },
       updateTask(id: number, v: { t: string; p: 'hi' | 'lo'; goal?: number }) {

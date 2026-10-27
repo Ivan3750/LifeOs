@@ -177,6 +177,8 @@ export function Prefs() {
           <NumField id="pGoal" label="Ціль фокусу на тиждень, год" value={S.goal} min={1} max={80} onSave={n => update(s => { s.goal = n; })} />
           <NumField id="pFocus" label="Тривалість фокусу, хв" value={S.focusMin} min={5} max={120} onSave={n => update(s => { if (!s.timer.running && s.timer.mode === 'focus') { logFocus(s); s.timer.sid = 0; s.timer.left = n * 60; } s.focusMin = n; })} />
           <NumField id="pBreak" label="Тривалість перерви, хв" value={S.breakMin} min={1} max={60} onSave={n => update(s => { s.breakMin = n; if (!s.timer.running && s.timer.mode === 'break') s.timer.left = n * 60; })} />
+          <NumField id="pWater" label="Ціль води, склянок на день (по 250 мл)" value={S.waterGoal || 8} min={1} max={20} onSave={n => update(s => { s.waterGoal = n; })} />
+          <NumField id="pMove" label="Ціль руху, хв на день" value={S.moveGoal || 30} min={5} max={300} onSave={n => update(s => { s.moveGoal = n; })} />
           <TextField id="pCo" label="Назва компанії" value={S.co.name} fallback="Моя компанія" onSave={v => update(s => { s.co.name = v; })} />
           <NumField id="pCoGoal" label="Ціль виручки на місяць, kr." value={S.co.goal} min={1000} max={100000000} onSave={n => update(s => { s.co.goal = n; })} />
           <label className="field" htmlFor="pDayStart">{S.dayFromSleep !== false ? 'Початок дня, якщо сну ще не записано' : 'Початок дня (для вільного часу)'}
