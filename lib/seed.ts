@@ -86,7 +86,7 @@ export function makeState(demo: boolean): State {
         .map(([title, area, target, cur, unit, dd]) => ({ id: id(), title, area, target, cur, unit, due: ymd(addD(now, dd)), demo: 1 as const }))
     : [];
 
-  const co: State['co'] = { name: 'Моя студія', goal: 150000, invSeq: 0, deals: [], projects: [], invoices: [], team: [] };
+  const co: State['co'] = { name: 'Моя студія', goal: 150000, invSeq: 0, deals: [], projects: [], invoices: [], team: [], leads: [], ads: [] };
   if (demo) {
     co.deals = ([['Сайт для кавʼярні', 'Kaffebar Bønne', 45000, 'proposal'], ['Брендинг фітнес-клубу', 'FitLab', 80000, 'talk'], ['Підтримка вебмагазину', 'Shopik ApS', 15000, 'lead'], ['Лендінг конференції', 'DevDays', 30000, 'lead'], ['Мобільний застосунок', 'MedCare', 220000, 'talk'], ['SMM на 3 місяці', 'Bloom', 36000, 'won']] as const)
       .map(([title, client, amt, stage]) => ({ id: id(), title, client, amt, stage, demo: 1 as const }));
@@ -109,6 +109,11 @@ export function makeState(demo: boolean): State {
         inv(cl[Math.floor(r2() * cl.length)], Math.round((25000 + r2() * 35000) / 500) * 500, iss, addD(iss, 14), mo > 0 || j === 0 ? (pa > now ? now : pa) : null);
       }
     }
+    const ds = (n: number) => ymd(addD(now, n));
+    co.leads = ([['Нова кавʼярня «Zorya»', '@zorya.coffee', 'Instagram', 'replied', 30000, 1, 'Просили кошторис на сайт'], ['Dr. Jensen, стоматологія', 'jensen@tand.dk', 'Google', 'new', 25000, 0, ''], ['Студія йоги Flow', '+45 22 33 44 55', 'Рекомендація', 'meeting', 18000, 3, 'Зустріч у четвер'], ['Магазин Pixel', 'pixel.shop', 'Facebook', 'contacted', 12000, -2, 'Не відповів, написати ще раз'], ['Бар «Nord»', '@nordbar', 'TikTok', 'dead', 8000, 0, 'Немає бюджету']] as const)
+      .map(([name, contact, source, status, value, nd, note]) => ({ id: id(), name, contact, source, status, value, next: status === 'dead' ? '' : ds(nd), note, created: ds(-10), demo: 1 as const }));
+    co.ads = ([['Instagram', 1800, -20, 'Таргет на кавʼярні'], ['Google', 2400, -14, 'Пошукова реклама'], ['Instagram', 1500, -6, 'Reels'], ['Facebook', 900, -3, 'Ретаргетинг']] as const)
+      .map(([channel, amt, dd, note]) => ({ id: id(), date: ds(dd), channel, amt, note, demo: 1 as const }));
     inv('FitLab', 18000, addD(now, -20), addD(now, -6), null);
     inv('Kaffebar Bønne', 22500, addD(now, -2), addD(now, 12), null);
   }
@@ -165,5 +170,7 @@ export function stripDemo(s: State) {
   s.co.projects = s.co.projects.filter(x => !x.demo);
   s.co.invoices = s.co.invoices.filter(x => !x.demo);
   s.co.team = s.co.team.filter(x => !x.demo);
+  s.co.leads = s.co.leads.filter(x => !x.demo);
+  s.co.ads = s.co.ads.filter(x => !x.demo);
   s.demo = false;
 }

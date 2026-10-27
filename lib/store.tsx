@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { AccId, Account, ExtEvent, Goal, HealthField, Meal, Mode, State, Tx, UiEvent } from './types';
+import type { AccId, Account, AdSpend, DayOff, Deal, ExtEvent, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, Mode, OffKind, Project, State, Tx, UiEvent } from './types';
 import { makeState } from './seed';
 import { DEFAULT_ACCOUNTS, XFER_CAT, account, fmtCur } from './money';
 import { addD, hhmm, money, STAGES, sod, TK, toMin, ymd } from './util';
@@ -13,14 +13,14 @@ export const VIEWS: [string, string, string][] = [
   ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
   ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
-  ['co', 'Огляд', 'company'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
+  ['co', 'Огляд', 'company'], ['leads', 'Клієнти', 'leads'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
 ];
 export const NAV: Record<Mode, string[]> = {
   me: ['home', 'focus', 'tasks', 'habits', 'health', 'money', 'goals', 'schedule', 'notes', 'prefs'],
-  co: ['co', 'deals', 'projects', 'invoices', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
+  co: ['co', 'leads', 'deals', 'ads', 'projects', 'invoices', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
 };
-export const TABS: Record<Mode, string[]> = { me: ['home', 'focus', 'tasks', 'money'], co: ['co', 'deals', 'projects', 'invoices'] };
-const CO_ONLY = ['co', 'deals', 'projects', 'invoices', 'team'];
+export const TABS: Record<Mode, string[]> = { me: ['home', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
+const CO_ONLY = ['co', 'leads', 'ads', 'deals', 'projects', 'invoices', 'team'];
 const ME_ONLY = ['home', 'focus', 'habits', 'health', 'money', 'goals'];
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
@@ -86,7 +86,11 @@ const saveMeta = (m: Meta) => { try { localStorage.setItem(SYNC_KEY, JSON.string
 
 function useStoreValue(dbOn: boolean) {
   // The app is rendered on the client only (see ClientApp), so browser storage can be read during init.
-  const [S, setS] = useState<State>(load);
+  // opening a link like /#leads also switches to the mode that section belongs to
+  const [S, setS] = useState<State>(() => {
+    const s = load(), h = location.hash.slice(1), mode: Mode = CO_ONLY.includes(h) ? 'co' : ME_ONLY.includes(h) ? 'me' : s.mode;
+    return mode === s.mode ? s : { ...s, mode };
+  });
   const [view, setView] = useState(() => { const h = location.hash.slice(1); return vinfo(h) ? h : vinfo(S.view) ? S.view : 'home'; });
   const [now, setNow] = useState(() => Date.now());
   const [toastMsg, setToast] = useState<{ msg: string; id: number } | null>(null);
@@ -364,6 +368,16 @@ function useStoreValue(dbOn: boolean) {
       addH(f: HealthField, d: number) { update(s => { const h = hday(s); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round((h[f] + d) * 10) / 10)); delete h.demo; }); },
       addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}) }); }); toast('Задачу додано'); },
       setTaskGoal(id: number, goal?: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; if (goal) t.goal = goal; else delete t.goal; }); },
+      updateTask(id: number, v: { t: string; p: 'hi' | 'lo'; goal?: number }) {
+        const text = v.t.trim(); if (!text) return;
+        update(s => {
+          const t = s.tasks.find(x => x.id === id); if (!t) return;
+          // a focus run started on this task keeps following it after a rename
+          if (s.timer.task === t.t) s.timer.task = text;
+          t.t = text; t.p = v.p; delete t.demo; if (v.goal) t.goal = v.goal; else delete t.goal;
+        });
+        toast('Задачу оновлено');
+      },
       toggleTask(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; t.d = !t.d; if (t.d && s.timer.task === t.t) s.timer.task = ''; }); },
       delTask(id: number) { update(s => { s.tasks = s.tasks.filter(x => x.id !== id); }); },
       addTx(type: 'in' | 'out', amt: number, cat: string, note: string, date: string, acc: AccId = 'dk') {
@@ -400,8 +414,13 @@ function useStoreValue(dbOn: boolean) {
         if (toMin(v.e) <= toMin(v.s)) { toast('Кінець має бути пізніше за початок'); return false; }
         update(s => { s.events.push({ id: s.nextId++, ...v }); }); toast('Подію додано'); return true;
       },
+      updateEvent(id: number, v: { title: string; date: string; s: string; e: string; c: string }) {
+        if (toMin(v.e) <= toMin(v.s)) { toast('Кінець має бути пізніше за початок'); return false; }
+        update(s => { const x = s.events.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Подію оновлено'); return true;
+      },
       delEvent(id: number) { update(s => { s.events = s.events.filter(x => x.id !== id); }); },
       addHabit(name: string) { name = name.trim(); if (!name) return; update(s => { s.habits.push({ id: s.nextId++, name, days: {} }); }); toast('Звичку додано'); },
+      renameHabit(id: number, name: string) { name = name.trim(); if (!name) return; update(s => { const h = s.habits.find(x => x.id === id); if (h) { h.name = name; delete h.demo; } }); toast('Звичку перейменовано'); },
       toggleHabit(id: number, k = TK()) {
         if (!S) return;
         const willAllDone = k === TK() && S.habits.every(h => h.id === id ? !h.days[k] : h.days[k]);
@@ -480,7 +499,7 @@ function useStoreValue(dbOn: boolean) {
         update(s => { const x = s.goals.find(y => y.id === id)!; x.cur = cur; delete x.demo; });
         if (g.cur < g.target && cur >= g.target) notify('Ціль досягнуто: ' + g.title);
       },
-      delGoal(id: number) { update(s => { s.goals = s.goals.filter(x => x.id !== id); }); },
+      delGoal(id: number) { update(s => { s.goals = s.goals.filter(x => x.id !== id); s.tasks.forEach(t => { if (t.goal === id) delete t.goal; }); }); },
       addDeal(v: { title: string; client: string; amt: number; stage: string }) { update(s => { s.co.deals.push({ id: s.nextId++, title: v.title, client: v.client, amt: v.amt || 0, stage: (v.stage || 'lead') as 'lead' }); }); toast('Угоду додано'); },
       moveDeal(id: number, dir: number) {
         if (!S) return;
@@ -490,10 +509,14 @@ function useStoreValue(dbOn: boolean) {
         const won = STAGES[n][0] === 'won';
         update(s => {
           const x = s.co.deals.find(y => y.id === id)!; x.stage = STAGES[n][0]; delete x.demo;
-          if (won) { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: x.client || x.title, amt: x.amt, issued: TK(), due: ymd(addD(new Date(), 14)), paid: false, paidAt: '' }); }
+          // winning a deal again (after moving it back) does not bill twice
+          if (won && !s.co.invoices.some(i => i.deal === x.id)) { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: x.client || x.title, amt: x.amt, issued: TK(), due: ymd(addD(new Date(), 14)), paid: false, paidAt: '', deal: x.id }); }
         });
-        if (won) notify(`Угоду виграно: ${d.title}. Рахунок створено автоматично`);
+        if (won) notify(S.co.invoices.some(i => i.deal === d.id) ? `Угоду виграно: ${d.title}` : `Угоду виграно: ${d.title}. Рахунок створено автоматично`);
       },
+      updateDeal(id: number, v: Partial<Pick<Deal, 'title' | 'client' | 'amt' | 'stage'>>) { update(s => { const x = s.co.deals.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Угоду оновлено'); },
+      delDeal(id: number) { update(s => { s.co.deals = s.co.deals.filter(x => x.id !== id); }); },
+      restoreDeal(id: number) { update(s => { const x = s.co.deals.find(y => y.id === id); if (x) x.stage = 'lead'; }); toast('Угоду повернуто в «Лід»'); },
       loseDeal(id: number) { update(s => { const x = s.co.deals.find(y => y.id === id); if (x) x.stage = 'lost'; }); toast('Угоду позначено як програну'); },
       addProject(v: { name: string; client: string; budget: number; due: string }) { update(s => { s.co.projects.push({ id: s.nextId++, ...v, budget: v.budget || 0, progress: 0, status: 'active' }); }); toast('Проєкт додано'); },
       setProgress(id: number, p: number) {
@@ -502,12 +525,14 @@ function useStoreValue(dbOn: boolean) {
         update(s => { const x = s.co.projects.find(y => y.id === id)!; x.progress = p; delete x.demo; if (p >= 100) x.status = 'done'; else if (x.status === 'done') x.status = 'active'; });
         if (p >= 100 && pr.status !== 'done') notify('Проєкт завершено: ' + pr.name);
       },
+      updateProject(id: number, v: Partial<Pick<Project, 'name' | 'client' | 'budget' | 'due'>>) { update(s => { const x = s.co.projects.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Проєкт оновлено'); },
       cycleProject(id: number) { update(s => { const x = s.co.projects.find(y => y.id === id); if (!x) return; x.status = ({ active: 'paused', paused: 'done', done: 'active' } as const)[x.status]; if (x.status === 'done') x.progress = 100; }); },
       delProject(id: number) { update(s => { s.co.projects = s.co.projects.filter(x => x.id !== id); }); },
       addInvoice(v: { client: string; amt: number; due: string }) {
         update(s => { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: v.client, amt: v.amt || 0, issued: TK(), due: v.due || ymd(addD(new Date(), 14)), paid: false, paidAt: '' }); });
         toast('Рахунок створено');
       },
+      updateInvoice(id: number, v: Partial<Pick<Invoice, 'client' | 'amt' | 'due'>>) { update(s => { const x = s.co.invoices.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Рахунок оновлено'); },
       togglePaid(id: number) {
         if (!S) return;
         const i = S.co.invoices.find(x => x.id === id); if (!i) return;
@@ -515,7 +540,41 @@ function useStoreValue(dbOn: boolean) {
         if (!i.paid) toast(`Оплату ${money(i.amt)} зараховано`);
       },
       delInvoice(id: number) { update(s => { s.co.invoices = s.co.invoices.filter(x => x.id !== id); }); },
+      addLead(v: { name: string; contact: string; source: string; value: number; next: string; note: string; status?: LeadStatus }) {
+        update(s => { s.co.leads.push({ id: s.nextId++, name: v.name.trim(), contact: v.contact.trim(), source: v.source, status: v.status || 'new', value: v.value || 0, next: v.next, note: v.note.trim(), created: TK() }); });
+        toast('Потенційного клієнта додано');
+      },
+      updateLead(id: number, v: Partial<Pick<Lead, 'name' | 'contact' | 'source' | 'value' | 'next' | 'note' | 'status'>>) {
+        update(s => { const x = s.co.leads.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } });
+      },
+      /** Moves a lead along the chain; a lead that is closed no longer needs a next contact. */
+      setLeadStatus(id: number, status: LeadStatus) {
+        update(s => { const x = s.co.leads.find(y => y.id === id); if (!x) return; x.status = status; delete x.demo; if (status === 'won' || status === 'dead') x.next = ''; });
+      },
+      /** Turns a lead into a deal in the pipeline and marks the lead as a client. */
+      leadToDeal(id: number) {
+        const l = S.co.leads.find(x => x.id === id); if (!l) return;
+        update(s => {
+          const x = s.co.leads.find(y => y.id === id)!; x.status = 'won'; x.next = ''; delete x.demo;
+          s.co.deals.push({ id: s.nextId++, title: 'Угода: ' + x.name, client: x.name, amt: x.value, stage: 'lead' });
+        });
+        notify(`${l.name}: створено угоду`);
+      },
+      delLead(id: number) { update(s => { s.co.leads = s.co.leads.filter(x => x.id !== id); }); },
+      addAd(v: { date: string; channel: string; amt: number; note: string }) { if (!(v.amt > 0)) return false; update(s => { s.co.ads.push({ id: s.nextId++, ...v, note: v.note.trim() }); }); toast('Витрату на рекламу записано'); return true; },
+      updateAd(id: number, v: Partial<Pick<AdSpend, 'date' | 'channel' | 'amt' | 'note'>>) { update(s => { const x = s.co.ads.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Запис оновлено'); },
+      delAd(id: number) { update(s => { s.co.ads = s.co.ads.filter(x => x.id !== id); }); },
+      /** Marks a day as sick, emergency, rest or trip (null clears it); the day score is judged more gently on it. */
+      setDayOff(k: string, kind: OffKind | null, note?: string) {
+        update(s => {
+          const o: Record<string, DayOff> = { ...(s.offDays || {}) };
+          if (kind) o[k] = { kind, note: note ?? o[k]?.note ?? '' }; else delete o[k];
+          s.offDays = o;
+        });
+        toast(kind ? 'День позначено: оцінка буде м’якшою' : 'Позначку дня знято');
+      },
       addMember(v: { name: string; role: string }) { update(s => { s.co.team.push({ id: s.nextId++, ...v, load: 50 }); }); toast('Учасника додано'); },
+      updateMember(id: number, v: Partial<Pick<Member, 'name' | 'role'>>) { update(s => { const m = s.co.team.find(x => x.id === id); if (m) { Object.assign(m, v); delete m.demo; } }); toast('Учасника оновлено'); },
       setLoad(id: number, l: number) { update(s => { const m = s.co.team.find(x => x.id === id); if (m) m.load = l; }); },
       delMember(id: number) { update(s => { s.co.team = s.co.team.filter(x => x.id !== id); }); },
     };

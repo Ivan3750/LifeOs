@@ -20,8 +20,21 @@ export const weekMinutes = (S: State, off = 0) => {
   S.sessions.forEach(s => { const i = Math.floor((sod(s.t).getTime() - ws) / DAY); if (i >= 0 && i < 7) arr[i] += s.m; });
   return arr;
 };
-export const streak = (S: State) => { let n = 0, d = new Date(); if (!dayMinutes(S, d)) d = addD(d, -1); while (dayMinutes(S, d) > 0) { n++; d = addD(d, -1); } return n; };
-export const habStreak = (days: Record<string, 1>) => { let n = 0, d = new Date(); if (!days[ymd(d)]) d = addD(d, -1); while (days[ymd(d)]) { n++; d = addD(d, -1); } return n; };
+/** Days marked sick or emergency neither add to a streak nor break it. */
+const paused = (S: State, d: Date) => { const k = S.offDays?.[ymd(d)]?.kind; return k === 'sick' || k === 'urgent'; };
+export const streak = (S: State) => {
+  let n = 0, d = new Date(), guard = 0;
+  if (!dayMinutes(S, d) && !paused(S, d)) d = addD(d, -1);
+  while (guard++ < 4000 && (dayMinutes(S, d) > 0 || paused(S, d))) { if (dayMinutes(S, d) > 0) n++; d = addD(d, -1); }
+  return n;
+};
+export const habStreak = (days: Record<string, 1>, S?: State) => {
+  let n = 0, d = new Date(), guard = 0;
+  const skip = (x: Date) => !days[ymd(x)] && !!S && paused(S, x);
+  if (!days[ymd(d)] && !skip(d)) d = addD(d, -1);
+  while (guard++ < 4000 && (days[ymd(d)] || skip(d))) { if (days[ymd(d)]) n++; d = addD(d, -1); }
+  return n;
+};
 export const loadC = (l: number) => (l >= 100 ? 'var(--m1)' : l >= 80 ? 'var(--accent)' : 'var(--good)');
 export const avg = (a: number[]) => (a.length ? sum(a) / a.length : 0);
 

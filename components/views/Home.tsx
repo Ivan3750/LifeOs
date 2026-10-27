@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { liveSessions, useStore } from '@/lib/store';
 import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
-import { dayPlan, dayScore, SCORE_GROUPS, freeTime, lastDays, scoreColor, scoreWord } from '@/lib/score';
+import { dayPlan, dayScore, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
+import type { OffKind } from '@/lib/types';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { FocusArea, Rhythm, Ring } from '../charts';
@@ -41,6 +42,7 @@ function HeroStats() {
       <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
         <i style={{ background: scoreColor(sc.total) }} /><span>Оцінка</span><b className="num">{sc.total ?? '—'}</b>
       </button>
+      {sc.off && <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} title={OFF_KINDS[sc.off.kind].hint}><span>{OFF_KINDS[sc.off.kind].icon} {OFF_KINDS[sc.off.kind].label}</span><b className="num">м’якше</b></button>}
       <button onClick={() => go('focus')}><span>Фокус</span><b className="num">{focus >= 60 ? `${Math.floor(focus / 60)}г ${Math.round(focus % 60)}хв` : `${Math.round(focus)} хв`}</b></button>
       {S.habits.length > 0 && <button onClick={() => go('habits')}><span>Звички</span><b className="num">{hDone}/{S.habits.length}</b></button>}
       {goalTasks(S).length > 0 && <button onClick={() => go('focus')} title="Сесія фокусу на крок до цілі"><span>Для цілі</span><b className="num">{gMin >= 20 ? '✓ ' + Math.round(gMin) + ' хв' : gMin ? Math.round(gMin) + ' хв' : 'ще ні'}</b></button>}
@@ -144,7 +146,8 @@ export function SchedCard() {
             <b>{sel.title}</b>
             <small>{sel.allDay ? 'Весь день' : `${sel.s}–${sel.e}`}{sel.location ? ` · ${sel.location}` : ''} · {sel.ext ? 'з календаря' : 'моя подія'}</small>
           </div>
-          {!sel.ext && <button className="chip" onClick={() => { A.delEvent(sel.localId!); setOpen(null); }}>Видалити</button>}
+          {!sel.ext && sel.localId !== undefined && <button className="chip" onClick={() => { setSheet({ kind: 'form', key: 'editEvent', init: { id: String(sel.localId), title: sel.title, date: sel.date, s: sel.s, e: sel.e, c: sel.c } }); setOpen(null); }}>Змінити</button>}
+          {!sel.ext && sel.localId !== undefined && <button className="chip" onClick={() => { A.delEvent(sel.localId!); setOpen(null); }}>Видалити</button>}
           <button className="rnd" aria-label="Закрити" onClick={() => setOpen(null)}><Icon n="x" /></button>
         </div>
       ) : (
@@ -222,6 +225,26 @@ function FreeTimeCard() {
   );
 }
 
+/** Marks the shown day as sick, emergency, rest or trip, so the score is judged more gently on it. */
+function DayOffBar({ k }: { k: string }) {
+  const { S, A } = useStore();
+  const off = offOn(S, k);
+  return (
+    <div className="dayoff">
+      <div className="seg" role="group" aria-label="Тип дня">
+        <button aria-pressed={!off} onClick={() => off && A.setDayOff(k, null)}>Звичайний день</button>
+        {(Object.keys(OFF_KINDS) as OffKind[]).map(x => <button key={x} aria-pressed={off?.kind === x} onClick={() => A.setDayOff(k, x)}>{OFF_KINDS[x].icon} {OFF_KINDS[x].label}</button>)}
+      </div>
+      {off && (
+        <>
+          <p className="help" style={{ margin: 0 }}>{OFF_KINDS[off.kind].hint}</p>
+          <input className="txsearch" style={{ maxWidth: 'none' }} placeholder="Нотатка: що сталося (необовʼязково)" aria-label="Нотатка про день" defaultValue={off.note} key={k + off.kind} onBlur={e => e.target.value !== off.note && A.setDayOff(k, off.kind, e.target.value.trim())} />
+        </>
+      )}
+    </div>
+  );
+}
+
 /** Day score 0–100 with what it is made of. Arrows and the bars below switch to earlier days. */
 function ScoreCard() {
   const { S, eventsOn, now, go } = useStore();
@@ -245,6 +268,7 @@ function ScoreCard() {
           <button className="btn ghost cal-nav" aria-label="Наступний день" disabled={isToday} onClick={() => setK(ymd(addD(dt, 1)))}>›</button>
         </div>
       </div>
+      <DayOffBar k={k} />
       <div className="score">
         <div className="scorebig" style={{ ['--sc' as string]: scoreColor(sc.total) }}>
           <b className="num">{sc.total ?? '—'}</b><small>{sc.total === null ? '' : '/100'}</small>
@@ -290,9 +314,37 @@ function ScoreCard() {
           <li><b>Тіло.</b> Сон 7–9 годин, 8 склянок води, 30 хв руху дають повні бали.</li>
           <li><b>Звички.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора.</li>
           <li><b>Настрій і гроші.</b> 7/10 і краще дає повний бал. Житло віднімається від місячного бюджету, решта ділиться на денний ліміт.</li>
-          <li>Частина, яку не можна оцінити (не записано, вихідний, ще рано), не дає нуля: її просто немає, а решта перераховується до 100.</li>
+          <li>Частина, яку не можна оцінити (вихідний, ще рано, день без записів), не дає нуля: її просто немає, а решта перераховується до 100. Дні до початку записів і майбутні дні не оцінюються взагалі.</li>
+          <li><b>Без поблажок на завершений день.</b> Якщо день уже минув і ти вів його записи (сон, настрій, звички або фокус), порожні «вода» та «рух» рахуються як 0, а не пропускаються.</li>
+          <li><b>Не робочий день.</b> Захворів, екстрені справи, відпочинок або поїздка: робота, цілі та бізнес не очікуються (що зробив, те плюс, 20 хв уже повний бал), звички очікуються частково, хворому сон до 11 год — норма. Такі дні не обривають серію.</li>
         </ul>
       )}
+    </div>
+  );
+}
+
+/** The last seven days in numbers: average and best day, focus, habits and the days marked as off. */
+function WeekSummary() {
+  const { S, eventsOn, now } = useStore();
+  const live = liveSessions(S, now), days = lastDays(7);
+  const sc = days.map(d => ({ d, v: dayScore(S, d, eventsOn(d), live, now).total }));
+  const rated = sc.filter(x => x.v !== null) as { d: string; v: number }[];
+  const avgV = rated.length ? Math.round(rated.reduce((a, x) => a + x.v, 0) / rated.length) : null;
+  const best = rated.length ? rated.reduce((a, x) => (x.v > a.v ? x : a)) : null;
+  const worst = rated.length > 1 ? rated.reduce((a, x) => (x.v < a.v ? x : a)) : null;
+  const focus = days.reduce((a, d) => a + freeTime(S, d, eventsOn(d), live, now).worked, 0);
+  const off = days.filter(d => offOn(S, d)).length;
+  const dl = (d: string) => { const x = new Date(d + 'T00:00'); return `${DN[weekdayIdx(x)]} ${x.getDate()}`; };
+  const tiles: [string, string, string][] = [
+    ['Середня оцінка', avgV === null ? '—' : String(avgV), avgV === null ? 'ще нема даних' : scoreWord(avgV)],
+    ['Найкращий день', best ? String(best.v) : '—', best ? dl(best.d) : ''],
+    ['Найслабший день', worst ? String(worst.v) : '—', worst ? dl(worst.d) : ''],
+    ['Фокус за 7 днів', `${Math.floor(focus / 60)}г ${Math.round(focus % 60)}хв`, off ? `${off} ${plural(off, 'день', 'дні', 'днів')} не робочих — враховано` : 'без вихідних поблажок'],
+  ];
+  return (
+    <div className="card s12">
+      <div className="ch"><Icon n="trend" className="ic" /><div><h3>Тиждень у цифрах</h3><p>Останні 7 днів. Дні без записів і не робочі дні не псують середнє</p></div></div>
+      <div className="woltstats">{tiles.map(([l, v, sub]) => <div key={l}><span>{l}</span><b className="num">{v}</b><span style={{ marginTop: 2 }}>{sub}</span></div>)}</div>
     </div>
   );
 }
@@ -316,6 +368,8 @@ export function Home() {
         <ScoreCard />
         <FreeTimeCard />
 
+        <WeekSummary />
+
         <div className="card s12">
           <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
           <LifeTiles full={false} />
@@ -326,7 +380,7 @@ export function Home() {
           <div className="list">
             {S.habits.slice(0, 6).map(h => {
               const on = !!h.days[k];
-              return <div className="item" key={h.id}><button className={`chk ${on ? 'on' : ''}`} aria-pressed={on} aria-label={`Відмітити: ${h.name}`} onClick={() => A.toggleHabit(h.id)}>{on && <Icon n="check" />}</button><span className="t">{h.name}</span><span className="muted num" style={{ fontSize: 12 }}>{habStreak(h.days)} дн</span></div>;
+              return <div className="item" key={h.id}><button className={`chk ${on ? 'on' : ''}`} aria-pressed={on} aria-label={`Відмітити: ${h.name}`} onClick={() => A.toggleHabit(h.id)}>{on && <Icon n="check" />}</button><span className="t">{h.name}</span><span className="muted num" style={{ fontSize: 12 }}>{habStreak(h.days, S)} дн</span></div>;
             })}
             {!S.habits.length && <p className="muted">Звичок поки немає.</p>}
           </div>

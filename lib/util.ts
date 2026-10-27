@@ -11,6 +11,9 @@ export const CATS = {
   in: ['Wolt', 'Зарплата', 'SU / стипендія', 'Фриланс', 'Подарунок', 'Інше'],
 };
 export const AREAS = ['Здоровʼя', 'Карʼєра', 'Фінанси', 'Стосунки', 'Друзі', 'Відпочинок', 'Розвиток', 'Дім'];
+export const LEAD_SOURCES = ['Instagram', 'Facebook', 'Google', 'TikTok', 'LinkedIn', 'Telegram', 'Рекомендація', 'Сайт', 'Холодний пошук', 'Інше'];
+export const AD_CHANNELS = ['Instagram', 'Facebook', 'Google', 'TikTok', 'LinkedIn', 'Telegram', 'Блогер', 'Друк / флаєри', 'Інше'];
+export const LEAD_STATUS = [['new', 'Новий'], ['contacted', 'Написав'], ['replied', 'Відповів'], ['meeting', 'Зустріч'], ['won', 'Клієнт'], ['dead', 'Не цікаво']] as const;
 export const STAGES = [['lead', 'Лід'], ['talk', 'Перемовини'], ['proposal', 'Пропозиція'], ['won', 'Виграно']] as const;
 export const COLORS: [string, string][] = [['c1', 'Помаранчевий'], ['c2', 'Білий'], ['c3', 'Зелений'], ['c4', 'Бузковий']];
 export const GUESS: [RegExp, string][] = [

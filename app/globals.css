@@ -704,3 +704,13 @@ main{min-width:0;display:flex;flex-direction:column;gap:18px}
 .sgh{display:flex;justify-content:space-between;font-size:12px}
 .sgh em{font-style:normal;color:var(--muted)}
 .hnav{display:flex;align-items:center;gap:6px;margin-left:auto}
+
+/* day off, leads */
+.dayoff{display:flex;flex-direction:column;gap:8px;margin:2px 0 14px}
+.dayoff .seg{align-self:flex-start;max-width:100%}
+.dayoff .seg button{padding:6px 11px;font-size:12px}
+.item.lead{flex-wrap:wrap;row-gap:6px}
+.item.lead .t{flex:1 1 220px;min-width:0}
+.item.lead a{text-decoration:underline}
+.item.lead .sqb{white-space:nowrap}
+.item.lead>.row{flex-wrap:wrap!important}

@@ -26,7 +26,16 @@ export type Goal = { id: number; title: string; area: string; target: number; cu
 export type Stage = 'lead' | 'talk' | 'proposal' | 'won' | 'lost';
 export type Deal = { id: number; title: string; client: string; amt: number; stage: Stage; demo?: 1 };
 export type Project = { id: number; name: string; client: string; due: string; progress: number; status: 'active' | 'paused' | 'done'; budget: number; demo?: 1 };
-export type Invoice = { id: number; no: string; client: string; amt: number; issued: string; due: string; paid: boolean; paidAt: string; demo?: 1 };
+/** deal: the deal this invoice was created from, so winning it again does not bill twice. */
+export type Invoice = { id: number; no: string; client: string; amt: number; issued: string; due: string; paid: boolean; paidAt: string; deal?: number; demo?: 1 };
+export type LeadStatus = 'new' | 'contacted' | 'replied' | 'meeting' | 'won' | 'dead';
+/** A possible client. next: date of the next contact ('' when none planned); value: expected deal size in kr. */
+export type Lead = { id: number; name: string; contact: string; source: string; status: LeadStatus; value: number; next: string; note: string; created: string; demo?: 1 };
+/** Money spent on advertising in a channel on a date, in kr. */
+export type AdSpend = { id: number; date: string; channel: string; amt: number; note: string; demo?: 1 };
+/** A day that is not a normal working day. The day score is judged more gently on it. */
+export type OffKind = 'sick' | 'urgent' | 'rest' | 'trip';
+export type DayOff = { kind: OffKind; note: string };
 export type Member = { id: number; name: string; role: string; load: number; demo?: 1 };
 /** sid: start time of the session the current focus run is written to (0 when nothing is logged yet). */
 export type Timer = { mode: 'focus' | 'break'; left: number; running: boolean; endAt: number; task: string; sid?: number };
@@ -48,6 +57,8 @@ export type State = {
   meals: Meal[];
   /** Work days Mon..Sun. Focus is expected only on these days; the weekly goal is split between them. */
   workDays: boolean[];
+  /** Days marked as not normal (sick, emergency…), keyed by date. */
+  offDays?: Record<string, DayOff>;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;
@@ -57,7 +68,7 @@ export type State = {
   money: { budget: number; tx: Tx[]; accounts: Account[]; uahPerDkk: number; rateAt: number; rateSrc: 'nbu' | 'manual' };
   goals: Goal[]; wheel: number[];
   mode: Mode; view: string;
-  co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[] };
+  co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; ads: AdSpend[] };
   icalUrls: string[];
 };
 

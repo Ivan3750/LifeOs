@@ -202,7 +202,7 @@ function ActLog() {
 
 /* ---------------- Tasks ---------------- */
 export function Tasks() {
-  const { S, A, update, go } = useStore();
+  const { S, A, update, go, setSheet } = useStore();
   const [f, setF] = useState<'open' | 'done' | 'all'>('open');
   const [text, setText] = useState('');
   const [pri, setPri] = useState<'hi' | 'lo'>('lo');
@@ -232,6 +232,7 @@ export function Tasks() {
               {t.goal && goalName(t.goal) && <button className="tag goaltag" title="Ця задача веде до цілі" onClick={() => go('goals')}>→ {goalName(t.goal)}</button>}
               {t.p === 'hi' && <span className="tag">Важливо</span>}
               <button className="x" title="Фокус на задачі" aria-label="Фокус на задачі" onClick={() => { update(s => { s.timer.task = t.t; }); go('focus'); }}><Icon n="focus" /></button>
+              <button className="sqb" aria-label={`Змінити: ${t.t}`} onClick={() => setSheet({ kind: 'form', key: 'editTask', init: { id: String(t.id), text: t.t, pri: t.p, goal: t.goal ? String(t.goal) : '' } })}>Змінити</button>
               <button className="x" aria-label="Видалити" onClick={() => A.delTask(t.id)}><Icon n="x" /></button>
             </div>
           ))}
@@ -244,7 +245,7 @@ export function Tasks() {
 
 /* ---------------- Habits ---------------- */
 export function Habits() {
-  const { S, A } = useStore();
+  const { S, A, setSheet } = useStore();
   const [name, setName] = useState('');
   const [off, setOff] = useState(0);
   const ws = addD(wStart(), off * 7), ti = off === 0 ? weekdayIdx() : 6, k = TK(), now = new Date();
@@ -278,12 +279,12 @@ export function Habits() {
               <div className="habrow head"><span />{DN.map((d, i) => <span key={d} className={i === ti ? 'today' : ''}>{d}</span>)}<span>Серія</span><span /></div>
               {S.habits.map(h => (
                 <div className="habrow" key={h.id}>
-                  <span className="t">{h.name}</span>
+                  <button className="t" style={{ textAlign: 'left' }} title="Натисни, щоб перейменувати" onClick={() => setSheet({ kind: 'form', key: 'editHabit', init: { id: String(h.id), name: h.name } })}>{h.name}</button>
                   {DN.map((d, i) => {
                     const day = addD(ws, i), key = ymd(day), on = !!h.days[key];
                     return <button key={d} className={`hc ${on ? 'on' : ''}`} disabled={day > now} aria-pressed={on} aria-label={`${h.name}, ${d}`} onClick={() => A.toggleHabit(h.id, key)}>{on && <Icon n="check" />}</button>;
                   })}
-                  <span className="num" style={{ textAlign: 'center' }}>{habStreak(h.days)} дн</span>
+                  <span className="num" style={{ textAlign: 'center' }}>{habStreak(h.days, S)} дн</span>
                   <DelBtn label="Видалити звичку" onDelete={() => A.delHabit(h.id)} />
                 </div>
               ))}
@@ -637,7 +638,7 @@ type CalView = 'day' | 'week' | 'month';
 const HOUR = 44;
 
 export function Schedule() {
-  const { S, A, eventsOn, cal, refreshCal, go, now } = useStore();
+  const { S, A, eventsOn, cal, refreshCal, go, now, setSheet } = useStore();
   const [mode, setMode] = useState<CalView>(() => (typeof window !== 'undefined' && window.innerWidth < 640 ? 'day' : 'week'));
   const [anchor, setAnchor] = useState(TK());
   const [v, setV] = useState({ title: '', date: TK(), s: '10:00', e: '11:00', c: 'c1' });
@@ -685,6 +686,7 @@ export function Schedule() {
   const nowD = new Date(now), nowMin = nowD.getHours() * 60 + nowD.getMinutes();
   const evClass = (e: UiEvent) => `cev ${e.ext ? 'ext' : e.act !== undefined ? 'act' : e.c}`;
   const evTitle = (e: UiEvent) => `${e.title}${e.allDay ? '' : ` · ${e.s}–${e.e}`}${e.location ? ` · ${e.location}` : ''}${e.ext ? ' (календар)' : ''}`;
+  const editBtn = (e: UiEvent) => !e.ext && e.act === undefined && e.localId !== undefined && <button className="cx" style={{ right: 22 }} aria-label={`Змінити ${e.title}`} title="Змінити" onClick={x => { x.stopPropagation(); setSheet({ kind: 'form', key: 'editEvent', init: { id: String(e.localId), title: e.title, date: e.date, s: e.s, e: e.e, c: e.c } }); }}>✎</button>;
   const delBtn = (e: UiEvent) => !e.ext && e.act !== 0 && <button className="cx" aria-label={`Видалити ${e.title}`} title="Видалити" onClick={x => { x.stopPropagation(); if (e.act) A.delActivity(e.act); else A.delEvent(e.localId!); }}><Icon n="x" /></button>;
 
   return (
@@ -743,7 +745,7 @@ export function Schedule() {
                       return (
                         <div key={e.id} className={evClass(e)} title={evTitle(e)}
                           style={{ top: (s0 / 60 - h0) * HOUR, height: Math.max(20, ((e0 - s0) / 60) * HOUR - 2), left: `calc(${(lane / of) * 100}% + 2px)`, width: `calc(${100 / of}% - 4px)` }}>
-                          <b>{e.title}</b><small className="num">{e.s}–{e.e}{e.location ? ` · ${e.location}` : ''}</small>{delBtn(e)}
+                          <b>{e.title}</b><small className="num">{e.s}–{e.e}{e.location ? ` · ${e.location}` : ''}</small>{editBtn(e)}{delBtn(e)}
                         </div>
                       );
                     })}

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, VIEWS } from '@/lib/store';
 import { GUESS, TK } from '@/lib/util';
 import { fmtCur } from '@/lib/money';
+import { OFF_KINDS } from '@/lib/score';
+import type { OffKind } from '@/lib/types';
 
 type Cmd = { l: string; k: string; run: () => void };
 
@@ -30,6 +32,10 @@ function PaletteDialog() {
       { l: 'Нова угода', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'deal' }) },
       { l: 'Новий рахунок', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'invoice' }) },
       { l: 'Новий проєкт', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'project' }) },
+      { l: 'Новий потенційний клієнт', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'lead' }) },
+      { l: 'Записати витрату на рекламу', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'ad' }) },
+      ...(Object.entries(OFF_KINDS) as [OffKind, (typeof OFF_KINDS)[OffKind]][]).map(([kind, o]) => ({ l: `Сьогодні: ${o.label.toLowerCase()}`, k: 'День', run: () => A.setDayOff(TK(), kind) })),
+      ...(S.offDays?.[TK()] ? [{ l: 'Сьогодні звичайний день (зняти позначку)', k: 'День', run: () => A.setDayOff(TK(), null) }] : []),
       { l: 'Нова подія', k: 'Розклад', run: () => setSheet({ kind: 'form', key: 'event' }) },
       ...S.tasks.filter(t => !t.d).map(t => ({ l: 'Фокус на: ' + t.t, k: 'Задача', run: () => { update(s => { s.timer.task = t.t; }); go('focus'); } })),
       ...S.habits.filter(h => !h.days[TK()]).map(h => ({ l: 'Відмітити звичку: ' + h.name, k: 'Звичка', run: () => A.toggleHabit(h.id) })),
