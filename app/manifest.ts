@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Pulse OS',
-    short_name: 'Pulse OS',
+    name: 'LifeOs',
+    short_name: 'LifeOs',
     description: 'Особиста жива ОС: фокус, звички, здоровʼя, фінанси, цілі й календар.',
     start_url: '/',
     display: 'standalone',

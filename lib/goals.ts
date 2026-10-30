@@ -2,7 +2,7 @@ import type { Goal, Session, State } from './types';
 import { ymd } from './util';
 
 /** Share of a goal that is done, 0–1: by steps when it has any, otherwise by the number. */
-export const goalProgress = (g: Goal) => (g.steps?.length ? g.steps.filter(s => s.d).length / g.steps.length : g.target > 0 ? Math.min(1, g.cur / g.target) : 0);
+export const goalProgress = (g: Goal) => (g.kind === 'rating' ? (g.target > (g.from ?? 0) ? Math.max(0, Math.min(1, (g.cur - (g.from ?? 0)) / (g.target - (g.from ?? 0)))) : 0) : g.steps?.length ? g.steps.filter(s => s.d).length / g.steps.length : g.target > 0 ? Math.min(1, g.cur / g.target) : 0);
 
 /** Open tasks that move a goal forward, important first, then the goal with the nearest deadline. */
 export function goalTasks(S: State) {

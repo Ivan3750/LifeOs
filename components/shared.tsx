@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { Icon, type IconName } from './Icon';
+import { Face } from './Face';
 import type { State, Tx, UiEvent } from '@/lib/types';
 import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
-import { dayMood, moveGoal, waterGoal, ENERGY3, energyWord, moodColor, moodsOn, moodWord } from '@/lib/score';
+import { dayMood, moveGoal, waterGoal, ENERGY3, energyWord, moodsOn, moodWord } from '@/lib/score';
 import { budgetDKK, monthOf, sumIn, txDKK } from '@/lib/money';
 
 export const today = () => TK();
@@ -58,7 +59,7 @@ function MoodTile() {
         </div>
       ) : (
         <div className="moods">
-          {QUICK_MOODS.map(([v, m]) => <button key={v} title={m} aria-label={`Настрій зараз: ${m}`} style={{ ['--mc' as string]: moodColor(v) }} onClick={() => { A.addMood({ t: Date.now(), v, energy: 0, tags: [], note: '' }); setAskEnergy(true); }}>{v / 2}</button>)}
+          {QUICK_MOODS.map(([v, m]) => <button key={v} title={m} aria-label={`Настрій зараз: ${m}`} onClick={() => { A.addMood({ t: Date.now(), v, energy: 0, tags: [], note: '' }); setAskEnergy(true); }}><Face v={v} size={30} /></button>)}
         </div>
       )}
       <div className="muted" style={{ fontSize: 11, marginTop: 'auto', display: 'flex', justifyContent: 'space-between', gap: 6 }}>

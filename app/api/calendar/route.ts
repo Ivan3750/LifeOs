@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     try {
       let hit = cache.get(u);
       if (!hit || Date.now() - hit.at > CACHE_MS) {
-        const res = await fetchPublicText(u, { maxBytes: MAX_BYTES, headers: { 'user-agent': 'PulseOS/1.0 (+calendar sync)' } });
+        const res = await fetchPublicText(u, { maxBytes: MAX_BYTES, headers: { 'user-agent': 'LifeOs/1.0 (+calendar sync)' } });
         if (res.status !== 200) throw new Error(res.status === 404 ? 'посилання не знайдено (404). Можливо, його скинули в налаштуваннях календаря' : `сервер відповів ${res.status}`);
         if (!res.text.includes('BEGIN:VCALENDAR')) throw new Error('це не iCal-файл. Потрібне посилання, що закінчується на .ics');
         hit = { at: Date.now(), text: res.text };

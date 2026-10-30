@@ -6,7 +6,7 @@ import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
 import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
-import { Icon } from '../Icon';
+import { Icon, type IconName } from '../Icon';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
 import { CatBars, dayMinutes, habStreak, lanes, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
@@ -42,9 +42,9 @@ function HeroStats() {
   return (
     <div className="herostats">
       <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-        <i style={{ background: scoreColor(sc.total) }} /><span>Оцінка</span><b className="num">{sc.total ?? '—'}</b>
+        <span>Оцінка дня</span><b className="num" style={{ color: scoreColor(sc.total) }}>{sc.total ?? '—'}<small>/100</small></b>
       </button>
-      {sc.off && <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} title={OFF_KINDS[sc.off.kind].hint}><span>{OFF_KINDS[sc.off.kind].icon} {OFF_KINDS[sc.off.kind].label}</span><b className="num">м’якше</b></button>}
+      {sc.off && <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} title={OFF_KINDS[sc.off.kind].hint}><span>День</span><b>{OFF_KINDS[sc.off.kind].label}</b></button>}
       <button onClick={() => go('focus')}><span>Фокус</span><b className="num">{focus >= 60 ? `${Math.floor(focus / 60)}г ${Math.round(focus % 60)}хв` : `${Math.round(focus)} хв`}</b></button>
       {S.habits.length > 0 && <button onClick={() => go('habits')}><span>Звички</span><b className="num">{hDone}/{S.habits.length}</b></button>}
       {goalTasks(S).length > 0 && <button onClick={() => go('focus')} title="Сесія фокусу на крок до цілі"><span>Для цілі</span><b className="num">{gMin >= 20 ? '✓ ' + Math.round(gMin) + ' хв' : gMin ? Math.round(gMin) + ' хв' : 'ще ні'}</b></button>}
@@ -236,9 +236,9 @@ function DayOffBar({ k }: { k: string }) {
   const off = offOn(S, k);
   return (
     <div className="dayoff">
-      <div className="seg" role="group" aria-label="Тип дня">
-        <button aria-pressed={!off} onClick={() => off && A.setDayOff(k, null)}>Звичайний день</button>
-        {(Object.keys(OFF_KINDS) as OffKind[]).map(x => <button key={x} aria-pressed={off?.kind === x} onClick={() => A.setDayOff(k, x)}>{OFF_KINDS[x].icon} {OFF_KINDS[x].label}</button>)}
+      <div className="daytype" role="radiogroup" aria-label="Тип дня">
+        <button role="radio" aria-checked={!off} onClick={() => off && A.setDayOff(k, null)}><span className="di"><Icon n="sun" /></span>Звичайний</button>
+        {(Object.keys(OFF_KINDS) as OffKind[]).map(x => <button key={x} role="radio" aria-checked={off?.kind === x} onClick={() => A.setDayOff(k, x)}><span className="di"><Icon n={OFF_KINDS[x].icon as IconName} /></span>{OFF_KINDS[x].label}</button>)}
       </div>
       {off && (
         <>

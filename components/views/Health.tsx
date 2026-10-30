@@ -6,61 +6,97 @@ import { dayMood, moveGoal, waterGoal, ENERGY3, energyLevel, energyWord, MOOD_TA
 import { useNow, useStore } from '@/lib/store';
 import { addD, DAY, DN, hhmm, MON, pad2, plural, TK, toMin, WD, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
+import { Face } from '../Face';
 import { Bars } from '../charts';
 import { avg, DelBtn, LifeTiles } from '../shared';
 
-/** New mood check-in, or editing an existing one when `edit` is given. */
+/** Tags that lift the mood and tags that weigh on it, so they can be shown in two calm groups. */
+const GOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність'];
+const FACES: [number, string][] = [[2, 'Погано'], [4, 'Так собі'], [6, 'Нормально'], [8, 'Добре'], [10, 'Чудово']];
+
+/** New mood check-in, or editing an existing one when `edit` is given. One tap on a face is enough; the rest is optional. */
 function MoodForm({ edit, onDone }: { edit?: MoodEntry | null; onDone?: () => void }) {
   const { S, A } = useStore();
-  const blank = () => ({ date: TK(), time: hhmm(new Date()), v: 7, energy: 3, tags: [] as string[], note: '' });
+  const blank = () => ({ date: TK(), time: hhmm(new Date()), v: 7, energy: 0, tags: [] as string[], note: '' });
   const [m, setM] = useState(() => (edit ? { date: ymd(new Date(edit.t)), time: hhmm(new Date(edit.t)), v: edit.v, energy: edit.energy, tags: [...edit.tags], note: edit.note } : blank()));
   const [custom, setCustom] = useState('');
+  const [more, setMore] = useState(!!edit);
   // own tags used before come back as buttons
   const ownTags = [...new Set(S.moods.flatMap(x => x.tags))].filter(t => !MOOD_TAGS.includes(t));
+  const bad = [...MOOD_TAGS.filter(t => !GOOD_TAGS.includes(t)), ...ownTags, ...m.tags.filter(t => !MOOD_TAGS.includes(t) && !ownTags.includes(t))];
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const v = { t: new Date(`${m.date}T${m.time || '12:00'}`).getTime(), v: m.v, energy: m.energy, tags: m.tags, note: m.note };
-    if (edit) { A.updateMood(edit.id, v); onDone?.(); } else { A.addMood(v); setM(blank()); }
+    if (edit) { A.updateMood(edit.id, v); onDone?.(); } else { A.addMood(v); setM(blank()); setMore(false); }
   };
   const toggleTag = (t: string) => setM({ ...m, tags: m.tags.includes(t) ? m.tags.filter(x => x !== t) : [...m.tags, t] });
   const addCustom = () => { const t = custom.trim(); if (t && !m.tags.includes(t)) setM({ ...m, tags: [...m.tags, t] }); setCustom(''); };
+  const chip = (t: string, good: boolean) => <button type="button" key={t} className={`mtag ${good ? 'pos' : 'neg'}`} aria-pressed={m.tags.includes(t)} onClick={() => toggleTag(t)}>{t}</button>;
   return (
-    <form className="moodform" onSubmit={submit}>
-      <div className="row">
-        <label className="field" htmlFor="mdDate" style={{ flex: 1 }}>Дата<input id="mdDate" type="date" value={m.date} max={TK()} onChange={e => setM({ ...m, date: e.target.value })} /></label>
-        <label className="field" htmlFor="mdTime" style={{ flex: 1 }}>Час<input id="mdTime" type="time" value={m.time} onChange={e => setM({ ...m, time: e.target.value })} /></label>
+    <form className="mf" onSubmit={submit}>
+      <div className="mf-now" style={{ ['--mc' as string]: moodColor(m.v) }}>
+        <Face v={m.v} size={56} />
+        <div><b>{moodWord(m.v)}</b><span className="num">{m.v} з 10</span></div>
       </div>
-      <div className="field">
-        <div className="row" style={{ justifyContent: 'space-between' }}><span>Настрій</span><b className="num" style={{ color: moodColor(m.v) }}>{m.v}/10 · {moodWord(m.v)}</b></div>
-        <div className="scale10">
-          {[...Array(10)].map((_, i) => <button type="button" key={i} aria-pressed={m.v === i + 1} aria-label={`Настрій ${i + 1} з 10`} style={{ ['--mc' as string]: moodColor(i + 1) }} onClick={() => setM({ ...m, v: i + 1 })}>{i + 1}</button>)}
-        </div>
+      <div className="faces" role="radiogroup" aria-label="Настрій">
+        {FACES.map(([v, l]) => {
+          const on = Math.ceil(m.v / 2) === Math.ceil(v / 2);
+          return <button type="button" key={v} role="radio" aria-checked={on} aria-label={l} onClick={() => setM({ ...m, v: on ? m.v : v })}><Face v={v} size={46} /><small>{l}</small></button>;
+        })}
       </div>
-      <div className="field">
-        <span>Скільки в тебе сил зараз? <em className="opt">необовʼязково</em></span>
-        <div className="energy3">
+      <label className="mf-fine" htmlFor="mdV">Точніше
+        <input id="mdV" type="range" min={1} max={10} step={1} value={m.v} style={{ ['--mc' as string]: moodColor(m.v) }} onChange={e => setM({ ...m, v: +e.target.value })} />
+      </label>
+
+      <div className="mf-sec">
+        <h5>Сили</h5>
+        <div className="seg3" role="group" aria-label="Скільки сил">
           {ENERGY3.map(x => {
             const on = energyLevel(m.energy) === energyLevel(x.v);
-            return <button type="button" key={x.v} aria-pressed={on} onClick={() => setM({ ...m, energy: on ? 0 : x.v })}><b>{x.l}</b><small>{x.hint}</small></button>;
+            return <button type="button" key={x.v} aria-pressed={on} title={x.hint} onClick={() => setM({ ...m, energy: on ? 0 : x.v })}><Battery level={energyLevel(x.v)} />{x.l}</button>;
           })}
         </div>
       </div>
-      <div className="field">
-        <span>Що відчуваєш</span>
-        <div className="tags">
-          {[...MOOD_TAGS, ...ownTags, ...m.tags.filter(t => !MOOD_TAGS.includes(t) && !ownTags.includes(t))].map(t => <button type="button" key={t} aria-pressed={m.tags.includes(t)} onClick={() => toggleTag(t)}>{t}</button>)}
-          <input className="tagin" value={custom} placeholder="+ свій тег" aria-label="Додати свій тег" onChange={e => setCustom(e.target.value)} onBlur={addCustom}
+
+      <div className="mf-sec">
+        <h5>Що відчуваєш</h5>
+        <div className="mtags">
+          {GOOD_TAGS.map(t => chip(t, true))}
+          {bad.map(t => chip(t, false))}
+          <input className="tagin" value={custom} placeholder="+ своє" aria-label="Додати свій тег" onChange={e => setCustom(e.target.value)} onBlur={addCustom}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }} />
         </div>
       </div>
-      <label className="field" htmlFor="mdNote">Що сталося, про що думаєш
-        <textarea id="mdNote" rows={3} placeholder="Необовʼязково: що вплинуло на настрій" value={m.note} onChange={e => setM({ ...m, note: e.target.value })} />
-      </label>
+
+      {more ? (
+        <div className="mf-more">
+          <div className="row">
+            <label className="field" htmlFor="mdDate" style={{ flex: 1 }}>Дата<input id="mdDate" type="date" value={m.date} max={TK()} onChange={e => setM({ ...m, date: e.target.value })} /></label>
+            <label className="field" htmlFor="mdTime" style={{ flex: 1 }}>Час<input id="mdTime" type="time" value={m.time} onChange={e => setM({ ...m, time: e.target.value })} /></label>
+          </div>
+          <label className="field" htmlFor="mdNote">Нотатка
+            <textarea id="mdNote" rows={2} placeholder="Що сталося, про що думаєш" value={m.note} onChange={e => setM({ ...m, note: e.target.value })} />
+          </label>
+        </div>
+      ) : (
+        <button type="button" className="mf-link" onClick={() => setMore(true)}>Зараз, {m.time} · змінити час або додати нотатку</button>
+      )}
+
       <div className="row">
-        <button className="btn acc">{edit ? 'Зберегти зміни' : 'Записати настрій'}</button>
+        <button className="btn acc" style={{ flex: 1, justifyContent: 'center' }}>{edit ? 'Зберегти зміни' : 'Записати'}</button>
         {edit && <button type="button" className="btn ghost" onClick={onDone}>Скасувати</button>}
       </div>
     </form>
+  );
+}
+
+/** Small battery for the energy choices: one, two or three bars lit. */
+function Battery({ level }: { level: number }) {
+  return (
+    <svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true">
+      <rect x="1" y="1.5" width="17" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M20 5v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      {[0, 1, 2].map(i => <rect key={i} x={3 + i * 5} y="3.5" width="3.4" height="7" rx="1" fill={i < level ? 'currentColor' : 'none'} opacity={i < level ? 1 : 0} />)}
+    </svg>
   );
 }
 

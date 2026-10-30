@@ -20,16 +20,16 @@ function TaskRow({ t, minutes }: { t: Task; minutes: number }) {
   const st = dueState(t.due), late = !t.d && st === 'overdue';
   const edit = () => setSheet({ kind: 'form', key: 'editTask', init: { id: String(t.id), text: t.t, pri: t.p, goal: t.goal ? String(t.goal) : '', due: t.due || '' } });
   return (
-    <div className={`item task${t.d ? ' done' : ''}${t.p === 'hi' && !t.d ? ' hi' : ''}`}>
+    <div className={`item task${t.d ? ' done' : ''}`}>
       <button className="chk" role="checkbox" aria-checked={t.d} aria-label={t.d ? `Повернути в роботу: ${t.t}` : `Виконано: ${t.t}`} onClick={() => A.toggleTask(t.id)}>{t.d && <Icon n="check" />}</button>
       <div className="tmain">
-        <button className="t" onClick={edit} title="Змінити задачу">{t.t}</button>
+        <button className="t" onClick={edit} title="Змінити задачу">{t.t}{t.p === 'hi' && !t.d && <span className="tstar" title="Важлива"><Icon n="star" /></span>}</button>
         {(t.due || goal || minutes > 0) && (
           <div className="tmeta">
-            {t.due && <span className={`chipx due ${t.d ? '' : st}`}><Icon n="schedule" />{dueLabel(t.due)}</span>}
-            {goal && <button className="chipx goal" title="Ця задача веде до цілі" onClick={() => go('goals')}><Icon n="goals" />{goal.title}</button>}
-            {minutes > 0 && <span className="chipx"><Icon n="focus" />{hmPlain(minutes)}</span>}
-            {late && <button className="chipx act" onClick={() => A.setTaskDue(t.id, TK())}>Перенести на сьогодні</button>}
+            {t.due && <span className={`tm due ${t.d ? '' : st}`}><Icon n="schedule" />{dueLabel(t.due)}</span>}
+            {goal && <button className="tm goal" title="Ця задача веде до цілі" onClick={() => go('goals')}><Icon n="goals" />{goal.title}</button>}
+            {minutes > 0 && <span className="tm"><Icon n="focus" />{hmPlain(minutes)}</span>}
+            {late && <button className="tm act" onClick={() => A.setTaskDue(t.id, TK())}>перенести на сьогодні</button>}
           </div>
         )}
       </div>
@@ -117,7 +117,7 @@ export function Tasks() {
 
       <div className="card" style={{ marginTop: 18 }}>
         <div className="row tbar">
-          <div className="seg" role="group" aria-label="Які задачі показати">
+          <div className="tabs" role="group" aria-label="Які задачі показати">
             {([['open', 'Відкриті'], ['today', 'На сьогодні'], ['done', 'Виконані'], ['all', 'Усі']] as const).map(([k, l]) => (
               <button key={k} aria-pressed={f === k} onClick={() => setF(k)}>{l}{counts[k] > 0 && <span className="cnt">{counts[k]}</span>}</button>
             ))}

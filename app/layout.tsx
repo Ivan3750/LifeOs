@@ -6,10 +6,10 @@ const onest = Onest({ variable: '--font-onest', subsets: ['latin', 'cyrillic'], 
 const mono = JetBrains_Mono({ variable: '--font-mono', subsets: ['latin', 'cyrillic'], weight: ['500', '600'] });
 
 export const metadata: Metadata = {
-  title: 'Pulse OS',
+  title: 'LifeOs',
   description: 'Особиста жива ОС: фокус, звички, здоровʼя, фінанси, цілі, календар і режим компанії.',
   robots: { index: false, follow: false },
-  appleWebApp: { capable: true, title: 'Pulse OS', statusBarStyle: 'black-translucent' },
+  appleWebApp: { capable: true, title: 'LifeOs', statusBarStyle: 'black-translucent' },
   icons: { icon: '/icon.svg' },
 };
 

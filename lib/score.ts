@@ -117,10 +117,10 @@ export const bizMinutesOn = (S: State, k: string) => S.activities.filter(a => a.
     habits: share of the habits that is a full mark (0 = not expected at all), money: spending is judged,
     move: movement is expected, sleepMax: upper end of the good sleep range (a sick body needs more). */
 export const OFF_KINDS: Record<OffKind, { label: string; icon: string; why: string; habits: number; money: boolean; move: boolean; sleepMax: number; hint: string }> = {
-  sick: { label: 'Захворів', icon: '🤒', why: 'хворієш, відпочивай', habits: 0.34, money: false, move: false, sleepMax: 11, hint: 'Робота, цілі, бізнес, рух і витрати не рахуються. Достатньо третини звичок. Сон до 11 год — норма.' },
-  urgent: { label: 'Екстрені справи', icon: '🚨', why: 'екстрені справи', habits: 0.5, money: false, move: false, sleepMax: 9, hint: 'Робота, цілі, бізнес, рух і витрати не рахуються. Достатньо половини звичок.' },
-  rest: { label: 'Відпочинок', icon: '🌴', why: 'день відпочинку', habits: 1, money: true, move: true, sleepMax: 10, hint: 'Робота, цілі й бізнес не очікуються (але що зробив, те плюс). Решта як зазвичай.' },
-  trip: { label: 'Поїздка', icon: '✈️', why: 'поїздка', habits: 0.5, money: true, move: false, sleepMax: 9, hint: 'Робота, цілі, бізнес і рух не очікуються. Достатньо половини звичок.' },
+  sick: { label: 'Захворів', icon: 'thermo', why: 'хворієш, відпочивай', habits: 0.34, money: false, move: false, sleepMax: 11, hint: 'Робота, цілі, бізнес, рух і витрати не рахуються. Достатньо третини звичок. Сон до 11 год — норма.' },
+  urgent: { label: 'Екстрені справи', icon: 'alert', why: 'екстрені справи', habits: 0.5, money: false, move: false, sleepMax: 9, hint: 'Робота, цілі, бізнес, рух і витрати не рахуються. Достатньо половини звичок.' },
+  rest: { label: 'Відпочинок', icon: 'bed', why: 'день відпочинку', habits: 1, money: true, move: true, sleepMax: 10, hint: 'Робота, цілі й бізнес не очікуються (але що зробив, те плюс). Решта як зазвичай.' },
+  trip: { label: 'Поїздка', icon: 'plane', why: 'поїздка', habits: 0.5, money: true, move: false, sleepMax: 9, hint: 'Робота, цілі, бізнес і рух не очікуються. Достатньо половини звичок.' },
 };
 export const waterGoal = (S: State) => S.waterGoal || 8;
 export const moveGoal = (S: State) => S.moveGoal || 30;

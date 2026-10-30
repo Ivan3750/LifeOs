@@ -121,7 +121,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <>
       <div className="app">
         <aside className="side">
-          <div className="brand"><span className="logo"><Icon n="logo" /></span>Pulse OS</div>
+          <div className="brand"><span className="logo"><Icon n="logo" /></span>LifeOs</div>
           <ModeSeg />
           <nav className="nav">{NAV[m].map(k => <NavBtn key={k} k={k} />)}</nav>
           <MiniTimer />

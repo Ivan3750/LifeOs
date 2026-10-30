@@ -12,7 +12,8 @@ export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake'>;
 /** A mood check-in at a moment of the day. v: 1–10, energy: 1–5 (0 = not set). */
 export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
 /** Time spent on errands and other non-work things (shop, commute…). start/end are timestamps. */
-export type Activity = { id: number; kind: string; title: string; start: number; end: number; demo?: 1 };
+/** A logged activity. For a Wolt shift: orders (number of deliveries), earned (kr., tips included) and km driven. */
+export type Activity = { id: number; kind: string; title: string; start: number; end: number; orders?: number; earned?: number; km?: number; demo?: 1 };
 export type Note = { id: number; title: string; text: string; created: number; updated: number; pinned?: boolean; demo?: 1 };
 export type Cur = 'DKK' | 'UAH';
 export type AccId = 'dk' | 'ua';
@@ -23,7 +24,9 @@ export type Account = { id: AccId; name: string; cur: Cur; opening: number; budg
 export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; demo?: 1 };
 export type GoalStep = { id: number; t: string; d: boolean };
 /** A goal is measured either by a number (cur of target) or, when it has steps, by the share of steps done. */
-export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; steps?: GoalStep[]; demo?: 1 };
+/** kind 'rating': a goal for a life area that cannot be counted (relationships, rest): it is reached when the area's wheel rating
+    climbs from `from` to `target`. Steps are the actions that get you there. */
+export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; steps?: GoalStep[]; kind?: 'rating'; from?: number; demo?: 1 };
 export type Stage = 'lead' | 'talk' | 'proposal' | 'won' | 'lost';
 export type Deal = { id: number; title: string; client: string; amt: number; stage: Stage; demo?: 1 };
 export type Project = { id: number; name: string; client: string; due: string; progress: number; status: 'active' | 'paused' | 'done'; budget: number; demo?: 1 };

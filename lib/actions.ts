@@ -1,6 +1,6 @@
 import type { AccId, Account, AdSpend, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
 import { XFER_CAT, account, fmtCur } from './money';
-import { addD, money, STAGES, TK, toMin, ymd } from './util';
+import { addD, AREAS, money, STAGES, TK, toMin, ymd } from './util';
 import { parseTask } from './tasks';
 
 export const goalStep = (target: number) => (target >= 200 ? Math.round(target / 20) : target >= 40 ? 5 : 1);
@@ -143,9 +143,19 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
         if (bed && wake) h.sleep = Math.round((((toMin(wake) - toMin(bed)) + 1440) % 1440) / 6) / 10;
       });
     },
-    addGoal(v: { title: string; area: string; target: number; unit: string; due: string; steps?: string[] }) {
-      update(s => { const { steps, ...rest } = v; s.goals.push({ id: s.nextId++, cur: 0, ...rest, ...(steps?.length ? { steps: steps.map(t => ({ id: s.nextId++, t, d: false })) } : {}) }); });
+    addGoal(v: { title: string; area: string; target: number; unit: string; due: string; steps?: string[]; kind?: 'rating' }) {
+      update(s => {
+        const { steps, kind, ...rest } = v;
+        // a rating goal starts from where the life area stands now
+        const now = kind ? s.wheel[AREAS.indexOf(v.area)] ?? 5 : 0;
+        s.goals.push({ id: s.nextId++, cur: now, ...rest, ...(kind ? { kind, from: now } : {}), ...(steps?.length ? { steps: steps.map(t => ({ id: s.nextId++, t, d: false })) } : {}) });
+      });
       toast('Ціль додано');
+    },
+    /** Rates a life area 1–10; goals that follow this area's rating move with it. */
+    setWheel(i: number, v: number) {
+      v = Math.max(1, Math.min(10, Math.round(v)));
+      update(s => { s.wheel[i] = v; s.goals.forEach(g => { if (g.kind === 'rating' && g.area === AREAS[i]) { g.cur = v; delete g.demo; } }); });
     },
     updateGoal(id: number, v: Partial<Pick<Goal, 'title' | 'area' | 'target' | 'unit' | 'due'>>) { update(s => { const g = s.goals.find(x => x.id === id); if (g) { Object.assign(g, v); delete g.demo; } }); },
     addStep(gid: number, t: string) { t = t.trim(); if (!t) return; update(s => { const g = s.goals.find(x => x.id === gid); if (g) (g.steps ||= []).push({ id: s.nextId++, t, d: false }); }); },

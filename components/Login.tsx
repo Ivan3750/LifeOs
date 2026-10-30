@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { Icon } from './Icon';
 
 export default function Login({ setup = false }: { setup?: boolean }) {
   const [password, setPassword] = useState('');
@@ -25,7 +26,7 @@ export default function Login({ setup = false }: { setup?: boolean }) {
   return (
     <div className="login">
       <div className="login-card">
-        <div className="brand"><span className="logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><path d="M6 20V11a6 6 0 0 1 12 0v9" /></svg></span>Pulse OS</div>
+        <div className="brand"><span className="logo"><Icon n="logo" /></span>LifeOs</div>
         {setup ? (
           <>
             <h1>Потрібне налаштування</h1>

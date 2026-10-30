@@ -5,9 +5,9 @@ import { fill, logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
 import { DN, TK } from '@/lib/util';
 import { dayPlan, sleepRhythm } from '@/lib/score';
-import { account, accOf, txDKK } from '@/lib/money';
 import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
+import { ExportCard } from '../ExportCard';
 import { CalStatusChip } from './Schedule';
 import { SYNC_TEXT } from '../Shell';
 
@@ -118,35 +118,19 @@ function download(name: string, type: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-const csvCell = (v: string | number) => (/[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v));
-const csv = (rows: (string | number)[][]) => '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n'); // BOM so Excel reads Cyrillic
 
 function exportJson(S: State) {
-  download(`pulse-os-${TK()}.json`, 'application/json', JSON.stringify({ app: 'pulse-os', exportedAt: new Date().toISOString(), data: S }, null, 2));
+  download(`lifeos-${TK()}.json`, 'application/json', JSON.stringify({ app: 'lifeos', exportedAt: new Date().toISOString(), data: S }, null, 2));
 }
 
 /** Reads a backup made by «Усі дані (JSON)» and returns the state in it, or a reason why it cannot be used. */
 function parseBackup(text: string): { state: State } | { error: string } {
   let j: unknown;
   try { j = JSON.parse(text); } catch { return { error: 'Це не JSON-файл' }; }
-  const data = (j as { app?: string; data?: unknown })?.app === 'pulse-os' ? (j as { data: unknown }).data : j;
+  const data = (j as { app?: string; data?: unknown })?.app === 'pulse-os' || (j as { app?: string })?.app === 'lifeos' ? (j as { data: unknown }).data : j;
   const d = data as Partial<State> | null;
   if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.tasks) || !Array.isArray(d.habits) || !d.money || !d.co) return { error: 'У файлі нема даних Pulse OS' };
   return { state: fill(d as State) };
-}
-
-function exportMoney(S: State) {
-  const rows = [...S.money.tx].sort((a, b) => a.date.localeCompare(b.date))
-    .map(t => {
-      const a = account(S, accOf(t));
-      return [t.date, a.name, a.cur, t.xfer ? 'Переказ' : t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, Math.round((t.type === 'in' ? 1 : -1) * txDKK(S, t) * 100) / 100, t.note];
-    });
-  download(`pulse-os-finansy-${TK()}.csv`, 'text/csv;charset=utf-8', csv([['Дата', 'Рахунок', 'Валюта', 'Тип', 'Категорія', 'Сума', 'Сума, kr. за курсом', 'Нотатка'], ...rows]));
-}
-
-function exportFocus(S: State) {
-  const rows = [...S.sessions].sort((a, b) => a.t - b.t).map(x => { const d = new Date(x.t); return [d.toLocaleDateString('sv-SE'), d.toTimeString().slice(0, 5), x.m]; });
-  download(`pulse-os-fokus-${TK()}.csv`, 'text/csv;charset=utf-8', csv([['Дата', 'Початок', 'Хвилин'], ...rows]));
 }
 
 /** Day start, end and breakfast follow the sleep you log, or fixed hours. */
@@ -244,13 +228,12 @@ export function Prefs() {
           <button className="btn ghost" disabled={!S.demo} onClick={() => { update(stripDemo); toast('Демо-дані прибрано'); }}>Прибрати демо-дані</button>
         </div>
       </div>
+      <div style={{ marginTop: 18 }}><ExportCard /></div>
       <div className="card" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div><h3 style={{ margin: 0, fontSize: 16 }}>Експорт даних</h3><p className="help" style={{ margin: '4px 0 0' }}>Повна копія всіх даних у JSON або окремі таблиці для Excel і Google Sheets.</p></div>
+        <div><h3 style={{ margin: 0, fontSize: 16 }}>Резервна копія</h3><p className="help" style={{ margin: '4px 0 0' }}>Повна копія всіх даних одним файлом: з неї можна відновити LifeOs на будь-якому пристрої.</p></div>
         <div className="row">
-          <button className="btn" onClick={() => { exportJson(S); toast('Копію даних завантажено'); }}>Усі дані (JSON)</button>
-          <button className="btn ghost" onClick={() => exportMoney(S)}>Фінанси (CSV)</button>
-          <button className="btn ghost" onClick={() => exportFocus(S)}>Сесії фокусу (CSV)</button>
-          <button className="btn ghost" onClick={() => fileRef.current?.click()}>Відновити з копії (JSON)</button>
+          <button className="btn" onClick={() => { exportJson(S); toast('Копію даних завантажено'); }}>Завантажити копію (JSON)</button>
+          <button className="btn ghost" onClick={() => fileRef.current?.click()}>Відновити з копії</button>
           <input ref={fileRef} type="file" accept="application/json,.json" hidden aria-label="Файл резервної копії" onChange={restore} />
         </div>
       </div>
