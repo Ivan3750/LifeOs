@@ -83,6 +83,34 @@ describe('every area of life can be linked', () => {
 });
 const describe_text = (S: State, id: string) => say(find(S, id)!, S).text;
 
+describe('first impressions after only a few days', () => {
+  it('finds a very clear link from just 6 days and marks it as preliminary', () => {
+    const S = world(i => ({ sleep: i % 2 ? 5.2 : 7.8, mood: i % 2 ? 3 : 8, energy: i % 2 ? 1 : 3 }), 7);
+    const f = find(S, 'sleep-mood')!;
+    expect(f).toBeDefined();
+    expect(f.preliminary).toBe(true);
+    expect(say(f, S).text).toContain('попередній висновок');
+  });
+  it('needs at least 4 days with both values and 2 on each side', () => {
+    expect(findings(world(i => ({ sleep: i % 2 ? 5.2 : 7.8, mood: i % 2 ? 3 : 8 }), 3), NOW)).toEqual([]);
+    expect(find(world(i => ({ sleep: i === 1 ? 5.2 : 7.8, mood: i === 1 ? 3 : 8 }), 6), 'sleep-mood')).toBeUndefined();
+  });
+  it('is stricter with few days: a weak difference is not enough', () => {
+    const S = world(i => ({ sleep: i % 2 ? 6 : 7.4, mood: i % 2 ? 6.5 : 7.5 }), 6);
+    expect(find(S, 'sleep-mood')).toBeUndefined();
+  });
+  it('gives the tip of the day from a first impression and says so', () => {
+    const S = world(i => ({ sleep: i % 2 ? 5.2 : 7.8, mood: i % 2 ? 3 : 8 }), 7);
+    S.health[key(0)] = { water: 6, sleep: 5.0, mood: 0, steps: 0, workout: 20, weight: 0 };
+    const a = todayAdvice(S, NOW)!;
+    expect(a.facts).toContain('попередньо, днів мало');
+    expect(a.reason).toContain('попередній висновок');
+  });
+  it('a full pattern from 14+ days is not marked preliminary', () => {
+    expect(find(world(i => ({ sleep: third(i) ? 5.2 : 7.6, mood: third(i) ? 4 : 8 })), 'sleep-mood')!.preliminary).toBe(false);
+  });
+});
+
 describe('what the algorithm leaves alone', () => {
   it('says nothing without enough data', () => {
     const S = makeState(false);

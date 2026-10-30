@@ -48,7 +48,7 @@ export function LinksCard() {
             const d = describe(f, S), max = Math.max(f.bad.avg, f.good.avg, 0.1);
             return (
               <div className="link" key={f.id}>
-                <div className="lk-areas"><span>{d.area}</span><i>→</i><span>{d.outArea}</span><em className={`lk-s s${f.strength}`}>{['', 'слабкий зв’язок', 'помітний зв’язок', 'сильний зв’язок'][f.strength]}</em></div>
+                <div className="lk-areas"><span>{d.area}</span><i>→</i><span>{d.outArea}</span><em className={`lk-s s${f.strength}`}>{f.preliminary ? 'попередньо' : ['', 'слабкий зв’язок', 'помітний зв’язок', 'сильний зв’язок'][f.strength]}</em></div>
                 <div className="lk-h"><b>{d.title}</b></div>
                 <div className="lk-bars">
                   <div><span>Гірше</span><i style={{ width: (f.bad.avg / max) * 100 + '%' }} className="lo" /><b className="num">{Math.round(f.bad.avg * 10) / 10}</b></div>
@@ -61,7 +61,7 @@ export function LinksCard() {
           })}
         </div>
       ) : (
-        <p className="help" style={{ margin: 0 }}>Поки замало даних. Записано: сон у {sleepDays} {sleepDays === 1 ? 'день' : 'днях'}, настрій у {moodDays}. Для висновків треба хоча б по три дні з коротким сном і з нормальним, разом із записаним настроєм. Продовжуй відмічати, і підказки зʼявляться самі.</p>
+        <p className="help" style={{ margin: 0 }}>Поки замало даних. Записано: сон у {sleepDays} {sleepDays === 1 ? 'день' : 'днях'}, настрій у {moodDays}. Перші підказки зʼявляться вже за 4 дні записів (спершу попередні): запиши сон, настрій і, якщо хочеш, воду, рух, фокус чи витрати. Чим більше днів, тим надійніші висновки.</p>
       )}
     </div>
   );

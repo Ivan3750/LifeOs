@@ -110,11 +110,15 @@ export type Finding = {
   bad: { n: number; avg: number }; good: { n: number; avg: number };
   /** how much better the outcome is in the good half, in its own units (always positive) */
   diff: number; effect: number; strength: 1 | 2 | 3;
+  /** fewer than 14 days with both values: a first impression, not yet a pattern */
+  preliminary: boolean;
   /** legacy names used by the screens: factor and target are the driver and the outcome */
   factor: Metric; target: Metric;
 };
 
-const MIN_PAIRS = 14, MIN_GROUP = 4, MIN_EFFECT = 0.85, MIN_R = 0.3;
+/** A link needs at least 4 days with both values and 2 days on each side. With so few days only a very strong, clean link counts,
+    and it is marked as preliminary; from 14 days on the normal, softer thresholds apply. */
+const MIN_PAIRS = 4, MIN_GROUP = 2, FULL_PAIRS = 14, MIN_EFFECT = 0.85, MIN_R = 0.3;
 const pct = (sorted: number[], p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1) + 0.5))];
 const sd = (a: number[]) => { const m = mean(a); return Math.sqrt(mean(a.map(x => (x - m) ** 2))); };
 const corr = (xs: number[], ys: number[]) => { const mx = mean(xs), my = mean(ys); let a = 0, bx = 0, by = 0; xs.forEach((x, i) => { a += (x - mx) * (ys[i] - my); bx += (x - mx) ** 2; by += (ys[i] - my) ** 2; }); return bx && by ? a / Math.sqrt(bx * by) : 0; };
@@ -150,13 +154,15 @@ export function findings(S: State, now = new Date()): Finding[] {
     const all = pairs.map(p => p[1]), spread = sd(all) || 1;
     const lowAvg = mean(lowY), highAvg = mean(highY), gain = (highAvg - lowAvg) * oc.better;   // >0: the high half goes better
     const diff = Math.abs(highAvg - lowAvg), effect = diff / spread;
-    if (diff < oc.min || effect < MIN_EFFECT) continue;
+    const n = pairs.length, minEffect = n < 8 ? 1.6 : n < FULL_PAIRS ? 1.15 : MIN_EFFECT, minR = n < 8 ? 0.8 : n < FULL_PAIRS ? 0.55 : MIN_R;
+    // with few days the difference must also be clearly large in plain units, not only tidy
+    if (diff < oc.min * (n < 8 ? 1.5 : n < FULL_PAIRS ? 1.2 : 1) || effect < minEffect) continue;
     const r = corr(pairs.map(p => p[0]), all);
-    if (Math.abs(r) < MIN_R || Math.sign(r) !== Math.sign(highAvg - lowAvg)) continue;
+    if (Math.abs(r) < minR || Math.sign(r) !== Math.sign(highAvg - lowAvg)) continue;
     const badSide: 'low' | 'high' = gain > 0 ? 'low' : 'high';
     if (dr.onlyBad && dr.onlyBad !== badSide) continue;
     const bad = badSide === 'low' ? { n: lowY.length, avg: lowAvg } : { n: highY.length, avg: highAvg }, good = badSide === 'low' ? { n: highY.length, avg: highAvg } : { n: lowY.length, avg: lowAvg };
-    out.push({ id: `${d}-${o}`, driver: d, outcome: o, factor: d, target: o, lag, badSide, thr: badSide === 'low' ? sp.lowMax : sp.highMin, bad, good, diff, effect, strength: effect >= 1.4 ? 3 : effect >= 1.1 ? 2 : 1 });
+    out.push({ id: `${d}-${o}`, driver: d, outcome: o, factor: d, target: o, lag, badSide, thr: badSide === 'low' ? sp.lowMax : sp.highMin, bad, good, diff, effect, preliminary: n < FULL_PAIRS, strength: effect >= 1.4 ? 3 : effect >= 1.1 ? 2 : 1 });
   }
   return out.sort((a, b) => b.effect - a.effect);
 }
@@ -168,7 +174,7 @@ export function describe(f: Finding, S?: State) {
   const lead = f.lag === 1 ? `Після дня, коли ${phrase}` : `Коли ${phrase}`;
   return {
     title: `${dr.name} → ${oc.name}`, area: dr.area, outArea: oc.area,
-    text: `${lead}, ${oc.name} ${f.lag === 1 ? oc.next + ' ' : ''}у тебе в середньому ${oc.fmt(f.bad.avg)} проти ${oc.fmt(f.good.avg)} в інші дні. Це видно з ${f.bad.n} таких днів проти ${f.good.n}.`,
+    text: `${lead}, ${oc.name} ${f.lag === 1 ? oc.next + ' ' : ''}у тебе в середньому ${oc.fmt(f.bad.avg)} проти ${oc.fmt(f.good.avg)} в інші дні. Це видно з ${f.bad.n} таких днів проти ${f.good.n}.${f.preliminary ? ' Днів поки мало, тож це лише попередній висновок.' : ''}`,
     advice: (f.badSide === 'low' ? dr.more : dr.less) || dr.more || dr.less,
   };
 }
@@ -205,7 +211,7 @@ export function adviceList(S: State, now = new Date()): Advice[] {
   if (poor || debt) {
     const s = poor ? today.sleep! : mean(nights), facts = [poor ? `сон ${n1(s)} год` : `дві ночі по ${n1(s)} год`];
     let reason = poor ? `Ти спав ${n1(s)} год, це менше за норму 7–8.` : `Дві останні ночі ти спав у середньому ${n1(s)} год: недосип накопичується.`;
-    if (sleepMood) { const d = describe(sleepMood, S); reason += ` Твоя історія на це вказує: ${d.text.charAt(0).toLowerCase()}${d.text.slice(1)}`; facts.push(`настрій ${n1(sleepMood.bad.avg)} проти ${n1(sleepMood.good.avg)}`); }
+    if (sleepMood) { const d = describe(sleepMood, S); reason += ` Твоя історія на це вказує: ${d.text.charAt(0).toLowerCase()}${d.text.slice(1)}`; facts.push(`настрій ${n1(sleepMood.bad.avg)} проти ${n1(sleepMood.good.avg)}`); if (sleepMood.preliminary) facts.push('попередньо, днів мало'); }
     else reason += ' Недосип знижує настрій, енергію і концентрацію, хоч у твоїх записах ще замало днів для точної закономірності.';
     if (sleepEnergy) facts.push(`енергія ${n1(sleepEnergy.bad.avg)} проти ${n1(sleepEnergy.good.avg)}`);
     if (lowMood) { reason += ` Сьогоднішній настрій ${n1(moodNow!)} із 10: схоже, це відлуння недосипу.`; facts.push(`настрій сьогодні ${n1(moodNow!)}`); }
@@ -227,7 +233,7 @@ export function adviceList(S: State, now = new Date()): Advice[] {
     out.push({
       tone: 'warn', area: dr.area, title: adviceTitle(f), forMood: f.outcome === 'mood',
       reason: `${when}: ${dr.name.toLowerCase()} ${valueText(f.driver, v)}. ${d.text}`,
-      facts: [`${dr.name.toLowerCase()}: ${valueText(f.driver, v)}`, `${oc.name} ${oc.fmt(f.bad.avg)} проти ${oc.fmt(f.good.avg)}`],
+      facts: [`${dr.name.toLowerCase()}: ${valueText(f.driver, v)}`, `${oc.name} ${oc.fmt(f.bad.avg)} проти ${oc.fmt(f.good.avg)}`, ...(f.preliminary ? ['попередньо, днів мало'] : [])],
       action: d.advice, cause: causeText(f, v), ...(task ? { task } : {}),
     });
   }
