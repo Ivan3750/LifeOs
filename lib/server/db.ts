@@ -27,9 +27,9 @@ function config(): mysql.PoolOptions {
   }
   if (sslWanted) {
     const ca = caCert();
-    // With a CA (Aiven: "CA certificate" on the service page) the server is fully verified.
-    // Without it the connection is still encrypted, but the server certificate is not checked.
-    o.ssl = ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false };
+    // The server certificate is always verified. Aiven uses its own CA: download "CA certificate" from the
+    // service page and point DB_CA_CERT at it. Only DB_SSL_INSECURE=true turns the check off (encryption stays).
+    o.ssl = process.env.DB_SSL_INSECURE === 'true' ? { rejectUnauthorized: false } : ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: true };
   }
   return { ...o, connectionLimit: 5, waitForConnections: true, connectTimeout: 10000, enableKeepAlive: true, charset: 'utf8mb4' };
 }
@@ -62,6 +62,10 @@ export function dbError(e: unknown) {
     ECONNREFUSED: 'база не приймає зʼєднання, перевір хост і порт',
     ETIMEDOUT: 'база не відповідає, перевір хост, порт і доступ з твоєї IP-адреси',
     HANDSHAKE_SSL_ERROR: 'помилка SSL, перевір DB_SSL і DB_CA_CERT',
+    SELF_SIGNED_CERT_IN_CHAIN: 'сертифікат бази не довірений, вкажи CA-сертифікат у DB_CA_CERT',
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'сертифікат бази не довірений, вкажи CA-сертифікат у DB_CA_CERT',
+    DEPTH_ZERO_SELF_SIGNED_CERT: 'сертифікат бази не довірений, вкажи CA-сертифікат у DB_CA_CERT',
+    ER_NET_PACKET_TOO_LARGE: 'дані завеликі для max_allowed_packet на сервері бази',
     ER_BAD_DB_ERROR: 'бази з такою назвою немає, перевір DB_NAME',
   };
   return code ? `${code}${hints[code] ? ': ' + hints[code] : ''}` : 'не вдалося підключитися до бази';

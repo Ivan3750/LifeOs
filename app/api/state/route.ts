@@ -8,6 +8,11 @@ export const dynamic = 'force-dynamic';
 const ID = 'main';
 const MAX_BYTES = 8 * 1024 * 1024;
 
+/** The stored text, or null when it cannot be read (the client then keeps its own copy instead of crashing). */
+function parse(text: string) {
+  try { const v = JSON.parse(text); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch { return null; }
+}
+
 type Row = RowDataPacket & { data: string; version: number; updated_at: Date };
 
 async function current() {
@@ -24,7 +29,9 @@ export async function GET(req: Request) {
     const row = await current();
     if (!row) return Response.json({ version: 0, data: null });
     if (row.version === known) return Response.json({ version: row.version, same: true });
-    return Response.json({ version: row.version, data: JSON.parse(row.data), at: row.updated_at });
+    const data = parse(row.data);
+    if (!data) return Response.json({ error: 'corrupt', message: 'Збережені дані в базі пошкоджені. Відновіть їх із резервної копії (Налаштування → Експорт/Імпорт).' }, { status: 502 });
+    return Response.json({ version: row.version, data, at: row.updated_at });
   } catch (e) {
     return Response.json({ error: 'db', message: dbError(e) }, { status: 502 });
   }
@@ -38,7 +45,7 @@ export async function PUT(req: Request) {
   try { body = await req.json(); } catch { return Response.json({ error: 'bad-json' }, { status: 400 }); }
   if (!body.data || typeof body.data !== 'object' || Array.isArray(body.data)) return Response.json({ error: 'bad-data' }, { status: 400 });
   const text = JSON.stringify(body.data);
-  if (text.length > MAX_BYTES) return Response.json({ error: 'too-large' }, { status: 413 });
+  if (Buffer.byteLength(text, 'utf8') > MAX_BYTES) return Response.json({ error: 'too-large', message: 'Дані завеликі для збереження (понад 8 МБ). Видали старі записи або зроби експорт і почисти.' }, { status: 413 });
   const base = Number(body.baseVersion) || 0;
   try {
     const pool = await db();
@@ -47,7 +54,7 @@ export async function PUT(req: Request) {
       : await pool.query<ResultSetHeader>('UPDATE pulse_state SET data = ?, version = version + 1 WHERE id = ? AND version = ?', [text, ID, base]);
     if (res.affectedRows === 0) {
       const row = await current();
-      return Response.json({ error: 'conflict', version: row?.version ?? 0, data: row ? JSON.parse(row.data) : null }, { status: 409 });
+      return Response.json({ error: 'conflict', version: row?.version ?? 0, data: row ? parse(row.data) : null }, { status: 409 });
     }
     return Response.json({ version: base + 1 });
   } catch (e) {

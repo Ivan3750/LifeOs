@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV, TABS, useStore, vinfo } from '@/lib/store';
+import { NAV, TABS, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
 import { fmt, MON, pad2, WD } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { SheetHost } from './Sheets';
@@ -30,8 +30,8 @@ function NavBtn({ k }: { k: string }) {
 }
 
 function MiniTimer() {
-  const { S, timerLeft, toggleTimer, go, durOf } = useStore();
-  const T = S.timer, dur = durOf(T.mode);
+  const { S, toggleTimer, go, durOf } = useStore();
+  const T = S.timer, dur = durOf(T.mode), timerLeft = timerLeftAt(S, useNow(1000, T.running));
   return (
     <div className="mini">
       <h4>{T.mode === 'focus' ? 'Один фокус.' : 'Пауза.'}<br /><em>{T.mode === 'focus' ? 'Більше справ.' : 'Більше сил.'}</em></h4>
@@ -57,9 +57,10 @@ function SyncLabel() {
 }
 
 function TopBar() {
-  const { S, update, now, timerLeft, durOf, go, setPalette } = useStore();
+  const { S, update, durOf, go, setPalette } = useStore();
   const [drop, setDrop] = useState(false);
-  const n = new Date(now), T = S.timer;
+  // ticks every second only while something is being timed
+  const now = useNow(S.timer.running || S.act ? 1000 : 30_000), n = new Date(now), T = S.timer, timerLeft = timerLeftAt(S, now);
   const showPill = T.running || timerLeft < durOf(T.mode);
   useEffect(() => {
     if (!drop) return;
@@ -102,7 +103,7 @@ function TopBar() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { S, view, toastMsg, setSheet, setPalette, sheet, palette } = useStore();
+  const { S, view, toastMsg, setToast, setSheet, setPalette, sheet, palette } = useStore();
   const m = S.mode === 'co' ? 'co' : 'me';
 
   useEffect(() => {
@@ -137,7 +138,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <button className="fab" onClick={() => setSheet({ kind: 'qa' })} aria-label="Швидко додати"><Icon n="plus" /></button>
       <SheetHost />
       <Palette />
-      {toastMsg && <div className="toast" role="status" key={toastMsg.id}>{toastMsg.msg}</div>}
+      {toastMsg && <div className="toast" role="status" key={toastMsg.id}>{toastMsg.msg}{toastMsg.action && <button className="toast-act" onClick={() => { toastMsg.action!.run(); setToast(null); }}>{toastMsg.action.label}</button>}</div>}
     </>
   );
 }

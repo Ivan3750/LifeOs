@@ -8,6 +8,9 @@ const mono = JetBrains_Mono({ variable: '--font-mono', subsets: ['latin', 'cyril
 export const metadata: Metadata = {
   title: 'Pulse OS',
   description: 'Особиста жива ОС: фокус, звички, здоровʼя, фінанси, цілі, календар і режим компанії.',
+  robots: { index: false, follow: false },
+  appleWebApp: { capable: true, title: 'Pulse OS', statusBarStyle: 'black-translucent' },
+  icons: { icon: '/icon.svg' },
 };
 
 export const viewport: Viewport = {

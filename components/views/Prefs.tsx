@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { logFocus, useStore } from '@/lib/store';
+import { useRef, useState, type FormEvent } from 'react';
+import { fill, logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
 import { DN, TK } from '@/lib/util';
 import { dayPlan, sleepRhythm } from '@/lib/score';
 import { account, accOf, txDKK } from '@/lib/money';
 import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
-import { CalStatusChip } from './Personal';
+import { CalStatusChip } from './Schedule';
 import { SYNC_TEXT } from '../Shell';
 
 /** Hides the secret part of a calendar address so it can be shown on screen. */
@@ -74,7 +74,7 @@ function CalendarSettings() {
         <b>Google Calendar:</b> calendar.google.com → ⚙ Налаштування → обери свій календар → «Інтеграція календаря» → «Секретна адреса у форматі iCal».<br />
         <b>Outlook:</b> outlook.com → ⚙ Налаштування → Календар → «Спільні календарі» → «Опублікувати календар» → посилання ICS.<br />
         <b>iCloud:</b> застосунок Календар → «Поділитися календарем» → «Публічний календар» → скопіюй посилання webcal://.<br />
-        Посилання зберігається лише в цьому браузері і йде тільки на твій сервер Next.js, який завантажує календар.
+        Посилання входить у твої дані: воно зберігається в цьому браузері і в базі (якщо вона підключена) і передається лише на твій сервер, який завантажує календар. Якщо не хочеш зберігати його в даних, пропиши його в <code>ICAL_URLS</code> на сервері.
       </div>
     </div>
   );
@@ -88,6 +88,8 @@ function AccountSettings() {
     setBusy(true);
     await flush().catch(() => {});
     await fetch('/api/login', { method: 'DELETE' }).catch(() => {});
+    // the offline copy of the pages must not outlive the session
+    await (typeof caches !== 'undefined' ? caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))) : Promise.resolve()).catch(() => {});
     location.reload();
   };
   return (
@@ -121,6 +123,16 @@ const csv = (rows: (string | number)[][]) => '\uFEFF' + rows.map(r => r.map(csvC
 
 function exportJson(S: State) {
   download(`pulse-os-${TK()}.json`, 'application/json', JSON.stringify({ app: 'pulse-os', exportedAt: new Date().toISOString(), data: S }, null, 2));
+}
+
+/** Reads a backup made by «Усі дані (JSON)» and returns the state in it, or a reason why it cannot be used. */
+function parseBackup(text: string): { state: State } | { error: string } {
+  let j: unknown;
+  try { j = JSON.parse(text); } catch { return { error: 'Це не JSON-файл' }; }
+  const data = (j as { app?: string; data?: unknown })?.app === 'pulse-os' ? (j as { data: unknown }).data : j;
+  const d = data as Partial<State> | null;
+  if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.tasks) || !Array.isArray(d.habits) || !d.money || !d.co) return { error: 'У файлі нема даних Pulse OS' };
+  return { state: fill(d as State) };
 }
 
 function exportMoney(S: State) {
@@ -168,9 +180,20 @@ function SleepDaySetting() {
 
 export function Prefs() {
   const { S, A, update, toast } = useStore();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const restore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    const r = parseBackup(await f.text());
+    if ('error' in r) { toast(r.error); return; }
+    if (!window.confirm('Замінити всі поточні дані даними з файлу? Поточні дані буде втрачено (зроби експорт, якщо вони потрібні).')) return;
+    update(s => { const keep = { view: s.view, mode: s.mode, theme: s.theme, log: s.log, unread: s.unread }; for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k]; Object.assign(s, r.state, keep); });
+    toast('Дані відновлено з копії');
+  };
   return (
     <section className="view">
-      <div className="vh"><div><h2>Налаштування</h2><p>Дані зберігаються лише в цьому браузері.</p></div></div>
+      <div className="vh"><div><h2>Налаштування</h2><p>Дані зберігаються в цьому браузері й, якщо налаштована база, синхронізуються між пристроями.</p></div></div>
       <div className="card" style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div className="kv">
           <TextField id="pName" label="Імʼя" value={S.name} fallback="Друже" onSave={v => update(s => { s.name = v; })} />
@@ -188,7 +211,7 @@ export function Prefs() {
             <input id="pDayEnd" type="time" value={S.dayEnd} onChange={e => e.target.value && update(s => { s.dayEnd = e.target.value; })} />
           </label>
           <label className="field" htmlFor="pTheme">Тема
-            <select id="pTheme" value={S.theme} onChange={e => update(s => { s.theme = e.target.value as Theme; })}>
+            <select id="pTheme" value={S.theme} onChange={e => update(s => { s.theme = e.target.value as Theme; }, true)}>
               <option value="system">Як у системі</option><option value="light">Світла</option><option value="dark">Темна</option>
             </select>
           </label>
@@ -227,6 +250,8 @@ export function Prefs() {
           <button className="btn" onClick={() => { exportJson(S); toast('Копію даних завантажено'); }}>Усі дані (JSON)</button>
           <button className="btn ghost" onClick={() => exportMoney(S)}>Фінанси (CSV)</button>
           <button className="btn ghost" onClick={() => exportFocus(S)}>Сесії фокусу (CSV)</button>
+          <button className="btn ghost" onClick={() => fileRef.current?.click()}>Відновити з копії (JSON)</button>
+          <input ref={fileRef} type="file" accept="application/json,.json" hidden aria-label="Файл резервної копії" onChange={restore} />
         </div>
       </div>
       <AccountSettings />

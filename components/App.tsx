@@ -3,7 +3,13 @@
 import { StoreProvider, useStore } from '@/lib/store';
 import { Shell } from './Shell';
 import { Home } from './views/Home';
-import { Focus, Goals, Habits, Health, Notes, Schedule, Tasks } from './views/Personal';
+import { Focus } from './views/Focus';
+import { Goals } from './views/Goals';
+import { Habits } from './views/Habits';
+import { Health } from './views/Health';
+import { Notes } from './views/Notes';
+import { Schedule } from './views/Schedule';
+import { Tasks } from './views/Tasks';
 import { Money } from './views/Money';
 import { Ads, CoOverview, Deals, Invoices, Leads, Projects, Team } from './views/Company';
 import { Prefs } from './views/Prefs';

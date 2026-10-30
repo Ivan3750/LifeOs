@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { liveSessions, useStore } from '@/lib/store';
+import { liveSessions, useNow, useStore } from '@/lib/store';
 import { fmtCur, realTx, txDKK } from '@/lib/money';
 import { TK, wStart } from '@/lib/util';
 import { Icon } from './Icon';
@@ -11,7 +11,8 @@ const hrs = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} год ${Math.round
 
 /** Wolt shifts against what they pay and against the focus time left for WebHjerte. */
 export function WoltCard({ span = 's12' }: { span?: string }) {
-  const { S, A, now, setSheet } = useStore();
+  const { S, A, setSheet } = useStore();
+  const now = useNow(15_000, !!S.act || S.timer.running);
   const [period, setPeriod] = useState<'week' | 'month'>('week');
   const from = period === 'week' ? wStart().getTime() : new Date(TK().slice(0, 7) + '-01T00:00').getTime();
   const fromK = new Date(from).toLocaleDateString('sv-SE');

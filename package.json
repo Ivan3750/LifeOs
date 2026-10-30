@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "db:check": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/db-check.mjs"
+    "db:check": "node --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/db-check.mjs",
+    "test": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
     "ical.js": "2.2.1",
@@ -19,11 +21,15 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@types/node": "^20",
+    "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "node": ">=20.9"
   }
 }

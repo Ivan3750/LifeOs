@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { liveSessions, useStore } from '@/lib/store';
+import { liveSessions, useNow, useStore } from '@/lib/store';
 import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
-import { dayPlan, dayScore, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
+import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
@@ -19,7 +19,8 @@ function greet(name: string) {
 }
 
 function NextEvent() {
-  const { eventsOn, now } = useStore();
+  const { eventsOn } = useStore();
+  const now = useNow(30_000);
   const n = new Date(now), m = n.getHours() * 60 + n.getMinutes();
   const ev = eventsOn(TK()).filter(e => !e.allDay && toMin(e.e) > m)[0];
   if (!ev) return null;
@@ -33,9 +34,10 @@ function NextEvent() {
 
 /** Today at a glance inside the hero: score, focus so far and habits. Each chip opens its section. */
 function HeroStats() {
-  const { S, eventsOn, now, go } = useStore();
+  const { S, scoreOn, go } = useStore();
+  const now = useNow(30_000);
   const k = TK(), live = liveSessions(S, now);
-  const sc = dayScore(S, k, eventsOn(k), live, now);
+  const sc = scoreOn(k, now);
   const focus = sc.ft.worked, hDone = S.habits.filter(h => h.days[k]).length, gMin = goalFocusOn(S, k, live);
   return (
     <div className="herostats">
@@ -74,7 +76,8 @@ const DV_HOUR = 38; // px per hour in the home day view
 
 /** Home calendar: week strip, a scrollable day timeline with meals, and tap-to-add. */
 export function SchedCard() {
-  const { S, A, eventsOn, now, setSheet, go } = useStore();
+  const { S, A, eventsOn, setSheet, go } = useStore();
+  const now = useNow(30_000);
   const [day, setDay] = useState(TK);
   const [open, setOpen] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -161,7 +164,8 @@ export function SchedCard() {
 }
 
 function HeatMap() {
-  const { S, now } = useStore();
+  const { S } = useStore();
+  const now = useNow(30_000);
   const ws = wStart().getTime(), grid = [...Array(5)].map(() => Array(28).fill(0) as number[]), n = new Date(now), ti = weekdayIdx(n);
   S.sessions.forEach(s => {
     const i = Math.floor((sod(s.t).getTime() - ws) / DAY); if (i < 0 || i > 6) return;
@@ -191,12 +195,13 @@ const hrs = (m: number) => { const h = m / 60; return h >= 10 || Number.isIntege
 
 /** Focus time against the free time left by the calendar, e.g. 5/7 hours. */
 function FreeTimeCard() {
-  const { S, eventsOn, now, go } = useStore();
-  const live = liveSessions(S, now), k = TK();
-  const t = freeTime(S, k, eventsOn(k), live, now);
+  const { S, scoreOn, go } = useStore();
+  const now = useNow(30_000);
+  const k = TK();
+  const t = scoreOn(k, now).ft;
   const pct = t.free ? Math.round((t.worked / t.free) * 100) : 0;
   const evBlock = t.blockers.filter(b => !b.meal), mealBlock = t.blockers.filter(b => b.meal);
-  const week = lastDays(7).map(d => ({ d, ...freeTime(S, d, eventsOn(d), live, now) }));
+  const week = lastDays(7).map(d => ({ d, ...scoreOn(d, now).ft }));
   const maxFree = Math.max(60, ...week.map(w => w.free));
   return (
     <div className="card s7">
@@ -247,14 +252,15 @@ function DayOffBar({ k }: { k: string }) {
 
 /** Day score 0–100 with what it is made of. Arrows and the bars below switch to earlier days. */
 function ScoreCard() {
-  const { S, eventsOn, now, go } = useStore();
-  const live = liveSessions(S, now), today = TK();
+  const { scoreOn, go } = useStore();
+  const now = useNow(30_000);
+  const today = TK();
   const [k, setK] = useState(today);
   const dt = new Date(k + 'T00:00'), isToday = k === today;
-  const sc = dayScore(S, k, eventsOn(k), live, now);
+  const sc = scoreOn(k, now);
   // 7 bars: the picked day and the days around it, never past today
   const endK = ymd(addD(dt, 3)) > today ? today : ymd(addD(dt, 3));
-  const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : dayScore(S, d, eventsOn(d), live, now).total }));
+  const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : scoreOn(d, now).total }));
   const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
   const to: Record<string, string> = { focus: 'focus', goals: 'goals', biz: 'schedule', sleep: 'health', water: 'health', move: 'health', habits: 'habits', mood: 'health', money: 'money' };
   const [how, setHow] = useState(false);
@@ -325,14 +331,15 @@ function ScoreCard() {
 
 /** The last seven days in numbers: average and best day, focus, habits and the days marked as off. */
 function WeekSummary() {
-  const { S, eventsOn, now } = useStore();
-  const live = liveSessions(S, now), days = lastDays(7);
-  const sc = days.map(d => ({ d, v: dayScore(S, d, eventsOn(d), live, now).total }));
+  const { S, scoreOn } = useStore();
+  const now = useNow(30_000);
+  const days = lastDays(7);
+  const sc = days.map(d => ({ d, v: scoreOn(d, now).total }));
   const rated = sc.filter(x => x.v !== null) as { d: string; v: number }[];
   const avgV = rated.length ? Math.round(rated.reduce((a, x) => a + x.v, 0) / rated.length) : null;
   const best = rated.length ? rated.reduce((a, x) => (x.v > a.v ? x : a)) : null;
   const worst = rated.length > 1 ? rated.reduce((a, x) => (x.v < a.v ? x : a)) : null;
-  const focus = days.reduce((a, d) => a + freeTime(S, d, eventsOn(d), live, now).worked, 0);
+  const focus = days.reduce((a, d) => a + scoreOn(d, now).ft.worked, 0);
   const off = days.filter(d => offOn(S, d)).length;
   const dl = (d: string) => { const x = new Date(d + 'T00:00'); return `${DN[weekdayIdx(x)]} ${x.getDate()}`; };
   const tiles: [string, string, string][] = [

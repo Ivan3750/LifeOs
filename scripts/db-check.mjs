@@ -19,9 +19,10 @@ if (url) {
 }
 const caRaw = env.DB_CA_CERT?.trim();
 const ca = caRaw ? (caRaw.startsWith('-----BEGIN') ? caRaw.replace(/\\n/g, '\n') : fs.readFileSync(caRaw, 'utf8')) : undefined;
-if (ssl) o.ssl = ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: false };
+const insecure = env.DB_SSL_INSECURE === 'true';
+if (ssl) o.ssl = insecure ? { rejectUnauthorized: false } : ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: true };
 
-console.log(`→ ${o.host}:${o.port} / ${o.database || '(без бази)'} · SSL: ${ssl ? (ca ? 'так, з перевіркою CA' : 'так, без перевірки CA') : 'ні'}`);
+console.log(`→ ${o.host}:${o.port} / ${o.database || '(без бази)'} · SSL: ${ssl ? (insecure ? 'так, БЕЗ перевірки сертифіката (DB_SSL_INSECURE)' : ca ? 'так, з перевіркою CA' : 'так, перевірка за системними CA (для Aiven потрібен DB_CA_CERT)') : 'ні'}`);
 console.log(`→ APP_PASSWORD: ${env.APP_PASSWORD ? 'задано' : 'НЕ задано (вхід у дашборд не працюватиме)'}`);
 try {
   const c = await mysql.createConnection({ ...o, connectTimeout: 10000 });
