@@ -8,6 +8,7 @@ import type { OffKind } from '@/lib/types';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon, type IconName } from '../Icon';
 import { LevelCard } from '../Achievements';
+import { AdviceCard } from '../Advice';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
 import { CatBars, dayMinutes, habStreak, lanes, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
@@ -375,6 +376,8 @@ export function Home() {
 
         <ScoreCard />
         <FreeTimeCard />
+
+        <AdviceCard />
 
         <WeekSummary />
 

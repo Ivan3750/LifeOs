@@ -2,6 +2,7 @@ import type { AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, He
 import { XFER_CAT, account, fmtCur, pendingRecurring } from './money';
 import { addD, AREAS, money, STAGES, TK, toMin, ymd } from './util';
 import { parseTask } from './tasks';
+import { todayAdvice } from './correlations';
 import { norm } from './clients';
 
 export const goalStep = (target: number) => (target >= 200 ? Math.round(target / 20) : target >= 40 ? 5 : 1);
@@ -182,7 +183,9 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     delSession(t: number) { del(s => { s.sessions = s.sessions.filter(x => x.t !== t); if (s.timer.sid === t) s.timer.sid = 0; }); },
     addMood(v: { t: number; v: number; energy: number; tags: string[]; note: string }) {
       update(s => { s.moods.push({ id: s.nextId++, ...v, note: v.note.trim() }); s.moods.sort((a, b) => a.t - b.t); });
-      toast('Настрій записано');
+      // a low mood is a good moment to look for the reason in what was logged: poor sleep, little water, no movement
+      const why = v.v <= 4 ? todayAdvice(getS()) : null;
+      if (why?.cause) notify(`Настрій низький. Схоже, причина: ${why.cause}. ${why.action}`); else toast('Настрій записано');
     },
     updateMood(id: number, v: { t: number; v: number; energy: number; tags: string[]; note: string }) {
       update(s => { const m = s.moods.find(x => x.id === id); if (!m) return; Object.assign(m, v, { note: v.note.trim() }); delete m.demo; s.moods.sort((a, b) => a.t - b.t); });

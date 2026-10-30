@@ -1167,3 +1167,29 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .item.lead .sqb{height:30px;padding:0 10px;font-size:12.5px;font-weight:500}
 .item.lead .sqb.acc{font-weight:600}
 .heat{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-top:-2px}
+
+/* advice of the day and links between habits and mood */
+.advice{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.advice.warn{background:linear-gradient(135deg,color-mix(in srgb,var(--sleep) 13%,var(--card)),var(--card) 70%)}
+.advice.good{background:linear-gradient(135deg,var(--good-soft),var(--card) 70%)}
+.adv-i{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none;background:var(--card);color:var(--sleep);box-shadow:var(--shadow)}
+.advice.good .adv-i{color:var(--good)}
+.adv-i svg{width:22px;height:22px}
+.adv-b{flex:1 1 320px;min-width:0}
+.adv-b h3{margin:0 0 6px;font-size:18px;letter-spacing:-.01em}
+.adv-b p{margin:0 0 10px;font-size:13.5px;line-height:1.55;max-width:72ch}
+.adv-facts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.adv-facts span{font-size:12px;padding:4px 10px;border-radius:8px;background:var(--bg);color:var(--muted)}
+.adv-do{margin:0!important}
+.links{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.link{padding:14px 16px;border-radius:16px;background:var(--bg);display:flex;flex-direction:column;gap:8px}
+.lk-h{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.lk-h b{font-size:14.5px}
+.lk-s{font-size:11px;color:var(--muted)}.lk-s.s3{color:var(--m1);font-weight:600}.lk-s.s2{color:var(--accent);font-weight:600}
+.lk-bars{display:flex;flex-direction:column;gap:5px}
+.lk-bars div{display:grid;grid-template-columns:44px minmax(0,1fr) 34px;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.lk-bars i{height:8px;border-radius:99px;display:block}
+.lk-bars i.lo{background:var(--sleep)}.lk-bars i.hi{background:var(--good)}
+.lk-bars b{color:var(--ink);font-weight:600;text-align:right}
+.link p{margin:0;font-size:13px;line-height:1.5}
+.link .lk-a{color:var(--ink);font-weight:500}

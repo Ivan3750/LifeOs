@@ -7,6 +7,7 @@ import { useNow, useStore } from '@/lib/store';
 import { addD, DAY, DN, hhmm, MON, pad2, plural, TK, toMin, WD, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Face } from '../Face';
+import { LinksCard } from '../Advice';
 import { Bars } from '../charts';
 import { avg, DelBtn, LifeTiles } from '../shared';
 
@@ -252,6 +253,7 @@ export function Health() {
         <div className="card s7"><MoodLog k={moodDay} setK={setMoodDay} onEdit={startEdit} /></div>
         <div className="card s5"><MoodMonth k={moodDay} setK={setMoodDay} /></div>
         <div className="card s7"><MoodInsights /></div>
+        <LinksCard />
         <div className="card s6"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {moodAv.toFixed(1)} з 10</p></div></div><Bars vals={moods.map(v => Math.round(v * 10) / 10)} max={10} color={v => moodColor(v)} unit="/10" /></div>
         <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
         <div className="card s6"><div className="ch"><div><h3>Вода</h3><p>{av('water') ? `У середньому ${av('water').toFixed(1)} склянки на день · ціль ${waterGoal(S)}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('water')} max={Math.max(12, waterGoal(S) + 2)} color={v => (v >= waterGoal(S) ? 'var(--good)' : 'var(--accent-2)')} target={waterGoal(S)} unit=" склянок" /></div>
