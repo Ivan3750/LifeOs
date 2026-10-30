@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { makeActions } from '@/lib/actions';
 import { makeState } from '@/lib/seed';
 import { balance, budgetDKK, expectedIncomeDKK, monthPlan, pendingRecurring, potSaved, realTx } from '@/lib/money';
+import { ymd } from '@/lib/util';
 import { moneyInsights, noSpendStreak } from '@/lib/insights';
 import type { State } from '@/lib/types';
 
@@ -89,6 +90,35 @@ describe('savings pots', () => {
     expect(realTx(S).filter(t => t.type === 'out')).toHaveLength(0);
     A.delPot(id);
     expect(balance(S, 'dk', '2026-12-31')).toBe(2000);
+  });
+});
+
+describe('safeguards', () => {
+  it('cannot take more out of a pot than is in it', () => {
+    const { S, A } = setup();
+    A.addPot({ name: 'Подушка', target: 1000, due: '' });
+    const id = S.money.pots[0].id;
+    A.potMove(id, 200); A.potMove(id, -500);
+    expect(potSaved(S, id)).toBe(200);
+    A.potMove(id, -200);
+    expect(potSaved(S, id)).toBe(0);
+  });
+  it('a regular payment whose day has passed this month starts next month', () => {
+    const { S, A } = setup();
+    const today = new Date(), day = today.getDate() === 1 ? 1 : today.getDate() - 1;
+    A.addRecurring({ type: 'out', name: 'Оренда', amt: 1, day, cat: 'Житло', acc: 'dk' });
+    const mk = ymd(today).slice(0, 7);
+    expect(S.money.recurring[0].from > mk || day === 1 ? true : false).toBe(true);
+    expect(pendingRecurring(S).every(x => x.date >= ymd(today))).toBe(true);
+  });
+  it('removes a month\'s record that two devices both created, keeping the oldest', () => {
+    const { S, A } = setup();
+    A.addRecurring({ type: 'out', name: 'Підписка', amt: 99, day: 1, cat: 'Розваги', acc: 'dk', from: '2026-03' });
+    const rid = S.money.recurring[0].id;
+    tx(S, { id: 50, amt: 99, cat: 'Розваги', date: '2026-03-01', rec: rid });
+    tx(S, { id: 60, amt: 99, cat: 'Розваги', date: '2026-03-01', rec: rid });
+    A.applyRecurring();
+    expect(S.money.tx.filter(t => t.rec === rid && t.date.startsWith('2026-03')).map(t => t.id)).toEqual([50]);
   });
 });
 

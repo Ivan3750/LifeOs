@@ -508,12 +508,15 @@ function useStoreValue(dbOn: boolean) {
   }, [S, update, notify]);
 
   // regular payments come due by themselves: checked on start and whenever the page is shown again
+  // (not before the first contact with the server: another device may already have created them)
+  const syncing = sync.state === 'syncing';
   useEffect(() => {
+    if (syncing) return;
     const run = () => { if (document.visibilityState === 'visible') A.applyRecurring(); };
     const t = setTimeout(run, 600);
     document.addEventListener('visibilitychange', run);
     return () => { clearTimeout(t); document.removeEventListener('visibilitychange', run); };
-  }, [A]);
+  }, [A, syncing]);
 
   return {
     S, update, view, go, setMode, toastMsg, setToast, toast, notify,

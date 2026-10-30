@@ -234,7 +234,7 @@ function TxList({ mk, filter, onEdit }: { mk: string; filter: Filter; onEdit: (t
       </div>
       {days.map(d => {
         const items = list.filter(t => t.date === d), dt = new Date(d + 'T00:00');
-        const spent = filter === 'all' ? sumIn(S, items.filter(t => !t.xfer), 'out') : sumIn(S, items.filter(t => !t.xfer), 'out', account(S, filter).cur);
+        const spent = filter === 'all' ? sumIn(S, items.filter(t => !t.xfer && !t.pot), 'out') : sumIn(S, items.filter(t => !t.xfer && !t.pot), 'out', account(S, filter).cur);
         return (
           <div key={d} className="txday">
             <div className="txday-h"><b>{d === TK() ? 'Сьогодні' : d === yday ? 'Вчора' : `${WD[dt.getDay()]}, ${dt.getDate()} ${MON[dt.getMonth()]}`}</b>{spent > 0 && <span className="num">−{fmtCur(spent, filter === 'all' ? 'DKK' : account(S, filter).cur)}</span>}</div>

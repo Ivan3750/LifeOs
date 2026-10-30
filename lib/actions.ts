@@ -1,5 +1,5 @@
 import type { AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
-import { XFER_CAT, account, fmtCur, pendingRecurring } from './money';
+import { XFER_CAT, account, fmtCur, pendingRecurring, potSaved, recDate, shiftMk, toDKK } from './money';
 import { addD, AREAS, money, STAGES, TK, toMin, ymd } from './util';
 import { parseTask } from './tasks';
 import { moodCause } from './correlations';
@@ -71,6 +71,10 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     },
     /** Creates the records of regular payments that have come due (one per month, only once). Returns how many were added. */
     applyRecurring() {
+      // two devices can create the same month's record before they sync: keep the oldest one only
+      const seen = new Set<string>(), extra = new Set<number>();
+      for (const t of [...getS().money.tx].sort((a, b) => a.id - b.id)) if (t.rec) { const k = t.rec + '|' + t.date.slice(0, 7); if (seen.has(k)) extra.add(t.id); else seen.add(k); }
+      if (extra.size) update(s => { s.money.tx = s.money.tx.filter(t => !extra.has(t.id)); });
       const due = pendingRecurring(getS()); if (!due.length) return 0;
       update(s => { for (const { r, date } of due) s.money.tx.push({ id: s.nextId++, type: r.type, amt: r.amt, cat: r.cat, note: r.name, date, acc: r.acc, rec: r.id }); });
       toast(`Додано регулярних записів: ${due.length}`);
@@ -78,8 +82,11 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     },
     addRecurring(v: Omit<Recurring, 'id' | 'from' | 'active'> & { from?: string }) {
       if (!v.name.trim() || !(v.amt > 0)) return false;
-      update(s => { s.money.recurring.push({ id: s.nextId++, ...v, name: v.name.trim(), from: v.from || TK().slice(0, 7), active: true, day: Math.min(31, Math.max(1, Math.round(v.day) || 1)) }); });
-      toast('Регулярний платіж додано'); return true;
+      const day = Math.min(31, Math.max(1, Math.round(v.day) || 1)), mk = TK().slice(0, 7);
+      // a payment whose day has already passed this month starts next month, so nothing is added twice for a record that was already typed in by hand
+      const from = v.from || (recDate({ day } as Recurring, mk) <= TK() ? shiftMk(mk, 1) : mk);
+      update(s => { s.money.recurring.push({ id: s.nextId++, ...v, name: v.name.trim(), from, active: true, day }); });
+      toast(`Регулярний платіж додано${from > mk ? ': перший запис у наступному місяці' : ''}`); return true;
     },
     toggleRecurring(id: number) { update(s => { const r = s.money.recurring.find(x => x.id === id); if (r) r.active = !r.active; }); },
     delRecurring(id: number) { del(s => { s.money.recurring = s.money.recurring.filter(x => x.id !== id); }, 'Регулярний платіж видалено'); },
@@ -87,6 +94,8 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     /** Moves money into a pot (or back out when amt is negative). The account balance changes, spending statistics do not. */
     potMove(id: number, amt: number, acc: AccId = 'dk') {
       const pot = getS().money.pots.find(p => p.id === id); if (!pot || !amt) return;
+      // cannot take out more than is in the pot (in kroner)
+      if (amt < 0 && -toDKK(getS(), amt, account(getS(), acc).cur) > potSaved(getS(), id) + 0.005) { toast('У скарбничці стільки нема'); return; }
       update(s => { s.money.tx.push({ id: s.nextId++, type: amt > 0 ? 'out' : 'in', amt: Math.abs(amt), cat: 'Заощадження', note: pot.name, date: TK(), acc, pot: id }); });
       toast(amt > 0 ? `Відкладено ${fmtCur(amt, account(getS(), acc).cur)}: ${pot.name}` : `Знято зі скарбнички: ${pot.name}`);
     },

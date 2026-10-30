@@ -37,7 +37,7 @@ export function moneyInsights(S: State, mk: string, now = new Date()): Insight[]
   const cur = byCat(S, mk), prev = byCat(S, shiftMk(mk, -1));
   const income = incomeDKK(S, mk), spent = spentDKK(S, mk);
 
-  if (income > 0 && (spent > 0 || isNow)) {
+  if (income > 0 && (!isNow || now.getDate() >= 10)) {
     const rate = (income - spent) / income;
     out.push(rate >= 0.2 ? { icon: 'trend', tone: 'good', text: `Ти відкладаєш ${Math.round(rate * 100)}% доходу: це більше за цільові 20%.` }
       : rate >= 0 ? { icon: 'trend', tone: 'info', text: `Лишається ${Math.round(rate * 100)}% доходу. Щоб було 20%, треба витрачати на ${fmtCur(Math.max(0, spent - income * 0.8), 'DKK')} менше.` }

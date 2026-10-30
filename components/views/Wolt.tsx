@@ -116,7 +116,7 @@ export function WoltPage() {
   const share = st.hours + focusH ? Math.round((st.hours / (st.hours + focusH)) * 100) : 0;
   const tiles: [string, string][] = [
     ['Час за кермом', hm(st.hours)], ['Заробіток', fmtCur(st.earned, 'DKK')], ['За годину', st.perHour ? fmtCur(st.perHour, 'DKK') : '—'],
-    ['Замовлень', st.orders ? String(st.orders) : '—'], ['За замовлення', st.perOrder ? fmtCur(st.perOrder, 'DKK') : '—'], ['Замовлень за годину', st.ordersPerHour ? st.ordersPerHour.toFixed(1) : '—'],
+    ['Замовлень', st.orders ? String(st.orders) : '—'], ['За замовлення', st.perOrder ? fmtCur(st.perOrder, 'DKK') : '—'], ['Замовлень за годину', st.ordersPerHour ? st.ordersPerHour.toFixed(1).replace('.', ',') : '—'],
   ];
   return (
     <section className="view">

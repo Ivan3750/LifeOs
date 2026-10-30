@@ -48,7 +48,7 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
   add('money', 'Фінанси', 'finansy', ['Дата', 'Рахунок', 'Валюта', 'Тип', 'Категорія', 'Сума', 'Сума, kr. за курсом', 'Нотатка'],
     S.money.tx.filter(t => inP(t.date, p)).sort((a, b) => a.date.localeCompare(b.date)).map(t => {
       const a = account(S, accOf(t));
-      return [t.date, a.name, a.cur, t.xfer ? 'Переказ' : t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, Math.round((t.type === 'in' ? 1 : -1) * txDKK(S, t) * 100) / 100, t.note];
+      return [t.date, a.name, a.cur, t.xfer ? 'Переказ' : t.pot ? 'Скарбничка' : t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, Math.round((t.type === 'in' ? 1 : -1) * txDKK(S, t) * 100) / 100, t.note];
     }));
   add('money', 'Скарбнички', 'skarbnychky', ['Скарбничка', 'Мета, kr.', 'Відкладено, kr.', 'До дати'], S.money.pots.map(p => [p.name, p.target, Math.round(potSaved(S, p.id) * 100) / 100, p.due]));
   add('money', 'Регулярні платежі', 'rehuliarni', ['Назва', 'Тип', 'Сума', 'Категорія', 'Числа місяця', 'Активний'], S.money.recurring.map(r => [r.name, r.type === 'in' ? 'Дохід' : 'Платіж', r.amt, r.cat, r.day, r.active ? 'так' : 'ні']));
