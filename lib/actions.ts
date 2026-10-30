@@ -1,7 +1,8 @@
-import type { AccId, Account, AdSpend, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
-import { XFER_CAT, account, fmtCur } from './money';
+import type { AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
+import { XFER_CAT, account, fmtCur, pendingRecurring } from './money';
 import { addD, AREAS, money, STAGES, TK, toMin, ymd } from './util';
 import { parseTask } from './tasks';
+import { norm } from './clients';
 
 export const goalStep = (target: number) => (target >= 200 ? Math.round(target / 20) : target >= 40 ? 5 : 1);
 
@@ -67,6 +68,31 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       });
       toast(`Переказ: ${fmtCur(amt, account(getS(), from).cur)} → ${fmtCur(received, account(getS(), to).cur)}`);
     },
+    /** Creates the records of regular payments that have come due (one per month, only once). Returns how many were added. */
+    applyRecurring() {
+      const due = pendingRecurring(getS()); if (!due.length) return 0;
+      update(s => { for (const { r, date } of due) s.money.tx.push({ id: s.nextId++, type: r.type, amt: r.amt, cat: r.cat, note: r.name, date, acc: r.acc, rec: r.id }); });
+      toast(`Додано регулярних записів: ${due.length}`);
+      return due.length;
+    },
+    addRecurring(v: Omit<Recurring, 'id' | 'from' | 'active'> & { from?: string }) {
+      if (!v.name.trim() || !(v.amt > 0)) return false;
+      update(s => { s.money.recurring.push({ id: s.nextId++, ...v, name: v.name.trim(), from: v.from || TK().slice(0, 7), active: true, day: Math.min(31, Math.max(1, Math.round(v.day) || 1)) }); });
+      toast('Регулярний платіж додано'); return true;
+    },
+    toggleRecurring(id: number) { update(s => { const r = s.money.recurring.find(x => x.id === id); if (r) r.active = !r.active; }); },
+    delRecurring(id: number) { del(s => { s.money.recurring = s.money.recurring.filter(x => x.id !== id); }, 'Регулярний платіж видалено'); },
+    addPot(v: { name: string; target: number; due: string }) { if (!v.name.trim() || !(v.target > 0)) return false; update(s => { s.money.pots.push({ id: s.nextId++, name: v.name.trim(), target: v.target, due: v.due }); }); toast('Скарбничку створено'); return true; },
+    /** Moves money into a pot (or back out when amt is negative). The account balance changes, spending statistics do not. */
+    potMove(id: number, amt: number, acc: AccId = 'dk') {
+      const pot = getS().money.pots.find(p => p.id === id); if (!pot || !amt) return;
+      update(s => { s.money.tx.push({ id: s.nextId++, type: amt > 0 ? 'out' : 'in', amt: Math.abs(amt), cat: 'Заощадження', note: pot.name, date: TK(), acc, pot: id }); });
+      toast(amt > 0 ? `Відкладено ${fmtCur(amt, account(getS(), acc).cur)}: ${pot.name}` : `Знято зі скарбнички: ${pot.name}`);
+    },
+    delPot(id: number) { del(s => { s.money.pots = s.money.pots.filter(p => p.id !== id); s.money.tx = s.money.tx.filter(t => t.pot !== id); }, 'Скарбничку видалено, гроші повернулись на рахунок'); },
+    setCatBudget(cat: string, n: number) { update(s => { if (n > 0) s.money.catBudgets[cat] = Math.round(n); else delete s.money.catBudgets[cat]; }); },
+    setBudgetMode(mode: 'fixed' | 'income') { update(s => { s.money.budgetMode = mode; }); },
+    setSaveRate(n: number) { update(s => { s.money.saveRate = Math.max(0, Math.min(90, Math.round(n))); }); },
     setAccount(id: AccId, v: Partial<Pick<Account, 'name' | 'opening' | 'budget'>>) { update(s => { const a = s.money.accounts.find(x => x.id === id); if (a) Object.assign(a, v); }); },
     setRate(uahPerDkk: number, src: 'nbu' | 'manual') { if (!(uahPerDkk > 0)) return; update(s => { s.money.uahPerDkk = uahPerDkk; s.money.rateAt = Date.now(); s.money.rateSrc = src; }); },
     /** Deleting one half of a transfer removes both halves. */
@@ -258,15 +284,33 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     setLeadStatus(id: number, status: LeadStatus) {
       update(s => { const x = s.co.leads.find(y => y.id === id); if (!x) return; x.status = status; delete x.demo; if (status === 'won' || status === 'dead') x.next = ''; });
     },
-    /** Turns a lead into a deal in the pipeline and marks the lead as a client. */
+    /** The lead has become a client: a client card is made (or an existing one with the same name is reused) and the lead is closed as won. */
+    leadToClient(id: number) {
+      const l = getS().co.leads.find(x => x.id === id); if (!l) return;
+      update(s => {
+        const x = s.co.leads.find(y => y.id === id)!; x.status = 'won'; x.next = ''; delete x.demo;
+        if (!s.co.clients.some(c => norm(c.name) === norm(x.name))) s.co.clients.push({ id: s.nextId++, name: x.name, contact: x.contact, source: x.source, since: TK(), note: x.note, lead: x.id });
+      });
+      notify(`${l.name}: тепер клієнт`);
+    },
+    /** Turns a lead into a deal in the pipeline; the lead also becomes a client. */
     leadToDeal(id: number) {
       const l = getS().co.leads.find(x => x.id === id); if (!l) return;
       update(s => {
         const x = s.co.leads.find(y => y.id === id)!; x.status = 'won'; x.next = ''; delete x.demo;
+        if (!s.co.clients.some(c => norm(c.name) === norm(x.name))) s.co.clients.push({ id: s.nextId++, name: x.name, contact: x.contact, source: x.source, since: TK(), note: x.note, lead: x.id });
         s.co.deals.push({ id: s.nextId++, title: 'Угода: ' + x.name, client: x.name, amt: x.value, stage: 'lead' });
       });
-      notify(`${l.name}: створено угоду`);
+      notify(`${l.name}: створено угоду, клієнта додано`);
     },
+    addClient(v: { name: string; contact: string; source: string; note: string }) {
+      if (!v.name.trim()) return false;
+      if (getS().co.clients.some(c => norm(c.name) === norm(v.name))) { toast('Такий клієнт уже є'); return false; }
+      update(s => { s.co.clients.push({ id: s.nextId++, name: v.name.trim(), contact: v.contact.trim(), source: v.source, since: TK(), note: v.note.trim() }); });
+      toast('Клієнта додано'); return true;
+    },
+    updateClient(id: number, v: Partial<Pick<Client, 'name' | 'contact' | 'source' | 'note'>>) { update(s => { const x = s.co.clients.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Клієнта оновлено'); },
+    delClient(id: number) { del(s => { s.co.clients = s.co.clients.filter(x => x.id !== id); }); },
     delLead(id: number) { del(s => { s.co.leads = s.co.leads.filter(x => x.id !== id); }); },
     addAd(v: { date: string; channel: string; amt: number; note: string }) { if (!(v.amt > 0)) return false; update(s => { s.co.ads.push({ id: s.nextId++, ...v, note: v.note.trim() }); }); toast('Витрату на рекламу записано'); return true; },
     updateAd(id: number, v: Partial<Pick<AdSpend, 'date' | 'channel' | 'amt' | 'note'>>) { update(s => { const x = s.co.ads.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Запис оновлено'); },

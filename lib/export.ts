@@ -1,5 +1,6 @@
 import type { ExtEvent, State } from './types';
-import { account, accOf, txDKK } from './money';
+import { account, accOf, potSaved, txDKK } from './money';
+import { clientRows } from './clients';
 import { goalProgress } from './goals';
 import { addD, hhmm, ymd } from './util';
 import { LEAD_STATUS, STAGES } from './util';
@@ -7,7 +8,7 @@ import { LEAD_STATUS, STAGES } from './util';
 export const SECTIONS = [
   ['focus', 'Фокус і сесії'], ['tasks', 'Задачі'], ['habits', 'Звички'], ['health', 'Сон, вода, рух'], ['moods', 'Настрій'],
   ['acts', 'Справи і зміни Wolt'], ['money', 'Фінанси'], ['events', 'Події: мої і з календарів'], ['goals', 'Цілі і сфери життя'],
-  ['notes', 'Нотатки'], ['company', 'Компанія: клієнти, угоди, проєкти, рахунки, реклама'],
+  ['notes', 'Нотатки'], ['company', 'Компанія: ліди, клієнти, угоди, проєкти, рахунки, реклама'],
 ] as const;
 export type SectionKey = (typeof SECTIONS)[number][0];
 
@@ -49,6 +50,8 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
       const a = account(S, accOf(t));
       return [t.date, a.name, a.cur, t.xfer ? 'Переказ' : t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, Math.round((t.type === 'in' ? 1 : -1) * txDKK(S, t) * 100) / 100, t.note];
     }));
+  add('money', 'Скарбнички', 'skarbnychky', ['Скарбничка', 'Мета, kr.', 'Відкладено, kr.', 'До дати'], S.money.pots.map(p => [p.name, p.target, Math.round(potSaved(S, p.id) * 100) / 100, p.due]));
+  add('money', 'Регулярні платежі', 'rehuliarni', ['Назва', 'Тип', 'Сума', 'Категорія', 'Числа місяця', 'Активний'], S.money.recurring.map(r => [r.name, r.type === 'in' ? 'Дохід' : 'Платіж', r.amt, r.cat, r.day, r.active ? 'так' : 'ні']));
   add('events', 'Події', 'podii', ['Дата', 'Початок', 'Кінець', 'Подія', 'Звідки', 'Місце'], [
     ...S.events.filter(e => inP(e.date, p)).map(e => [e.date, e.s, e.e, e.title, 'мої', '']),
     ...ext.filter(e => inP(e.start.slice(0, 10), p)).map(e => e.allDay
@@ -60,8 +63,10 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
   add('goals', 'Колесо балансу', 'koleso', ['Сфера', 'Оцінка 1–10'], ['Здоровʼя', 'Карʼєра', 'Фінанси', 'Стосунки', 'Друзі', 'Відпочинок', 'Розвиток', 'Дім'].map((a, i) => [a, S.wheel[i] ?? '']));
   add('notes', 'Нотатки', 'notatky', ['Оновлено', 'Назва', 'Текст'],
     S.noteList.filter(n => inP(day(n.updated), p)).map(n => [day(n.updated), n.title, n.text]));
-  add('company', 'Клієнти', 'klijenty', ['Створено', 'Імʼя', 'Контакт', 'Джерело', 'Статус', 'Очікувана сума', 'Наступний контакт', 'Нотатка'],
+  add('company', 'Ліди', 'lidy', ['Створено', 'Імʼя', 'Контакт', 'Джерело', 'Статус', 'Очікувана сума', 'Наступний контакт', 'Нотатка'],
     S.co.leads.filter(l => inP(l.created, p)).map(l => [l.created, l.name, l.contact, l.source, LEAD_STATUS.find(x => x[0] === l.status)?.[1] || l.status, l.value, l.next, l.note]));
+  add('company', 'Клієнти (база)', 'klijenty-baza', ['Клієнт', 'Контакт', 'Джерело', 'З', 'Принесли', 'Чекаємо оплату', 'Відкриті угоди', 'Активні проєкти'],
+    clientRows(S).map(r => [r.name, r.contact, r.source, r.since, r.revenue, r.unpaid, r.deals, r.projects]));
   add('company', 'Угоди', 'uhody', ['Угода', 'Клієнт', 'Сума', 'Етап'], S.co.deals.map(d => [d.title, d.client, d.amt, STAGES.find(x => x[0] === d.stage)?.[1] || (d.stage === 'lost' ? 'Програно' : d.stage)]));
   add('company', 'Проєкти', 'proiekty', ['Проєкт', 'Клієнт', 'Бюджет', 'Прогрес, %', 'Дедлайн', 'Статус'], S.co.projects.map(x => [x.name, x.client, x.budget, x.progress, x.due, x.status]));
   add('company', 'Рахунки', 'rakhunky', ['Номер', 'Клієнт', 'Сума', 'Виставлено', 'Оплатити до', 'Оплачено'],

@@ -221,7 +221,7 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   // Spending: fixed bills (housing) come off the month budget first; the rest is split into a daily limit.
   // A day within the limit is full marks, twice the limit or more is zero.
   // Both accounts count, hryvnias converted to kroner; transfers between own accounts are not spending.
-  const mk = k.slice(0, 7), monthTx = monthOf(S, mk).filter(t => t.type === 'out'), budget = budgetDKK(S);
+  const mk = k.slice(0, 7), monthTx = monthOf(S, mk).filter(t => t.type === 'out'), budget = budgetDKK(S, mk);
   if (O && !O.money) skip('money', 'Витрати', `${O.why}, позаплановий день`);
   else if (budget > 0 && monthTx.length) {
     const d = new Date(k + 'T00:00'), dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();

@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useStore } from '@/lib/store';
 import type { AccId, Tx } from '@/lib/types';
-import { account, accOf, balance, convert, CUR_SIGN, curOfTx, fmtCur, monthOf, rate, realTx, sumIn } from '@/lib/money';
+import { account, accOf, balance, convert, CUR_SIGN, curOfTx, fmtCur, monthOf, rate, realTx, sumIn, toDKK } from '@/lib/money';
 import { addD, CATS, daysInMonth, MON, MONTHN, pctW, TK, WD, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { DelBtn } from '../shared';
 import { WoltCard } from '../Wolt';
+import { InsightsCard, MonthHero, Pots, RecurringCard, Trends } from '../MoneyExtras';
 
 type Filter = 'all' | AccId;
 type Kind = 'out' | 'in' | 'xfer';
@@ -49,7 +50,7 @@ function AccountCard({ id, mk, active, onPick }: { id: AccId; mk: string; active
       <div className="acct-bal num" style={{ color: bal < 0 ? 'var(--m1)' : undefined }}>{fmtCur(bal, cur)}</div>
       <div className="muted acct-sub">баланс зараз</div>
       <div className="acct-row"><span className="num in">+{fmtCur(inc, cur)}</span><span className="num out">−{fmtCur(out, cur)}</span><span className="muted">за {MONTHN[+mk.slice(5) - 1].toLowerCase()}</span></div>
-      {a.budget > 0 && (
+      {a.budget > 0 && S.money.budgetMode !== 'income' && (
         <>
           <div className="bar" style={{ marginTop: 10 }}><i style={{ width: pctW(out, a.budget) + '%', background: out > a.budget ? 'var(--m1)' : 'var(--accent)' }} /></div>
           <div className="muted acct-sub" style={{ marginTop: 6 }}>Бюджет {fmtCur(a.budget, cur)} · {left >= 0 ? `лишилось ${fmtCur(left, cur)}` : `перевищено на ${fmtCur(-left, cur)}`}{isNow && left > 0 ? ` · ≈ ${fmtCur(left / dl, cur)} на день` : ''}</div>
@@ -58,7 +59,7 @@ function AccountCard({ id, mk, active, onPick }: { id: AccId; mk: string; active
       {edit && (
         <div className="acct-edit">
           <SaveNum id={`op-${id}`} label="Початковий баланс" value={a.opening} suffix={CUR_SIGN[cur]} onSave={n => A.setAccount(id, { opening: n })} />
-          <SaveNum id={`bd-${id}`} label="Бюджет витрат на місяць" value={a.budget} suffix={CUR_SIGN[cur]} onSave={n => A.setAccount(id, { budget: Math.max(0, n) })} />
+          <SaveNum id={`bd-${id}`} key={a.budget} label="Бюджет витрат на місяць" value={a.budget} suffix={CUR_SIGN[cur]} onSave={n => A.setAccount(id, { budget: Math.max(0, n) })} />
           <p className="help">Початковий баланс — скільки було на рахунку до першого запису тут. Бюджет 0 вимикає ліміт.</p>
         </div>
       )}
@@ -176,20 +177,39 @@ function TxForm({ filter, edit, onDone }: { filter: Filter; edit: Tx | null; onD
 }
 
 function CatCard({ list, cur }: { list: Tx[]; cur?: 'DKK' | 'UAH' }) {
-  const { S } = useStore();
+  const { S, A } = useStore();
+  const [editing, setEditing] = useState<string | null>(null);
+  const [lim, setLim] = useState('');
   const c = cur || 'DKK', by: Record<string, number> = {};
   list.filter(t => t.type === 'out').forEach(t => { by[t.cat] = (by[t.cat] || 0) + convert(S, t.amt, curOfTx(S, t), c); });
-  const arr = Object.entries(by).sort((a, b) => b[1] - a[1]), max = arr[0]?.[1] || 1, total = arr.reduce((a, [, v]) => a + v, 0);
+  // categories with a limit are shown even when nothing is spent there yet
+  for (const k of Object.keys(S.money.catBudgets)) by[k] = by[k] || 0;
+  const arr = Object.entries(by).sort((a, b) => b[1] - a[1]), max = Math.max(1, arr[0]?.[1] || 1, ...Object.values(S.money.catBudgets).map(v => toDKK(S, v, 'DKK') * (c === 'UAH' ? rate(S) : 1))), total = arr.reduce((a, [, v]) => a + v, 0);
+  const open = (k: string) => { setEditing(k); setLim(S.money.catBudgets[k] ? String(S.money.catBudgets[k]) : ''); };
   return (
     <div className="card s7">
-      <div className="ch"><div><h3>Куди йдуть гроші</h3><p>{cur ? 'Витрати рахунку за місяць' : 'Обидва рахунки, у кронах за курсом'}</p></div></div>
+      <div className="ch"><div><h3>Куди йдуть гроші</h3><p>{cur ? 'Витрати рахунку за місяць' : 'Обидва рахунки, у кронах за курсом'}. Натисни «ліміт», щоб обмежити категорію.</p></div></div>
       <div className="cats">
-        {arr.map(([k, v]) => (
-          <div className="catrow" key={k} style={{ gridTemplateColumns: '96px minmax(0,1fr) 110px' }}>
-            <span>{k}</span><div className="bar"><i style={{ width: pctW(v, max) + '%' }} /></div>
-            <span className="num" style={{ textAlign: 'right' }}>{fmtCur(v, c)} <small className="muted">{Math.round((v / total) * 100)}%</small></span>
-          </div>
-        ))}
+        {arr.map(([k, v]) => {
+          const limit = S.money.catBudgets[k], limC = limit ? limit * (c === 'UAH' ? rate(S) : 1) : 0, over = limit > 0 && v > limC;
+          return (
+            <div className="catrow2" key={k}>
+              <div className="cr-h">
+                <span>{k}</span>
+                <span className="num">{fmtCur(v, c)} {total > 0 && <small className="muted">{Math.round((v / total) * 100)}%</small>}</span>
+              </div>
+              <div className="bar cr-bar"><i style={{ width: pctW(v, limC || max) + '%', background: over ? 'var(--m1)' : limit && v > limC * 0.85 ? 'var(--m2)' : undefined }} />{limit > 0 && <u style={{ left: pctW(limC, max) + '%' }} />}</div>
+              <div className="cr-f">
+                {editing === k
+                  ? <form onSubmit={e => { e.preventDefault(); A.setCatBudget(k, +lim.replace(',', '.') || 0); setEditing(null); }} className="row" style={{ gap: 6 }}>
+                      <input autoFocus inputMode="decimal" placeholder="kr. на місяць" value={lim} aria-label={`Ліміт для ${k}, kr.`} onChange={e => setLim(e.target.value)} onBlur={() => setEditing(null)} />
+                      <button className="sqb" onMouseDown={e => e.preventDefault()}>Ок</button>
+                    </form>
+                  : <button className={`linkbtn${over ? ' over' : ''}`} onClick={() => open(k)}>{limit ? `ліміт ${fmtCur(limit, 'DKK')}${over ? `, перевищено на ${fmtCur(v / (c === 'UAH' ? rate(S) : 1) - limit, 'DKK')}` : ''}` : 'ліміт'}</button>}
+              </div>
+            </div>
+          );
+        })}
         {!arr.length && <p className="muted" style={{ margin: 0 }}>Витрат за цей місяць немає.</p>}
       </div>
     </div>
@@ -256,7 +276,7 @@ export function Money() {
   return (
     <section className="view">
       <div className="vh">
-        <div><h2>Фінанси</h2><p>Два рахунки: данський у кронах і український у гривнях. Разом рахується за курсом НБУ.</p></div>
+        <div><h2>Фінанси</h2><p>Дохід і витрати разом: бюджет, скарбнички, регулярні платежі. Два рахунки, разом за курсом НБУ.</p></div>
         <div className="row" style={{ marginLeft: 'auto', gap: 8 }}>
           <div className="seg">
             {([['all', 'Усі'], ['dk', 'kr.'], ['ua', '₴']] as const).map(([k, l]) => <button key={k} aria-pressed={filter === k} onClick={() => setFilter(k)}>{l}</button>)}
@@ -268,11 +288,18 @@ export function Money() {
           </div>
         </div>
       </div>
+      <div style={{ marginTop: 18 }}><MonthHero mk={mk} /></div>
       <div className="grid" style={{ marginTop: 18 }}>
         <AccountCard id="dk" mk={mk} active={filter === 'dk'} onPick={() => setFilter(filter === 'dk' ? 'all' : 'dk')} />
         <AccountCard id="ua" mk={mk} active={filter === 'ua'} onPick={() => setFilter(filter === 'ua' ? 'all' : 'ua')} />
         <TotalCard mk={mk} />
         <WoltCard />
+      </div>
+      <div style={{ marginTop: 18 }}><InsightsCard mk={mk} /></div>
+      <div className="grid" style={{ marginTop: 18 }}>
+        <Pots />
+        <RecurringCard />
+        <Trends />
       </div>
       <div className="grid" style={{ marginTop: 18 }}>
         <TxForm key={editing ? 'e' + editing.id : 'new-' + filter} filter={filter} edit={editing} onDone={() => setEditing(null)} />

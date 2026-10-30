@@ -8,6 +8,7 @@ import { addD, daysInMonth, daysTo, kfmt, LEAD_SOURCES, LEAD_STATUS, MON, MONTHN
 import { Icon, type IconName } from '../Icon';
 import { RevenueChart, Ring } from '../charts';
 import { DelBtn, Empty, loadC, sumA } from '../shared';
+import { clientRows, clientScript, HEAT_LABEL, leadHeat, leadScript } from '@/lib/clients';
 
 const invState = (i: Invoice) => (i.paid ? 'paid' : i.due < TK() ? 'over' : 'wait');
 const OPEN = ['lead', 'talk', 'proposal'];
@@ -30,7 +31,8 @@ function adStats(S: ReturnType<typeof useStore>['S'], mk = '') {
 
 /** The path of one client through the business, in the order the work really happens. */
 const FLOW: [string, string, IconName, string][] = [
-  ['leads', 'Клієнти', 'leads', 'Хто може купити'],
+  ['leads', 'Ліди', 'leads', 'Хто може купити'],
+  ['clients', 'Клієнти', 'user', 'Хто вже купив'],
   ['deals', 'Угоди', 'deals', 'Що саме продаєш'],
   ['projects', 'Проєкти', 'projects', 'Робота для клієнта'],
   ['invoices', 'Рахунки', 'invoice', 'Отримати гроші'],
@@ -40,6 +42,7 @@ function flowCounts(S: ReturnType<typeof useStore>['S']) {
   const C = S.co;
   return {
     leads: C.leads.filter(l => l.status !== 'won' && l.status !== 'dead').length,
+    clients: clientRows(S).length,
     deals: C.deals.filter(d => OPEN.includes(d.stage)).length,
     projects: C.projects.filter(p => p.status === 'active').length,
     invoices: C.invoices.filter(i => !i.paid).length,
@@ -80,12 +83,13 @@ function useNext(): Task2[] {
   const C = S.co, today = TK(), q: Task2[] = [];
   for (const i of C.invoices.filter(x => !x.paid && x.due < today)) q.push({ key: 'i' + i.id, tone: 'bad', icon: 'invoice', title: `Рахунок ${i.no} прострочено на ${-daysTo(i.due)} дн`, sub: `${i.client} · ${money(i.amt)}`, label: 'Нагадати клієнту', run: () => go('invoices') });
   for (const p of C.projects.filter(x => x.status !== 'done' && x.due && x.due < today)) q.push({ key: 'pd' + p.id, tone: 'bad', icon: 'projects', title: `Проєкт «${p.name}» прострочено`, sub: `${p.client || 'без клієнта'} · ${p.progress}% готово`, label: 'Відкрити проєкт', run: () => go('projects') });
-  for (const l of C.leads.filter(x => x.next && x.next <= today && x.status !== 'won' && x.status !== 'dead')) q.push({ key: 'l' + l.id, tone: 'warn', icon: 'leads', title: `Звʼяжись з ${l.name}`, sub: `${LEAD_STATUS.find(x => x[0] === l.status)![1]} · ${l.source}${l.next < today ? ' · чекає ' + -daysTo(l.next) + ' дн' : ''}`, label: 'Відкрити клієнтів', run: () => go('leads') });
+  for (const l of C.leads.filter(x => x.next && x.next <= today && x.status !== 'won' && x.status !== 'dead')) q.push({ key: 'l' + l.id, tone: 'warn', icon: 'leads', title: `Звʼяжись з ${l.name}`, sub: `${LEAD_STATUS.find(x => x[0] === l.status)![1]} · ${l.source}${l.next < today ? ' · чекає ' + -daysTo(l.next) + ' дн' : ''}`, label: 'Відкрити ліди', run: () => go('leads') });
   for (const p of C.projects.filter(x => (x.status === 'done' || x.progress >= 100) && !C.invoices.some(i => i.project === x.id || (x.deal && i.deal === x.deal)))) q.push({ key: 'pi' + p.id, tone: 'warn', icon: 'invoice', title: `Проєкт «${p.name}» готовий, рахунку нема`, sub: `${p.client || ''} · ${money(p.budget)}`, label: 'Виставити рахунок', run: () => A.invoiceProject(p.id) });
   for (const i of C.invoices.filter(x => !x.paid && x.due >= today && daysTo(x.due) <= 3)) q.push({ key: 'is' + i.id, tone: 'warn', icon: 'invoice', title: `Оплата ${i.no} через ${daysTo(i.due)} дн`, sub: `${i.client} · ${money(i.amt)}`, label: 'До рахунків', run: () => go('invoices') });
   for (const p of C.projects.filter(x => x.status === 'active' && x.due && x.due >= today && daysTo(x.due) <= 3)) q.push({ key: 'ps' + p.id, tone: 'warn', icon: 'projects', title: `Дедлайн проєкту «${p.name}» через ${daysTo(p.due)} дн`, sub: `${p.progress}% готово`, label: 'До проєктів', run: () => go('projects') });
   for (const d of C.deals.filter(x => x.stage === 'proposal')) q.push({ key: 'd' + d.id, tone: 'info', icon: 'deals', title: `Дотисни угоду «${d.title}»`, sub: `${d.client} · ${money(d.amt)} · пропозицію надіслано`, label: 'До угод', run: () => go('deals') });
-  for (const l of C.leads.filter(x => x.status === 'new' && !(x.next && x.next <= today))) q.push({ key: 'ln' + l.id, tone: 'info', icon: 'leads', title: `Ще не писав: ${l.name}`, sub: `${l.source}${l.value ? ' · ' + money(l.value) : ''}`, label: 'До клієнтів', run: () => go('leads') });
+  for (const l of C.leads.filter(x => x.status === 'new' && !(x.next && x.next <= today))) q.push({ key: 'ln' + l.id, tone: 'info', icon: 'leads', title: `Ще не писав: ${l.name}`, sub: `${l.source}${l.value ? ' · ' + money(l.value) : ''}`, label: 'До лідів', run: () => go('leads') });
+  for (const c of clientRows(S).filter(x => x.dormant !== null).slice(0, 3)) q.push({ key: 'cd' + c.name, tone: 'info', icon: 'user', title: `Нагадай про себе: ${c.name}`, sub: `${c.dormant} дн без замовлень · раніше принесли ${money(c.revenue)}`, label: 'До клієнтів', run: () => go('clients') });
   const rank = { bad: 0, warn: 1, info: 2 } as const;
   return q.sort((a, b) => rank[a.tone] - rank[b.tone]);
 }
@@ -95,19 +99,22 @@ function Journey() {
   const { S, go, setSheet } = useStore();
   const n = flowCounts(S), C = S.co;
   const cta: Record<string, [string, () => void]> = {
-    leads: ['+ Клієнт', () => setSheet({ kind: 'form', key: 'lead' })],
+    leads: ['+ Лід', () => setSheet({ kind: 'form', key: 'lead' })],
+    clients: ['+ Клієнт', () => setSheet({ kind: 'form', key: 'client' })],
     deals: ['+ Угода', () => setSheet({ kind: 'form', key: 'deal' })],
     projects: ['+ Проєкт', () => setSheet({ kind: 'form', key: 'project' })],
     invoices: ['+ Рахунок', () => setSheet({ kind: 'form', key: 'invoice' })],
   };
   const text: Record<string, string> = {
-    leads: 'Запиши кожного, хто може купити, і дату наступного контакту. Коли людина готова, натисни «В угоду».',
+    leads: 'Лід це людина, яка ще не купила. Запиши її і дату наступного контакту: холодні, теплі й гарячі підсвічуються.',
+    clients: 'Лід, що купує, стає клієнтом. Тут видно, скільки кожен приніс і хто давно не купував.',
     deals: 'Рухай угоду вправо: розмова, пропозиція, виграно. Виграна угода сама створить проєкт і рахунок.',
     projects: 'Роби роботу й відмічай прогрес. Коли проєкт готовий, виставляй рахунок.',
     invoices: 'Став «Оплачено», коли гроші прийшли. Прострочені підсвітяться, і буде готовий текст нагадування.',
   };
   const stat: Record<string, string> = {
     leads: `${n.leads} у роботі · ${C.leads.filter(l => l.status === 'won').length} стали клієнтами`,
+    clients: `${n.clients} всього · ${money(sumA(C.invoices.filter(i => i.paid)))} принесли`,
     deals: `${n.deals} відкритих на ${money(sumA(C.deals.filter(d => OPEN.includes(d.stage))))}`,
     projects: `${n.projects} активних · ${C.projects.filter(p => p.status === 'done').length} завершено`,
     invoices: `${n.invoices} чекають · оплачено ${money(sumA(C.invoices.filter(i => i.paid)))}`,
@@ -438,16 +445,17 @@ export function Leads() {
   const contactLink = (c: string) => (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c) ? 'mailto:' + c : /^\+?[\d\s()-]{7,}$/.test(c) ? 'tel:' + c.replace(/[^\d+]/g, '') : /^@\w+$/.test(c) ? '' : /^https?:\/\//.test(c) ? c : '');
   return (
     <section className="view">
-      <Head flow="leads" title="Можливі клієнти" sub={`${live.length} у роботі на ${money(sumV(live))} · ${due.length ? `треба звʼязатися: ${due.length}` : 'нічого термінового'} · ${closed ? `конверсія ${Math.round((won / closed) * 100)}%` : 'ще нічого не закрито'}`}>
-        <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'lead' })}>+ Клієнт</button>
+      <Head flow="leads" title="Ліди" sub={`${live.length} у роботі на ${money(sumV(live))} · ${due.length ? `треба звʼязатися: ${due.length}` : 'нічого термінового'} · ${closed ? `конверсія ${Math.round((won / closed) * 100)}%` : 'ще нічого не закрито'}`}>
+        <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'lead' })}>+ Лід</button>
       </Head>
+      <QuickLead />
       <div className="grid" style={{ marginTop: 18 }}>
         <div className="card s12">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <div className="seg">
-              {([['live', `У роботі ${live.length}`], ['today', `Звʼязатися ${due.length}`], ['won', 'Клієнти'], ['dead', 'Не цікаво'], ['all', 'Усі']] as const).map(([k, l]) => <button key={k} aria-pressed={f === k} onClick={() => setF(k)}>{l}</button>)}
+              {([['live', `У роботі ${live.length}`], ['today', `Звʼязатися ${due.length}`], ['won', 'Стали клієнтами'], ['dead', 'Не цікаво'], ['all', 'Усі']] as const).map(([k, l]) => <button key={k} aria-pressed={f === k} onClick={() => setF(k)}>{l}</button>)}
             </div>
-            <input className="txsearch" placeholder="Пошук: імʼя, контакт, нотатка…" value={q} onChange={e => setQ(e.target.value)} aria-label="Пошук клієнтів" />
+            <input className="txsearch" placeholder="Пошук: імʼя, контакт, нотатка…" value={q} onChange={e => setQ(e.target.value)} aria-label="Пошук лідів" />
           </div>
           <div className="list" style={{ marginTop: 10 }}>
             {list.map(l => <LeadRow key={l.id} l={l} link={contactLink(l.contact)} />)}
@@ -458,7 +466,7 @@ export function Leads() {
         </div>
         {bySource.length > 0 && (
           <div className="card s12">
-            <div className="ch"><Icon n="trend" className="ic" /><div><h3>Звідки приходять клієнти</h3><p>Скільки людей і скільки з них стали клієнтами</p></div></div>
+            <div className="ch"><Icon n="trend" className="ic" /><div><h3>Звідки приходять ліди</h3><p>Скільки людей і скільки з них стали клієнтами</p></div></div>
             <div className="cats">
               {bySource.map(x => <div className="catrow" key={x.c} style={{ gridTemplateColumns: '130px minmax(0,1fr) 80px' }}><span>{x.c}</span><div className="bar"><i style={{ width: pctW(x.n, bySource[0].n) + '%' }} /></div><span className="num" style={{ textAlign: 'right' }}>{x.n} / {x.w}</span></div>)}
             </div>
@@ -469,13 +477,32 @@ export function Leads() {
   );
 }
 
+/** One line is enough to catch a lead: who, where from. The next contact is set for tomorrow. */
+function QuickLead() {
+  const { A } = useStore();
+  const [name, setName] = useState('');
+  const [src, setSrc] = useState(LEAD_SOURCES[0]);
+  const submit = (e: React.FormEvent) => { e.preventDefault(); if (!name.trim()) return; A.addLead({ name, contact: '', source: src, value: 0, next: ymd(addD(new Date(), 1)), note: '' }); setName(''); };
+  return (
+    <form className="card quicklead" onSubmit={submit}>
+      <div className="addrow">
+        <input aria-label="Новий лід" placeholder="Новий лід: імʼя чи компанія…" autoComplete="off" value={name} onChange={e => setName(e.target.value)} />
+        <select aria-label="Звідки" value={src} onChange={e => setSrc(e.target.value)}>{LEAD_SOURCES.map(c => <option key={c}>{c}</option>)}</select>
+        <button className="btn acc" disabled={!name.trim()}>Додати</button>
+      </div>
+    </form>
+  );
+}
+
 function LeadRow({ l, link }: { l: Lead; link: string }) {
-  const { A, setSheet } = useStore();
+  const { S, A, setSheet, toast } = useStore();
+  const heat = l.status === 'won' || l.status === 'dead' ? null : leadHeat(l);
+  const script = () => { const t = leadScript(l, S.name); navigator.clipboard?.writeText(t).then(() => toast('Текст повідомлення скопійовано'), () => toast(t)); };
   const dd = l.next ? daysTo(l.next) : null, lbl = LEAD_STATUS.find(x => x[0] === l.status)![1], nx = LEAD_NEXT[l.status];
   return (
     <div className="item lead">
       <span className="t">
-        <b>{l.name}</b>{' '}
+        {heat && <span className={`heat ${heat}`} title={`Лід ${HEAT_LABEL[heat]}`}><Icon n="flame" /></span>}<b>{l.name}</b>{' '}
         {l.contact && (link ? <a href={link} className="muted" style={{ fontSize: 12 }}>{l.contact}</a> : <span className="muted" style={{ fontSize: 12 }}>{l.contact}</span>)}
         <br /><small className="muted">{l.source}{l.value ? ' · ' + money(l.value) : ''}{l.note ? ' · ' + l.note : ''}</small>
       </span>
@@ -483,14 +510,80 @@ function LeadRow({ l, link }: { l: Lead; link: string }) {
       <span className={`pillst ${leadCls(l.status)}`}>{lbl}</span>
       <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
         {nx && <button className="sqb acc" title={`Статус: ${LEAD_STATUS.find(x => x[0] === nx)![1]}`} onClick={() => { A.setLeadStatus(l.id, nx); if (l.next && l.next <= TK()) A.updateLead(l.id, { next: ymd(addD(new Date(), 3)) }); }}>{LEAD_STATUS.find(x => x[0] === nx)![1]} →</button>}
-        {l.status !== 'won' && l.status !== 'dead' && <button className="sqb" title="Створити угоду в воронці" onClick={() => A.leadToDeal(l.id)}>В угоду</button>}
+        {l.status !== 'won' && l.status !== 'dead' && <button className="ib" title="Скопіювати готове повідомлення" aria-label="Скопіювати готове повідомлення" onClick={script}><Icon n="copy" /></button>}
+        {l.status !== 'won' && l.status !== 'dead' && <button className="sqb" title="Лід купує: зробити клієнтом" onClick={() => A.leadToClient(l.id)}>Клієнт</button>}
+        {l.status !== 'won' && l.status !== 'dead' && <button className="sqb" title="Створити угоду і клієнта" onClick={() => A.leadToDeal(l.id)}>В угоду</button>}
         {l.status !== 'won' && l.status !== 'dead' && <button className="sqb" title="Відкласти на 3 дні" onClick={() => A.updateLead(l.id, { next: ymd(addD(new Date(), 3)) })}>+3 дн</button>}
         {(l.status === 'won' || l.status === 'dead') && <button className="sqb" onClick={() => A.setLeadStatus(l.id, 'new')}>Відновити</button>}
         {l.status !== 'dead' && l.status !== 'won' && <button className="sqb" title="Не цікаво" aria-label="Позначити, що не цікаво" onClick={() => A.setLeadStatus(l.id, 'dead')}><Icon n="x" /></button>}
         <button className="ib" aria-label={`Змінити: ${l.name}`} onClick={() => edit(setSheet, 'editLead', { id: String(l.id), name: l.name, contact: l.contact, source: l.source, status: l.status, value: String(l.value || ''), next: l.next, note: l.note })} title="Змінити"><Icon n="edit" /></button>
-        <DelBtn label="Видалити клієнта" onDelete={() => A.delLead(l.id)} />
+        <DelBtn label="Видалити ліда" onDelete={() => A.delLead(l.id)} />
       </span>
     </div>
+  );
+}
+
+export function Clients() {
+  const { S, setSheet, toast, go } = useStore();
+  const [q, setQ] = useState('');
+  const [f, setF] = useState<'all' | 'active' | 'dormant'>('all');
+  const rows = clientRows(S), ql = q.trim().toLowerCase();
+  const list = rows.filter(r => (f === 'all' || (f === 'dormant' ? r.dormant !== null : r.deals + r.projects + r.unpaid > 0)) && (!ql || `${r.name} ${r.contact} ${r.note}`.toLowerCase().includes(ql)));
+  const total = sum(rows.map(r => r.revenue)), buyers = rows.filter(r => r.revenue > 0), dormant = rows.filter(r => r.dormant !== null);
+  const topMax = Math.max(1, ...rows.map(r => r.revenue));
+  const remind = (name: string) => { const t = clientScript(name, S.name); navigator.clipboard?.writeText(t).then(() => toast('Текст повідомлення скопійовано'), () => toast(t)); };
+  const prefill = (key: string, name: string) => setSheet({ kind: 'form', key, init: key === 'deal' ? { client: name } : key === 'project' ? { client: name } : { client: name } });
+  return (
+    <section className="view">
+      <Head flow="clients" title="Клієнти" sub={rows.length ? `${rows.length} у базі · принесли ${money(total)} · ${dormant.length ? `давно не купували: ${dormant.length}` : 'усі активні'}` : 'Хто вже купив або от-от купить'}>
+        <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'client' })}>+ Клієнт</button>
+      </Head>
+      {rows.length > 0 && (
+        <div className="grid" style={{ marginTop: 18 }}>
+          {([['Клієнтів', String(rows.length), `${buyers.length} уже платили`], ['Дохід від клієнтів', money(total), 'оплачені рахунки'], ['Середній клієнт', buyers.length ? money(total / buyers.length) : '—', 'дохід на того, хто платив'], ['Давно не купували', String(dormant.length), dormant.length ? `понад ${60} днів` : 'усі свіжі']] as const).map(([l, v, sub]) => (
+            <div key={l} className="card s3 stat"><div className="k">{l}</div><div className="v num">{v}</div><div className="k" style={{ marginTop: 4 }}>{sub}</div></div>
+          ))}
+        </div>
+      )}
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <div className="tabs" role="group" aria-label="Які клієнти показати" style={{ flex: '0 1 auto' }}>
+            {([['all', 'Усі'], ['active', 'У роботі'], ['dormant', `Давно не було ${dormant.length || ''}`]] as const).map(([k, l]) => <button key={k} aria-pressed={f === k} onClick={() => setF(k)}>{l}</button>)}
+          </div>
+          <input className="txsearch" placeholder="Пошук: імʼя, контакт, нотатка…" value={q} onChange={e => setQ(e.target.value)} aria-label="Пошук клієнтів" />
+        </div>
+        <div className="clientgrid">
+          {list.map(r => (
+            <div className="clcard" key={r.name}>
+              <div className="cl-h">
+                <span className="cl-av" aria-hidden="true">{r.name.trim()[0]?.toUpperCase()}</span>
+                <div style={{ minWidth: 0, flex: 1 }}><b>{r.name}</b><small className="muted">{r.contact || r.source || (r.card ? '' : 'без картки')}{r.since ? ` · з ${r.since.split('-').reverse().join('.')}` : ''}</small></div>
+                {r.id !== undefined
+                  ? <button className="ib" title="Змінити" aria-label={`Змінити клієнта ${r.name}`} onClick={() => setSheet({ kind: 'form', key: 'editClient', init: { id: String(r.id), name: r.name, contact: r.contact, source: r.source || LEAD_SOURCES[0], note: r.note } })}><Icon n="edit" /></button>
+                  : <button className="linkbtn" onClick={() => S.co.clients.some(c => c.name === r.name) || setSheet({ kind: 'form', key: 'client', init: { name: r.name } })}>створити картку</button>}
+              </div>
+              <div className="cl-stats">
+                <div><span>Принесли</span><b className="num">{r.revenue ? money(r.revenue) : '—'}</b></div>
+                <div><span>Чекаємо оплату</span><b className="num" style={{ color: r.unpaid ? 'var(--accent)' : undefined }}>{r.unpaid ? money(r.unpaid) : '—'}</b></div>
+                <div><span>Угоди / проєкти</span><b className="num">{r.deals} / {r.projects}</b></div>
+              </div>
+              {r.revenue > 0 && <div className="bar" style={{ height: 5 }}><i style={{ width: pctW(r.revenue, topMax) + '%', background: 'var(--ink)' }} /></div>}
+              {r.note && <p className="help" style={{ margin: 0 }}>{r.note}</p>}
+              {r.dormant !== null && <p className="cl-warn">Останній платіж {r.dormant} дн тому: час нагадати про себе.</p>}
+              <div className="row" style={{ gap: 6 }}>
+                <button className="sqb" onClick={() => prefill('deal', r.name)}>+ Угода</button>
+                <button className="sqb" onClick={() => prefill('project', r.name)}>+ Проєкт</button>
+                <button className="sqb" onClick={() => prefill('invoice', r.name)}>+ Рахунок</button>
+                {r.dormant !== null && <button className="sqb acc" onClick={() => remind(r.name)}>Скопіювати нагадування</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+        {!list.length && (rows.length
+          ? <Empty icon="user" title="Нікого не знайдено" text="Змінь фільтр чи пошук." />
+          : <Empty icon="user" title="Клієнтів ще нема" text="Клієнт зʼявляється, коли лід починає купувати. Натисни «Клієнт» біля ліда або додай людину вручну."><div className="row" style={{ justifyContent: 'center' }}><button className="btn ghost" onClick={() => go('leads')}>До лідів</button><button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'client' })}>+ Клієнт</button></div></Empty>)}
+      </div>
+    </section>
   );
 }
 

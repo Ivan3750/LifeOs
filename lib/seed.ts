@@ -86,7 +86,7 @@ export function makeState(demo: boolean): State {
         .map(([title, area, target, cur, unit, dd]) => ({ id: id(), title, area, target, cur, unit, due: ymd(addD(now, dd)), demo: 1 as const }))
     : [];
 
-  const co: State['co'] = { name: 'Моя студія', goal: 150000, invSeq: 0, deals: [], projects: [], invoices: [], team: [], leads: [], ads: [] };
+  const co: State['co'] = { name: 'Моя студія', goal: 150000, invSeq: 0, deals: [], projects: [], invoices: [], team: [], leads: [], clients: [], ads: [] };
   if (demo) {
     co.deals = ([['Сайт для кавʼярні', 'Kaffebar Bønne', 45000, 'proposal'], ['Брендинг фітнес-клубу', 'FitLab', 80000, 'talk'], ['Підтримка вебмагазину', 'Shopik ApS', 15000, 'lead'], ['Лендінг конференції', 'DevDays', 30000, 'lead'], ['Мобільний застосунок', 'MedCare', 220000, 'talk'], ['SMM на 3 місяці', 'Bloom', 36000, 'won']] as const)
       .map(([title, client, amt, stage]) => ({ id: id(), title, client, amt, stage, demo: 1 as const }));
@@ -148,7 +148,7 @@ export function makeState(demo: boolean): State {
     timer: { mode: 'focus', left: 25 * 60, running: false, endAt: 0, task: '' },
     log: [], unread: false, nextId,
     habits, health, goals,
-    money: { budget: 9000, tx, accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a, budget: a.id === 'ua' && demo ? 3000 : a.budget, opening: demo ? (a.id === 'dk' ? 4200 : 8500) : 0 })), uahPerDkk: DEFAULT_UAH_PER_DKK, rateAt: 0, rateSrc: 'manual' },
+    money: { budget: 9000, tx, accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a, budget: a.id === 'ua' && demo ? 3000 : a.budget, opening: demo ? (a.id === 'dk' ? 4200 : 8500) : 0 })), budgetMode: 'fixed', saveRate: 20, catBudgets: {}, recurring: [], pots: [], uahPerDkk: DEFAULT_UAH_PER_DKK, rateAt: 0, rateSrc: 'manual' },
     wheel: demo ? [7, 6, 5, 8, 6, 4, 7, 6] : [5, 5, 5, 5, 5, 5, 5, 5],
     mode: 'me', view: 'home', co, icalUrls: [],
   };

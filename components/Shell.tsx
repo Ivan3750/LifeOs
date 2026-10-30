@@ -17,7 +17,7 @@ export function ModeSeg() {
   );
 }
 
-const CO_FLOW = ['leads', 'deals', 'projects', 'invoices'];
+const CO_FLOW = ['leads', 'clients', 'deals', 'projects', 'invoices'];
 
 function NavBtn({ k, step }: { k: string; step?: number }) {
   const { S, view, go } = useStore();

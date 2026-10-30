@@ -22,7 +22,12 @@ export type Account = { id: AccId; name: string; cur: Cur; opening: number; budg
 /** amt is in the currency of its account (acc, 'dk' for records saved before accounts existed).
     xfer links the two halves of a transfer between accounts; transfers are not income or spending. */
 /** shift: id of the Wolt shift (activity) this income came from, so deleting the shift removes it too. */
-export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; shift?: number; demo?: 1 };
+/** rec: id of the regular payment that created it, pot: id of the savings pot it feeds (a deposit leaves the account but is not spending). */
+export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; shift?: number; rec?: number; pot?: number; demo?: 1 };
+/** A payment or income that repeats every month on `day` (29–31 means the last day of short months). from: first month it applies to ('YYYY-MM'). */
+export type Recurring = { id: number; name: string; type: 'in' | 'out'; amt: number; cat: string; acc: AccId; day: number; from: string; active: boolean };
+/** A savings pot. What is saved in it is worked out from the deposit records (Tx.pot), in kroner. */
+export type Pot = { id: number; name: string; target: number; due: string };
 export type GoalStep = { id: number; t: string; d: boolean };
 /** A goal is measured either by a number (cur of target) or, when it has steps, by the share of steps done. */
 /** kind 'rating': a goal for a life area that cannot be counted (relationships, rest): it is reached when the area's wheel rating
@@ -37,6 +42,8 @@ export type Invoice = { id: number; no: string; client: string; amt: number; iss
 export type LeadStatus = 'new' | 'contacted' | 'replied' | 'meeting' | 'won' | 'dead';
 /** A possible client. next: date of the next contact ('' when none planned); value: expected deal size in kr. */
 export type Lead = { id: number; name: string; contact: string; source: string; status: LeadStatus; value: number; next: string; note: string; created: string; demo?: 1 };
+/** A client: someone who has bought, or is about to. It grows out of a lead (lead: its id). What they bring is counted from deals, projects and invoices that carry the same name. */
+export type Client = { id: number; name: string; contact: string; source: string; since: string; note: string; lead?: number; demo?: 1 };
 /** Money spent on advertising in a channel on a date, in kr. */
 export type AdSpend = { id: number; date: string; channel: string; amt: number; note: string; demo?: 1 };
 /** A day that is not a normal working day. The day score is judged more gently on it. */
@@ -75,11 +82,15 @@ export type State = {
   habits: Habit[]; health: Record<string, HealthDay>;
   /** budget is kept only for data from before accounts; the budgets now live on the accounts.
       uahPerDkk: how many hryvnias one krone costs (from NBU or typed in), rateAt: when it was set. */
-  money: { budget: number; tx: Tx[]; accounts: Account[]; uahPerDkk: number; rateAt: number; rateSrc: 'nbu' | 'manual' };
+  /** budgetMode 'income': the month's allowance is the income of the month minus saveRate % (falls back to the fixed budgets while there is no income);
+      catBudgets: limits per spending category, in kroner. */
+  money: { budget: number; tx: Tx[]; accounts: Account[]; uahPerDkk: number; rateAt: number; rateSrc: 'nbu' | 'manual'; budgetMode: 'fixed' | 'income'; saveRate: number; catBudgets: Record<string, number>; recurring: Recurring[]; pots: Pot[] };
   goals: Goal[]; wheel: number[];
   mode: Mode; view: string;
-  co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; ads: AdSpend[] };
+  co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[] };
   icalUrls: string[];
+  /** Ids of the achievements already celebrated. */
+  badges?: string[];
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */
