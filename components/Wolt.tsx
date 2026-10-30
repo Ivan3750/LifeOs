@@ -52,7 +52,7 @@ export function WoltCard({ span = 's12' }: { span?: string }) {
       <div className="row" style={{ marginTop: 6 }}>
         {isRunning
           ? <button className="btn acc" onClick={() => A.stopAct()}><Icon n="pause" />Завершити зміну</button>
-          : <button className="btn" onClick={() => A.startAct(WOLT, 'Зміна')} disabled={!!S.act}><Icon n="play" />Почати зміну Wolt</button>}
+          : <button className="btn acc" onClick={() => A.startAct(WOLT, 'Зміна')} disabled={!!S.act}><Icon n="play" />Почати зміну Wolt</button>}
         <button className="btn ghost" onClick={() => setSheet({ kind: 'form', key: 'in', init: { cat: WOLT, note: 'Wolt' } })}>+ Заробіток Wolt</button>
         {S.act && !isRunning && <span className="muted" style={{ fontSize: 12 }}>Зараз іде «{S.act.kind}», спершу заверши його.</span>}
       </div>

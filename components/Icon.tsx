@@ -41,6 +41,10 @@ const I = {
   plus: S(22, '<path d="M12 5v14M5 12h14"/>', 'fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"'),
   refresh: S(16, '<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>', 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'),
   pin: S(16, '<path d="M9 4h6l-1 6 4 3v2H6v-2l4-3zM12 15v6"/>'),
+  edit: S(16, '<path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>'),
+  trash: S(16, '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>'),
+  star: S(16, '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>'),
+  flag: S(14, '<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>'),
   link: S(16, '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>'),
 };
 

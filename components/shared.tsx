@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
+import { Icon, type IconName } from './Icon';
 import type { State, Tx, UiEvent } from '@/lib/types';
 import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
 import { dayMood, moveGoal, waterGoal, ENERGY3, energyWord, moodColor, moodsOn, moodWord } from '@/lib/score';
@@ -178,14 +179,25 @@ export function CatBars({ tx, limit }: { tx: Tx[]; limit: number }) {
 }
 
 /** Two-click delete: the first click arms the button, the second one deletes. */
+/** Deletes at once: every deletion offers «Скасувати» in the message at the bottom, so asking twice is not needed. */
 export function DelBtn({ onDelete, label }: { onDelete: () => void; label: string }) {
-  const { toast } = useStore();
-  const [armed, setArmed] = useState(false);
+  return <button className="ib danger" title={label} aria-label={label} onClick={onDelete}><Icon n="trash" /></button>;
+}
+
+/** Small round button with an icon: edit, delete, focus… The same size and hover everywhere. */
+export function IconBtn({ icon, label, onClick, tone, pressed }: { icon: IconName; label: string; onClick: () => void; tone?: 'danger' | 'acc'; pressed?: boolean }) {
+  return <button className={`ib${tone ? ' ' + tone : ''}`} title={label} aria-label={label} aria-pressed={pressed} onClick={onClick}><Icon n={icon} /></button>;
+}
+
+/** What a list shows when there is nothing in it: say what it is for and offer the first step. */
+export function Empty({ icon, title, text, children }: { icon: IconName; title: string; text?: string; children?: React.ReactNode }) {
   return (
-    <button className="x" aria-label={label} style={armed ? { color: 'var(--m1)', opacity: 1 } : undefined}
-      onClick={() => { if (armed) onDelete(); else { setArmed(true); toast('Натисни ще раз, щоб видалити'); setTimeout(() => setArmed(false), 3000); } }}>
-      <span className="icn" dangerouslySetInnerHTML={{ __html: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>' }} />
-    </button>
+    <div className="empty-st">
+      <span className="ei"><Icon n={icon} /></span>
+      <b>{title}</b>
+      {text && <p>{text}</p>}
+      {children}
+    </div>
   );
 }
 

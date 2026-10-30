@@ -1,7 +1,8 @@
 /** task: what the focus run was for (the task title), when one was picked. */
 export type Session = { t: number; m: number; task?: string; demo?: 1 };
 /** goal: id of the goal this task moves forward. */
-export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; demo?: 1 };
+/** due: date to finish by ('YYYY-MM-DD'), doneAt: when it was ticked off. */
+export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; due?: string; doneAt?: number; demo?: 1 };
 export type LocalEvent = { id: number; date: string; s: string; e: string; title: string; c: string; demo?: 1 };
 export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 1 };
 /** One day, keyed by the date you woke up. bed/wake are 'HH:MM'; sleep hours are derived from them when both are set.

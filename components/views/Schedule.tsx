@@ -143,7 +143,7 @@ export function Schedule() {
           </div>
           <label className="field" htmlFor="evColor">Колір<select id="evColor" value={v.c} onChange={e => setV({ ...v, c: e.target.value })}>{COLORS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
           {err && <p className="muted" style={{ margin: 0, fontSize: 12, color: 'var(--m1)' }}>{err}</p>}
-          <button className="btn" style={{ alignSelf: 'flex-start' }}>Додати подію</button>
+          <button className="btn acc" style={{ alignSelf: 'flex-start' }}>Додати подію</button>
           <p className="help">Події з підключених календарів показані бузковим. Їх змінюють у самому календарі, тут вони лише для перегляду. Свою подію можна видалити хрестиком.</p>
         </form>
       </div>

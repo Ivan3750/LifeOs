@@ -60,7 +60,7 @@ svg{display:block}
 main{min-width:0;display:flex;flex-direction:column;gap:18px}
 .top{display:flex;align-items:center;gap:14px}
 .search{flex:1;max-width:340px;display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:11px 14px;color:var(--muted);box-shadow:var(--shadow);text-align:left}
-.search kbd{margin-left:auto;font-family:var(--f-num);font-size:11px;background:var(--bg);border-radius:6px;padding:2px 6px}
+.search kbd{margin-left:auto;white-space:nowrap;flex:none;font-family:var(--f-num);font-size:11px;background:var(--bg);border-radius:6px;padding:2px 6px}
 .top .spacer{flex:1}
 .clock{font-family:var(--f-num);font-size:13px;color:var(--muted);white-space:nowrap}
 .clock b{color:var(--ink);font-weight:600;font-size:15px}
@@ -722,3 +722,101 @@ main{min-width:0;display:flex;flex-direction:column;gap:18px}
 .glasses button{width:20px;height:28px;border-radius:3px 3px 7px 7px;background:var(--card);border:2px solid var(--bar);transition:background .15s,border-color .15s}
 .glasses button.on{background:#4DA8E8;border-color:#4DA8E8}
 .step button:disabled{opacity:.4;cursor:default}
+
+/* ---------- UI polish: one set of small controls, lists, empty states ---------- */
+.view{animation:vin .22s ease both}
+@keyframes vin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+/* round icon buttons (edit, delete, focus, star…) look and behave the same everywhere */
+.ib{width:32px;height:32px;border-radius:10px;display:inline-grid;place-items:center;color:var(--muted);flex:none;transition:background .15s,color .15s,transform .1s}
+.ib:hover{background:var(--bg);color:var(--ink)}
+.ib:active{transform:scale(.92)}
+.ib.danger:hover{background:var(--accent-soft);color:var(--m1)}
+.ib.acc{background:var(--accent);color:#fff}.ib.acc:hover{background:var(--accent);filter:brightness(1.08);color:#fff}
+.ib[aria-pressed="true"]{color:var(--accent)}
+.ib[aria-pressed="true"] svg{fill:currentColor}
+.ib.big{width:44px;height:44px;border-radius:14px;background:var(--bg);border:1px solid var(--line)}
+.ib.big.on{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.btn{transition:transform .12s,filter .15s,opacity .15s,background .15s}
+.btn:hover:not(:disabled){filter:brightness(1.12)}
+.btn.ghost:hover:not(:disabled){filter:none;background:var(--bg)}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn.sm{padding:7px 14px;font-size:13px}
+.btn.danger{color:var(--m1)}
+.sqb{transition:background .15s,color .15s,transform .1s}.sqb:active{transform:scale(.95)}
+.field input:hover,.field select:hover,.field textarea:hover{border-color:var(--muted)}
+.field input:focus,.field select:focus,.field textarea:focus{box-shadow:0 0 0 3px var(--accent-soft)}
+.seg button{transition:background .15s,color .15s}
+.seg .cnt,.tgroup .cnt{font-family:var(--f-num);font-size:11px;margin-left:6px;opacity:.65}
+.item{transition:background .15s}
+.item .x{border-radius:8px;padding:4px}
+
+/* sliders */
+input[type=range]{-webkit-appearance:none;appearance:none;height:22px;background:transparent;cursor:pointer;accent-color:var(--accent)}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;background:var(--bar)}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:var(--bar)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-6px;border-radius:50%;background:var(--accent);border:3px solid var(--card);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--accent);border:3px solid var(--card);box-shadow:0 1px 4px rgba(0,0,0,.25)}
+
+/* empty states */
+.empty-st{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:36px 16px 28px;color:var(--muted)}
+.empty-st .ei{width:48px;height:48px;border-radius:16px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);margin-bottom:6px}
+.empty-st .ei svg{width:22px;height:22px}
+.empty-st b{color:var(--ink);font-size:15px}
+.empty-st p{margin:0;max-width:340px;font-size:13px;line-height:1.5}
+.empty-st .btn{margin-top:10px}
+
+/* tasks */
+.vh .late-note{color:var(--m1);font-weight:600}
+.tprog{margin-left:auto;min-width:200px;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+.tprog b{color:var(--ink);font-size:14px}
+.tprog .bar{height:6px;border-radius:99px;background:var(--bar);overflow:hidden}
+.tprog .bar i{display:block;height:100%;border-radius:99px;background:var(--good);transition:width .3s}
+.taskadd{margin-top:18px}
+.addrow{display:flex;gap:10px;align-items:center}
+.addrow input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:13px 16px;font-size:15px;outline:none;transition:border-color .15s,box-shadow .15s}
+.addrow input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.taskadd .addopts{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}
+.taskadd .addopts .field{flex:0 1 180px}
+.taskadd .addopts .help{flex:1 1 240px;margin:0 0 8px;font-size:12px;color:var(--muted)}
+.taskadd .addopts .help b{color:var(--ink)}
+.tbar{margin-bottom:6px;align-items:center}
+.tgroup{margin-top:14px}
+.tgroup h4{margin:0 0 2px;padding:0 4px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.tgroup h4.late{color:var(--m1)}
+.item.task{align-items:flex-start;padding:12px 6px 12px 12px;border-radius:12px;border-bottom:1px solid var(--line)}
+.item.task .chk{margin-top:2px;transition:background .15s,border-color .15s,transform .1s}
+.item.task .chk:hover{border-color:var(--good)}
+.item.task .chk:active{transform:scale(.88)}
+.item.task .tmain{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.item.task .t{flex:none;text-align:left;font-size:15px;line-height:1.35;overflow-wrap:anywhere;cursor:pointer}
+.item.task.hi{box-shadow:inset 3px 0 0 var(--accent)}
+.item.task.done .t{cursor:default}
+.item.task.done .tmeta{opacity:.55}
+.tmeta{display:flex;flex-wrap:wrap;gap:6px}
+.chipx{display:inline-flex;align-items:center;gap:5px;font-size:12px;line-height:1;padding:5px 9px;border-radius:99px;background:var(--bg);color:var(--muted);font-weight:500;white-space:nowrap;max-width:100%}
+.chipx svg{width:12px;height:12px;flex:none}
+.chipx.goal{background:var(--accent-soft);color:var(--accent);overflow:hidden;text-overflow:ellipsis}
+.chipx.due.overdue{background:var(--m1);color:#fff}
+.chipx.due.today{background:var(--accent-soft);color:var(--accent)}
+.chipx.due.tomorrow{background:var(--good-soft);color:var(--good)}
+.chipx.act{background:transparent;border:1px dashed var(--line);color:var(--ink);cursor:pointer}
+.chipx.act:hover{border-color:var(--accent);color:var(--accent)}
+.tact{display:flex;gap:2px;align-items:center;flex:none}
+.tact .ib:not([aria-pressed="true"]){opacity:0;transition:opacity .15s,background .15s,color .15s}
+.item.task:hover .tact .ib,.item.task:focus-within .tact .ib{opacity:1}
+@media (hover:none){.tact .ib{opacity:1!important}}
+@media (max-width:700px){.tact .del{display:none}.taskadd .addopts .field{flex:1 1 140px}.addrow{flex-wrap:wrap}.addrow input{flex:1 1 100%}.addrow .btn{flex:1}.tprog{margin-left:0;width:100%}}
+
+/* day-by-day bars that can have any number of columns (habit weeks) */
+.scorehist{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr)}
+
+/* deals board: cards never overflow their column */
+.kcard{min-width:0}
+.kcard b{overflow-wrap:anywhere}
+.kfoot{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.kact{display:flex;gap:2px}.kact .ib:first-child{margin-right:auto}
+.kact .ib{width:30px;height:30px}
+.kcol{background:var(--card)}
+.kempty{margin:6px 2px;font-size:12px;color:var(--muted);text-align:center;padding:14px 8px;border:1px dashed var(--line);border-radius:12px}

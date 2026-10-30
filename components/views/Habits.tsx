@@ -5,7 +5,7 @@ import { scoreColor } from '@/lib/score';
 import { useStore } from '@/lib/store';
 import { addD, DN, TK, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
-import { DelBtn, habStreak } from '../shared';
+import { DelBtn, Empty, habStreak } from '../shared';
 
 export function Habits() {
   const { S, A, setSheet } = useStore();
@@ -32,9 +32,9 @@ export function Habits() {
           <button className="btn ghost cal-nav" aria-label="Наступний тиждень" disabled={off === 0} onClick={() => setOff(off + 1)}>›</button>
         </div></div>
       <div className="card" style={{ marginTop: 18 }}>
-        <form className="row" onSubmit={e => { e.preventDefault(); A.addHabit(name); setName(''); }}>
-          <label className="field" htmlFor="habIn" style={{ flex: '1 1 240px' }}>Нова звичка<input id="habIn" value={name} onChange={e => setName(e.target.value)} placeholder="Напр. 10 хвилин медитації" autoComplete="off" /></label>
-          <button className="btn" style={{ alignSelf: 'flex-end' }}>Додати</button>
+        <form className="addrow" onSubmit={e => { e.preventDefault(); A.addHabit(name); setName(''); }}>
+          <input id="habIn" aria-label="Нова звичка" value={name} onChange={e => setName(e.target.value)} placeholder="Нова звичка… напр. «10 хвилин медитації»" autoComplete="off" />
+          <button className="btn acc" disabled={!name.trim()}>Додати</button>
         </form>
         <div style={{ marginTop: 18, overflowX: 'auto' }}>
           {S.habits.length ? (
@@ -52,7 +52,7 @@ export function Habits() {
                 </div>
               ))}
             </>
-          ) : <p className="muted">Звичок поки немає. Додай першу вище.</p>}
+          ) : <Empty icon="habits" title="Звичок поки немає" text="Почни з однієї маленької: 10 хвилин на день краще за ідеальний план. Напиши її вище." />}
         </div>
         {S.habits.length > 0 && (
           <div className="scorehist" style={{ marginTop: 18 }}>

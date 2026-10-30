@@ -49,8 +49,8 @@ function PaletteDialog() {
       return [{ l: `Записати витрату ${fmtCur(amt, acc === 'ua' ? 'UAH' : 'DKK')} · ${cat}${note ? ' · ' + note : ''}`, k: 'Enter', run: () => A.addTx('out', amt, cat, note, TK(), acc) }];
     }
     let r = ql ? base.filter(c => c.l.toLowerCase().includes(ql)) : base;
-    if (t.startsWith('+')) r = [{ l: 'Додати задачу: ' + t.slice(1).trim(), k: 'Enter', run: () => A.addTask(t.slice(1)) }, ...r];
-    else if (ql && !r.length) r = [{ l: 'Додати задачу: ' + t, k: 'Enter', run: () => A.addTask(t) }];
+    if (t.startsWith('+')) r = [{ l: 'Додати задачу: ' + t.slice(1).trim(), k: 'Enter', run: () => A.addTaskLine(t.slice(1)) }, ...r];
+    else if (ql && !r.length) r = [{ l: 'Додати задачу: ' + t, k: 'Enter', run: () => A.addTaskLine(t) }];
     return r.slice(0, 9);
   }, [q, S, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, update]);
 

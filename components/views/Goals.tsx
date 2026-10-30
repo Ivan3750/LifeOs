@@ -29,7 +29,7 @@ function GoalItem({ g }: { g: Goal }) {
         <span className="muted" style={{ fontSize: 12 }}>{left === null ? 'без дедлайну' : left < 0 ? 'термін минув' : left === 0 ? 'дедлайн сьогодні' : 'ще ' + left + ' дн'}</span>
         <span className="row" style={{ marginLeft: 'auto', gap: 6 }}>
           {!bySteps && <><button className="sqb" aria-label="Зменшити прогрес" onClick={() => A.stepGoal(g.id, -1)}>−</button><button className="sqb" onClick={() => A.stepGoal(g.id, 1)}>+{fmtN(goalStep(g.target))}</button></>}
-          <button className="sqb" onClick={() => setEdit(!edit)}>{edit ? 'Закрити' : 'Змінити'}</button>
+          <button className="ib" title={edit ? 'Закрити редагування' : 'Змінити'} aria-label={edit ? 'Закрити редагування' : 'Змінити ціль'} aria-pressed={edit} onClick={() => setEdit(!edit)}><Icon n={edit ? 'x' : 'edit'} /></button>
           <DelBtn label="Видалити ціль" onDelete={() => A.delGoal(g.id)} />
         </span>
       </div>
@@ -65,7 +65,7 @@ function GoalItem({ g }: { g: Goal }) {
             <label className="field" htmlFor={`gd${g.id}`} style={{ flex: '1 1 140px' }}>Дедлайн<input id={`gd${g.id}`} type="date" value={e.due} onChange={x => setE({ ...e, due: x.target.value })} /></label>
             <label className="field" htmlFor={`ga${g.id}`} style={{ flex: '1 1 120px' }}>Сфера<select id={`ga${g.id}`} value={e.area} onChange={x => setE({ ...e, area: x.target.value })}>{AREAS.map(a => <option key={a}>{a}</option>)}</select></label>
           </div>
-          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={save}>Зберегти</button>
+          <button className="btn acc" style={{ alignSelf: 'flex-start' }} onClick={save}>Зберегти</button>
         </div>
       )}
     </div>
@@ -112,7 +112,7 @@ export function Goals() {
               <label className="field" htmlFor="gArea" style={{ flex: '1 1 120px' }}>Сфера<select id="gArea" value={v.area} onChange={e => setV({ ...v, area: e.target.value })}>{AREAS.map(a => <option key={a}>{a}</option>)}</select></label>
               <label className="field" htmlFor="gDue" style={{ flex: '1 1 140px' }}>Дедлайн<input id="gDue" type="date" value={v.due} onChange={e => setV({ ...v, due: e.target.value })} /></label>
             </div>
-            <button className="btn" style={{ alignSelf: 'flex-start' }}>Додати ціль</button>
+            <button className="btn acc" style={{ alignSelf: 'flex-start' }}>Додати ціль</button>
           </form>
           <div style={{ marginTop: 12 }}>
             {S.goals.map(g => <GoalItem key={g.id} g={g} />)}

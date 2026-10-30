@@ -1,6 +1,7 @@
 import type { AccId, Account, AdSpend, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
 import { XFER_CAT, account, fmtCur } from './money';
 import { addD, money, STAGES, TK, toMin, ymd } from './util';
+import { parseTask } from './tasks';
 
 export const goalStep = (target: number) => (target >= 200 ? Math.round(target / 20) : target >= 40 ? 5 : 1);
 
@@ -18,22 +19,29 @@ export type ActionDeps = {
 export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
   const hday = (s: State, k = TK()) => s.health[k] || (s.health[k] = { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0 });
   const LIM: Record<HealthField, [number, number]> = { water: [0, 20], sleep: [0, 16], steps: [0, 80000], workout: [0, 600], weight: [0, 350], mood: [0, 5] };
+  function addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number, due?: string) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}), ...(due ? { due } : {}) }); }); toast('Задачу додано'); }
   return {
     setH(f: HealthField, v: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },
     addH(f: HealthField, d: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round((h[f] + d) * 10) / 10)); delete h.demo; }); },
-    addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}) }); }); toast('Задачу додано'); },
+    addTask,
+    /** Adds a task from one line of text: «!» makes it important, a trailing «завтра» or «25.11» sets the date. */
+    addTaskLine(line: string, goal?: number) { const q = parseTask(line); if (!q.t) return false; addTask(q.t, q.p, goal, q.due); return true; },
     setTaskGoal(id: number, goal?: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; if (goal) t.goal = goal; else delete t.goal; }); },
-    updateTask(id: number, v: { t: string; p: 'hi' | 'lo'; goal?: number }) {
+    updateTask(id: number, v: { t: string; p: 'hi' | 'lo'; goal?: number; due?: string }) {
       const text = v.t.trim(); if (!text) return;
       update(s => {
         const t = s.tasks.find(x => x.id === id); if (!t) return;
         // a focus run started on this task keeps following it after a rename
         if (s.timer.task === t.t) s.timer.task = text;
-        t.t = text; t.p = v.p; delete t.demo; if (v.goal) t.goal = v.goal; else delete t.goal;
+        t.t = text; t.p = v.p; delete t.demo; if (v.goal) t.goal = v.goal; else delete t.goal; if (v.due) t.due = v.due; else delete t.due;
       });
       toast('Задачу оновлено');
     },
-    toggleTask(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; t.d = !t.d; if (t.d && s.timer.task === t.t) s.timer.task = ''; }); },
+    toggleTask(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; t.d = !t.d; if (t.d) { t.doneAt = Date.now(); if (s.timer.task === t.t) s.timer.task = ''; } else delete t.doneAt; }); },
+    togglePriority(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (t) { t.p = t.p === 'hi' ? 'lo' : 'hi'; delete t.demo; } }); },
+    setTaskDue(id: number, due?: string) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; if (due) t.due = due; else delete t.due; }); },
+    /** Removes every finished task in one go (can be undone). */
+    clearDoneTasks() { del(s => { s.tasks = s.tasks.filter(x => !x.d); }, 'Виконані задачі видалено'); },
     delTask(id: number) { del(s => { s.tasks = s.tasks.filter(x => x.id !== id); }); },
     addTx(type: 'in' | 'out', amt: number, cat: string, note: string, date: string, acc: AccId = 'dk') {
       if (!(amt > 0)) return;

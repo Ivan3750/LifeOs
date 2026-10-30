@@ -231,7 +231,7 @@ function TxList({ mk, filter, onEdit }: { mk: string; filter: Filter; onEdit: (t
                     <b className="num" style={{ color: t.xfer ? 'var(--muted)' : t.type === 'in' ? 'var(--good)' : 'var(--ink)' }}>{t.type === 'in' ? '+' : '−'}{fmtCur(t.amt, cur)}</b>
                     {filter === 'all' && cur === 'UAH' && <small className="muted num">≈ {fmtCur(convert(S, t.amt, 'UAH', 'DKK'), 'DKK')}</small>}
                   </span>
-                  <button className="sqb" onClick={() => onEdit(t)} aria-label="Змінити запис">Змінити</button>
+                  <button className="ib" onClick={() => onEdit(t)} aria-label="Змінити запис" title="Змінити"><Icon n="edit" /></button>
                   <DelBtn label={t.xfer ? 'Видалити переказ' : 'Видалити запис'} onDelete={() => A.delTx(t.id)} />
                 </div>
               );

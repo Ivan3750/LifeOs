@@ -7,7 +7,7 @@ import type { Lead, LeadStatus } from '@/lib/types';
 import { addD, daysInMonth, daysTo, kfmt, LEAD_SOURCES, LEAD_STATUS, MON, MONTHN, money, pctW, STAGES, sum, TK, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { RevenueChart, Ring } from '../charts';
-import { DelBtn, loadC, sumA } from '../shared';
+import { DelBtn, Empty, loadC, sumA } from '../shared';
 
 const invState = (i: Invoice) => (i.paid ? 'paid' : i.due < TK() ? 'over' : 'wait');
 const OPEN = ['lead', 'talk', 'proposal'];
@@ -132,20 +132,20 @@ export function Deals() {
               {ds.map(d => (
                 <div className="kcard" key={d.id}>
                   <b>{d.title}</b><small className="muted">{d.client}</small>
-                  <div className="row" style={{ justifyContent: 'space-between', marginTop: 8, flexWrap: 'nowrap' }}>
+                  <div className="kfoot">
                     <span className="num" style={{ fontWeight: 600 }}>{money(d.amt)}</span>
-                    <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
-                      <button className="sqb" title="Змінити або видалити" aria-label={`Змінити: ${d.title}`} onClick={() => edit(setSheet, 'editDeal', { id: String(d.id), title: d.title, client: d.client, amt: String(d.amt), stage: d.stage })}>⋯</button>
-                      {si > 0 && <button className="sqb" aria-label="На попередній етап" onClick={() => A.moveDeal(d.id, -1)}><Icon n="left" /></button>}
+                    <span className="kact">
+                      <button className="ib" aria-label={`Змінити: ${d.title}`} onClick={() => edit(setSheet, 'editDeal', { id: String(d.id), title: d.title, client: d.client, amt: String(d.amt), stage: d.stage })} title="Змінити"><Icon n="edit" /></button>
+                      {si > 0 && <button className="ib" title="На попередній етап" aria-label="На попередній етап" onClick={() => A.moveDeal(d.id, -1)}><Icon n="left" /></button>}
                       {si < 3 && <>
-                        <button className="sqb acc" aria-label="На наступний етап" onClick={() => A.moveDeal(d.id, 1)}><Icon n="right" /></button>
-                        <button className="sqb" title="Угоду програно" aria-label="Позначити як програну" onClick={() => A.loseDeal(d.id)}><Icon n="x" /></button>
+                        <button className="ib acc" title="На наступний етап" aria-label="На наступний етап" onClick={() => A.moveDeal(d.id, 1)}><Icon n="right" /></button>
+                        <button className="ib danger" title="Угоду програно" aria-label="Позначити як програну" onClick={() => A.loseDeal(d.id)}><Icon n="x" /></button>
                       </>}
                     </span>
                   </div>
                 </div>
               ))}
-              {!ds.length && <p className="muted" style={{ fontSize: 12, margin: '6px 2px' }}>Порожньо</p>}
+              {!ds.length && <p className="kempty">Тут поки нічого</p>}
             </div>
           );
         })}
@@ -154,7 +154,7 @@ export function Deals() {
         <div className="card" style={{ marginTop: 18 }}>
           <div className="ch"><div><h3>Програні угоди</h3><p>{lost.length} на {money(sumA(lost))}. Поверни в роботу або видали</p></div></div>
           <div className="list">
-            {lost.map(d => <div className="item" key={d.id}><span className="t">{d.title}<br /><small className="muted">{d.client}</small></span><span className="num muted">{money(d.amt)}</span><button className="sqb" onClick={() => A.restoreDeal(d.id)}>Повернути</button><button className="sqb" onClick={() => edit(setSheet, 'editDeal', { id: String(d.id), title: d.title, client: d.client, amt: String(d.amt), stage: d.stage })}>Змінити</button><DelBtn label="Видалити угоду" onDelete={() => A.delDeal(d.id)} /></div>)}
+            {lost.map(d => <div className="item" key={d.id}><span className="t">{d.title}<br /><small className="muted">{d.client}</small></span><span className="num muted">{money(d.amt)}</span><button className="sqb" onClick={() => A.restoreDeal(d.id)}>Повернути</button><button className="ib" onClick={() => edit(setSheet, 'editDeal', { id: String(d.id), title: d.title, client: d.client, amt: String(d.amt), stage: d.stage })} title="Змінити"><Icon n="edit" /></button><DelBtn label="Видалити угоду" onDelete={() => A.delDeal(d.id)} /></div>)}
           </div>
         </div>
       )}
@@ -197,7 +197,7 @@ export function Projects() {
               <ProgressSlider key={p.progress} id={p.id} value={p.progress} />
               <div className="row" style={{ justifyContent: 'space-between', fontSize: 12, marginTop: 10, flexWrap: 'nowrap' }}>
                 <span className="muted">{p.budget ? money(p.budget) : ''}</span>
-                <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><span className={`pillst ${dueCls}`}>{dueTxt}</span><button className="sqb" aria-label={`Змінити проєкт ${p.name}`} onClick={() => edit(setSheet, 'editProject', { id: String(p.id), name: p.name, client: p.client, budget: String(p.budget || ''), due: p.due })}>Змінити</button><DelBtn label="Видалити проєкт" onDelete={() => A.delProject(p.id)} /></span>
+                <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><span className={`pillst ${dueCls}`}>{dueTxt}</span><button className="ib" aria-label={`Змінити проєкт ${p.name}`} onClick={() => edit(setSheet, 'editProject', { id: String(p.id), name: p.name, client: p.client, budget: String(p.budget || ''), due: p.due })} title="Змінити"><Icon n="edit" /></button><DelBtn label="Видалити проєкт" onDelete={() => A.delProject(p.id)} /></span>
               </div>
             </div>
           );
@@ -239,13 +239,13 @@ export function Invoices() {
                 <span className="num" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{money(i.amt)}</span>
                 <span className={`pillst ${lbl[s][1]}`}>{lbl[s][0]}</span>
                 {s === 'over' && <button className="sqb" title="Скопіювати текст нагадування" onClick={() => remind(i)}>Нагадати</button>}
-                <button className="sqb" onClick={() => edit(setSheet, 'editInvoice', { id: String(i.id), client: i.client, amt: String(i.amt), due: i.due })}>Змінити</button>
+                <button className="ib" onClick={() => edit(setSheet, 'editInvoice', { id: String(i.id), client: i.client, amt: String(i.amt), due: i.due })} title="Змінити"><Icon n="edit" /></button>
                 <button className="sqb" onClick={() => A.togglePaid(i.id)}>{i.paid ? 'Скасувати' : 'Оплачено'}</button>
                 <DelBtn label="Видалити рахунок" onDelete={() => A.delInvoice(i.id)} />
               </div>
             );
           })}
-          {!list.length && <p className="muted">Тут порожньо.</p>}
+          {!list.length && <Empty icon="invoice" title="Рахунків тут нема" text="Рахунок зʼявиться сам, коли ти виграєш угоду, або створи його вручну." />}
         </div>
       </div>
     </section>
@@ -278,7 +278,7 @@ export function Team() {
             <div className="row" style={{ flexWrap: 'nowrap' }}>
               <span className="ava">{(m.name.trim()[0] || '?').toUpperCase()}</span>
               <div style={{ flex: 1, minWidth: 0 }}><b>{m.name}</b><div className="muted" style={{ fontSize: 12 }}>{m.role}</div></div>
-              <button className="sqb" aria-label={`Змінити ${m.name}`} onClick={() => edit(setSheet, 'editMember', { id: String(m.id), name: m.name, role: m.role })}>⋯</button>
+              <button className="ib" aria-label={`Змінити ${m.name}`} onClick={() => edit(setSheet, 'editMember', { id: String(m.id), name: m.name, role: m.role })} title="Змінити"><Icon n="edit" /></button>
               <DelBtn label="Видалити з команди" onDelete={() => A.delMember(m.id)} />
             </div>
             <LoadSlider key={m.load} id={m.id} value={m.load} />
@@ -321,7 +321,9 @@ export function Leads() {
           </div>
           <div className="list" style={{ marginTop: 10 }}>
             {list.map(l => <LeadRow key={l.id} l={l} link={contactLink(l.contact)} />)}
-            {!list.length && <p className="muted">{ql ? 'Нічого не знайдено.' : L.length ? 'У цьому фільтрі порожньо.' : 'Поки нікого. Натисни «+ Клієнт» і запиши, кому ти написав або хто тобою зацікавився.'}</p>}
+            {!list.length && (ql || L.length
+              ? <Empty icon="leads" title={ql ? 'Нічого не знайдено' : 'У цьому фільтрі порожньо'} text={ql ? 'Спробуй інше імʼя, контакт або слово з нотатки.' : 'Змінь фільтр угорі, щоб побачити інших.'} />
+              : <Empty icon="leads" title="Поки нікого" text="Запиши, кому ти написав або хто тобою зацікавився, і система нагадає про наступний контакт."><button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'lead' })}>+ Клієнт</button></Empty>)}
           </div>
         </div>
         {bySource.length > 0 && (
@@ -355,7 +357,7 @@ function LeadRow({ l, link }: { l: Lead; link: string }) {
         {l.status !== 'won' && l.status !== 'dead' && <button className="sqb" title="Відкласти на 3 дні" onClick={() => A.updateLead(l.id, { next: ymd(addD(new Date(), 3)) })}>+3 дн</button>}
         {(l.status === 'won' || l.status === 'dead') && <button className="sqb" onClick={() => A.setLeadStatus(l.id, 'new')}>Відновити</button>}
         {l.status !== 'dead' && l.status !== 'won' && <button className="sqb" title="Не цікаво" aria-label="Позначити, що не цікаво" onClick={() => A.setLeadStatus(l.id, 'dead')}><Icon n="x" /></button>}
-        <button className="sqb" aria-label={`Змінити: ${l.name}`} onClick={() => edit(setSheet, 'editLead', { id: String(l.id), name: l.name, contact: l.contact, source: l.source, status: l.status, value: String(l.value || ''), next: l.next, note: l.note })}>⋯</button>
+        <button className="ib" aria-label={`Змінити: ${l.name}`} onClick={() => edit(setSheet, 'editLead', { id: String(l.id), name: l.name, contact: l.contact, source: l.source, status: l.status, value: String(l.value || ''), next: l.next, note: l.note })} title="Змінити"><Icon n="edit" /></button>
         <DelBtn label="Видалити клієнта" onDelete={() => A.delLead(l.id)} />
       </span>
     </div>
@@ -406,7 +408,7 @@ export function Ads() {
                 <span className="num muted" style={{ fontSize: 12 }}>{d.getDate()} {MON[d.getMonth()]}</span>
                 <span className="t">{a.channel}{a.note && <span className="muted"> · {a.note}</span>}</span>
                 <span className="num" style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{money(a.amt)}</span>
-                <button className="sqb" onClick={() => edit(setSheet, 'editAd', { id: String(a.id), channel: a.channel, amt: String(a.amt), date: a.date, note: a.note })}>Змінити</button>
+                <button className="ib" onClick={() => edit(setSheet, 'editAd', { id: String(a.id), channel: a.channel, amt: String(a.amt), date: a.date, note: a.note })} title="Змінити"><Icon n="edit" /></button>
                 <DelBtn label="Видалити запис" onDelete={() => A.delAd(a.id)} />
               </div>
             ); })}

@@ -5,7 +5,7 @@ import type { Note } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { hhmm, MON, plural, TK, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
-import { DelBtn } from '../shared';
+import { DelBtn, Empty } from '../shared';
 
 /* ---------------- Notes ---------------- */
 const noteTitle = (n: Note) => n.title.trim() || n.text.trim().split('\n')[0].slice(0, 60) || 'Без назви';
@@ -54,7 +54,7 @@ export function Notes() {
     <section className="view">
       <div className="vh">
         <div><h2>Нотатки</h2><p>{S.noteList.length ? `${S.noteList.length} ${plural(S.noteList.length, 'нотатка', 'нотатки', 'нотаток')}. Зберігаються автоматично.` : 'Зберігаються автоматично.'}</p></div>
-        <button className="btn" style={{ marginLeft: 'auto' }} onClick={() => { setQ(''); open(A.addNote('')); }}><Icon n="plus" />Нова нотатка</button>
+        <button className="btn acc" style={{ marginLeft: 'auto' }} onClick={() => { setQ(''); open(A.addNote('')); }}><Icon n="plus" />Нова нотатка</button>
       </div>
       <div className={`card notesapp${cur ? ' open' : ''}`} style={{ marginTop: 18 }}>
         <div className="notelist">
@@ -67,7 +67,7 @@ export function Notes() {
           ))}
           {!list.length && <p className="muted" style={{ padding: '8px 4px', fontSize: 13 }}>{ql ? 'Нічого не знайдено.' : 'Нотаток поки немає. Натисни «Нова нотатка».'}</p>}
         </div>
-        {cur ? <NoteEditor key={cur.id} note={cur} onBack={() => open(null)} /> : <div className="noteempty muted">Вибери нотатку зліва або створи нову.</div>}
+        {cur ? <NoteEditor key={cur.id} note={cur} onBack={() => open(null)} /> : <div className="noteempty"><Empty icon="notes" title="Нотатку не вибрано" text="Вибери нотатку зі списку або створи нову." /></div>}
       </div>
     </section>
   );

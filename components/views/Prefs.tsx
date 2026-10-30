@@ -57,7 +57,7 @@ function CalendarSettings() {
         <label className="field" htmlFor="icalUrl" style={{ flex: '1 1 280px' }}>Секретне iCal-посилання (.ics)
           <input id="icalUrl" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" autoComplete="off" spellCheck={false} />
         </label>
-        <button className="btn" style={{ alignSelf: 'flex-end' }}>Підключити</button>
+        <button className="btn acc" style={{ alignSelf: 'flex-end' }}>Підключити</button>
       </form>
       <div>
         {S.icalUrls.map(u => (

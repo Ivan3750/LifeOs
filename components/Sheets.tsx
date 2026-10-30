@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, type FormEvent } from 'react';
 import { NAV, useStore, vinfo, type Store } from '@/lib/store';
 import type { AccId } from '@/lib/types';
 import type { LeadStatus } from '@/lib/types';
+import { parseTask } from '@/lib/tasks';
 import { AD_CHANNELS, addD, CATS, COLORS, LEAD_SOURCES, LEAD_STATUS, STAGES, TK, ymd } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { ModeSeg } from './Shell';
@@ -16,7 +17,7 @@ function forms(st: Store): Record<string, FormSpec> {
   const { A } = st;
   const num = (v: string) => +v.replace(',', '.') || 0;
   return {
-    task: { t: 'Нова задача', f: [{ k: 'text', label: 'Що зробити', req: true, ph: 'Напр. Подзвонити клієнту' }, { k: 'pri', label: 'Пріоритет', type: 'select', opts: [['lo', 'Звичайно'], ['hi', 'Важливо']], val: 'lo' }], ok: v => A.addTask(v.text, v.pri as 'hi' | 'lo') },
+    task: { t: 'Нова задача', f: [{ k: 'text', label: 'Що зробити', req: true, ph: 'Напр. Подзвонити клієнту завтра !' }, { k: 'pri', label: 'Пріоритет', type: 'select', half: true, opts: [['lo', 'Звичайно'], ['hi', 'Важливо']], val: 'lo' }, { k: 'due', label: 'Термін', type: 'date', half: true }], ok: v => { const q = parseTask(v.text); A.addTask(q.t, v.pri === 'hi' ? 'hi' : q.p, undefined, v.due || q.due); } },
     out: { t: 'Нова витрата', f: [{ k: 'acc', label: 'Рахунок', type: 'select', opts: [['dk', 'Данський · kr.'], ['ua', 'Український · ₴']], val: 'dk' }, { k: 'amt', label: 'Сума', type: 'number', req: true, half: true, ph: '120' }, { k: 'cat', label: 'Категорія', type: 'select', half: true, opts: CATS.out.map(c => [c, c] as const) }, { k: 'note', label: 'Коментар', ph: 'Кава з друзями' }, { k: 'date', label: 'Дата', type: 'date', val: TK() }], ok: v => A.addTx('out', num(v.amt), v.cat, v.note, v.date || TK(), v.acc as AccId) },
     in: { t: 'Новий дохід', f: [{ k: 'acc', label: 'Рахунок', type: 'select', opts: [['dk', 'Данський · kr.'], ['ua', 'Український · ₴']], val: 'dk' }, { k: 'amt', label: 'Сума', type: 'number', req: true, half: true, ph: '5000' }, { k: 'cat', label: 'Категорія', type: 'select', half: true, opts: CATS.in.map(c => [c, c] as const) }, { k: 'note', label: 'Коментар', ph: 'Звідки гроші' }, { k: 'date', label: 'Дата', type: 'date', val: TK() }], ok: v => A.addTx('in', num(v.amt), v.cat, v.note, v.date || TK(), v.acc as AccId) },
     event: { t: 'Нова подія', f: [{ k: 'title', label: 'Назва', req: true, ph: 'Зустріч, лекція, спорт…' }, { k: 'date', label: 'Дата', type: 'date', val: TK(), half: true }, { k: 'c', label: 'Колір', type: 'select', opts: COLORS, half: true }, { k: 's', label: 'Початок', type: 'time', val: '10:00', half: true }, { k: 'e', label: 'Кінець', type: 'time', val: '11:00', half: true }], ok: v => A.addEvent({ title: v.title, date: v.date || TK(), s: v.s, e: v.e, c: v.c }) },
@@ -28,7 +29,7 @@ function forms(st: Store): Record<string, FormSpec> {
     project: { t: 'Новий проєкт', f: [{ k: 'name', label: 'Назва', req: true, ph: 'Редизайн сайту' }, { k: 'client', label: 'Клієнт', half: true }, { k: 'budget', label: 'Бюджет, kr.', type: 'number', half: true }, { k: 'due', label: 'Дедлайн', type: 'date', val: ymd(addD(new Date(), 30)) }], ok: v => A.addProject({ name: v.name, client: v.client, budget: num(v.budget), due: v.due }) },
     invoice: { t: 'Новий рахунок', f: [{ k: 'client', label: 'Клієнт', req: true, half: true }, { k: 'amt', label: 'Сума, kr.', type: 'number', req: true, half: true }, { k: 'due', label: 'Оплатити до', type: 'date', val: ymd(addD(new Date(), 14)) }], ok: v => A.addInvoice({ client: v.client, amt: num(v.amt), due: v.due }) },
     member: { t: 'Новий учасник', f: [{ k: 'name', label: 'Імʼя', req: true, half: true }, { k: 'role', label: 'Роль', half: true, ph: 'Дизайнер' }], ok: v => A.addMember({ name: v.name, role: v.role }) },
-    editTask: { t: 'Змінити задачу', f: [{ k: 'id', label: '', type: 'hidden' }, { k: 'text', label: 'Що зробити', req: true }, { k: 'pri', label: 'Пріоритет', type: 'select', opts: [['lo', 'Звичайно'], ['hi', 'Важливо']], half: true }, { k: 'goal', label: 'Для цілі', type: 'select', half: true, opts: [['', 'Без цілі'], ...st.S.goals.map(g => [String(g.id), g.title] as const)] }], ok: v => A.updateTask(+v.id, { t: v.text, p: v.pri as 'hi' | 'lo', goal: +v.goal || undefined }), del: v => A.delTask(+v.id) },
+    editTask: { t: 'Змінити задачу', f: [{ k: 'id', label: '', type: 'hidden' }, { k: 'text', label: 'Що зробити', req: true }, { k: 'pri', label: 'Пріоритет', type: 'select', opts: [['lo', 'Звичайно'], ['hi', 'Важливо']], half: true }, { k: 'due', label: 'Термін', type: 'date', half: true }, { k: 'goal', label: 'Для цілі', type: 'select', half: true, opts: [['', 'Без цілі'], ...st.S.goals.map(g => [String(g.id), g.title] as const)] }], ok: v => A.updateTask(+v.id, { t: v.text, p: v.pri as 'hi' | 'lo', goal: +v.goal || undefined, due: v.due || undefined }), del: v => A.delTask(+v.id) },
     editEvent: { t: 'Змінити подію', f: [{ k: 'id', label: '', type: 'hidden' }, { k: 'title', label: 'Назва', req: true }, { k: 'date', label: 'Дата', type: 'date', half: true }, { k: 'c', label: 'Колір', type: 'select', opts: COLORS, half: true }, { k: 's', label: 'Початок', type: 'time', half: true }, { k: 'e', label: 'Кінець', type: 'time', half: true }], ok: v => A.updateEvent(+v.id, { title: v.title, date: v.date || TK(), s: v.s, e: v.e, c: v.c }), del: v => A.delEvent(+v.id) },
     editHabit: { t: 'Змінити звичку', f: [{ k: 'id', label: '', type: 'hidden' }, { k: 'name', label: 'Звичка', req: true }], ok: v => A.renameHabit(+v.id, v.name), del: v => A.delHabit(+v.id) },
     editDeal: { t: 'Змінити угоду', f: [{ k: 'id', label: '', type: 'hidden' }, { k: 'title', label: 'Що продаємо', req: true }, { k: 'client', label: 'Клієнт', half: true }, { k: 'amt', label: 'Сума, kr.', type: 'number', half: true }, { k: 'stage', label: 'Етап', type: 'select', opts: [...STAGES, ['lost', 'Програно'] as const] }], ok: v => A.updateDeal(+v.id, { title: v.title, client: v.client, amt: num(v.amt), stage: v.stage as 'lead' }), del: v => A.delDeal(+v.id) },
@@ -47,7 +48,6 @@ const QA: Record<'me' | 'co', [string, string, IconName][]> = {
 
 function FormBody({ spec, close }: { spec: FormSpec; close: () => void }) {
   const ref = useRef<HTMLFormElement>(null);
-  const [armed, setArmed] = useState(false);
   useEffect(() => { const t = setTimeout(() => ref.current?.querySelector<HTMLElement>('input,textarea')?.focus(), 60); return () => clearTimeout(t); }, []);
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -70,12 +70,11 @@ function FormBody({ spec, close }: { spec: FormSpec; close: () => void }) {
         return <label key={f.k} className="field" htmlFor={id} style={{ flex: f.half ? '1 1 140px' : '1 1 100%' }}>{f.label}{input}</label>;
       })}
       <div className="row" style={{ flex: '1 1 100%', justifyContent: 'flex-end', marginTop: 6 }}>
-        {spec.del && <button type="button" className="btn ghost" style={{ marginRight: 'auto', color: armed ? 'var(--m1)' : undefined }} onClick={() => {
-          if (!armed) { setArmed(true); setTimeout(() => setArmed(false), 3000); return; }
+        {spec.del && <button type="button" className="btn ghost danger" style={{ marginRight: 'auto' }} onClick={() => {
           const fd = new FormData(ref.current!), v: Record<string, string> = {};
           spec.f.forEach(f => { v[f.k] = String(fd.get(f.k) ?? ''); });
           spec.del!(v); close();
-        }}>{armed ? 'Точно видалити?' : 'Видалити'}</button>}
+        }}><Icon n="trash" />Видалити</button>}
         <button type="button" className="btn ghost" onClick={close}>Скасувати</button>
         <button className="btn acc">Зберегти</button>
       </div>

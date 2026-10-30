@@ -7,7 +7,7 @@ import { goalFocusOn, goalTasks } from '@/lib/goals';
 import { WoltCard } from '../Wolt';
 import { addD, DN, fmt, hhmm, hmPlain, MON, pad2, sod, sum, TK, WD, weekdayIdx, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
-import { DelBtn } from '../shared';
+import { DelBtn, Empty } from '../shared';
 
 /* ---------------- Focus ---------------- */
 /** One focus session a day goes to a goal: suggests the most important goal task until that is done. */
@@ -87,7 +87,7 @@ export function Focus() {
           <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>Журнал сесій</div>
           <div className="list log">
             {recent.map(s => { const d = new Date(s.t); return <div className="item" key={s.t}><span className="sw c1" /><span className="t">{DN[weekdayIdx(d)]}, {pad2(d.getHours())}:{pad2(d.getMinutes())}{'live' in s && <span className="muted"> · триває</span>}</span><span className="num">{s.m} хв</span>{!('live' in s) && <DelBtn label="Видалити сесію" onDelete={() => A.delSession(s.t)} />}</div>; })}
-            {!recent.length && <p className="muted">Ще немає сесій. Натисни «Старт».</p>}
+            {!recent.length && <Empty icon="focus" title="Ще немає сесій" text="Натисни «Старт»: час фокусу запишеться сам." />}
           </div>
         </div>
         <ActTimer />
@@ -160,7 +160,7 @@ function ManualTime() {
         <label className="field" htmlFor="mtS" style={{ flex: '1 1 100px' }}>З<input id="mtS" type="time" required value={v.s} onChange={e => setV({ ...v, s: e.target.value })} /></label>
         <label className="field" htmlFor="mtE" style={{ flex: '1 1 100px' }}>До<input id="mtE" type="time" required value={v.e} onChange={e => setV({ ...v, e: e.target.value })} /></label>
       </div>
-      <button className="btn" style={{ alignSelf: 'flex-start' }}>Додати</button>
+      <button className="btn acc" style={{ alignSelf: 'flex-start' }}>Додати</button>
     </form>
   );
 }

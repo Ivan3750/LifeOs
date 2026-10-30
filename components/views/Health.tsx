@@ -5,6 +5,7 @@ import type { MoodEntry } from '@/lib/types';
 import { dayMood, moveGoal, waterGoal, ENERGY3, energyLevel, energyWord, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { useNow, useStore } from '@/lib/store';
 import { addD, DAY, DN, hhmm, MON, pad2, plural, TK, toMin, WD, wStart, ymd } from '@/lib/util';
+import { Icon } from '../Icon';
 import { Bars } from '../charts';
 import { avg, DelBtn, LifeTiles } from '../shared';
 
@@ -99,7 +100,7 @@ function MoodLog({ k, setK, onEdit }: { k: string; setK: (k: string) => void; on
               {m.tags.length > 0 && <div className="tags small">{m.tags.map(t => <span key={t}>{t}</span>)}</div>}
               {m.note && <div className="muted" style={{ fontSize: 13, marginTop: 4, whiteSpace: 'pre-wrap' }}>{m.note}</div>}
             </div>
-            <button className="sqb" onClick={() => onEdit(m)} aria-label="Змінити запис настрою">Змінити</button>
+            <button className="ib" onClick={() => onEdit(m)} aria-label="Змінити запис настрою" title="Змінити"><Icon n="edit" /></button>
             <DelBtn label="Видалити запис настрою" onDelete={() => A.delMood(m.id)} />
           </div>
         ))}
