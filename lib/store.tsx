@@ -22,17 +22,17 @@ const keepLocal = (next: State, cur: State): State => { const o = { ...next } as
 
 export const VIEWS: [string, string, string][] = [
   ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
-  ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
+  ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['wolt', 'Wolt', 'wolt'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
   ['co', 'Огляд', 'company'], ['leads', 'Клієнти', 'leads'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
 ];
 export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'focus', 'tasks', 'habits', 'health', 'money', 'goals', 'schedule', 'notes', 'prefs'],
-  co: ['co', 'leads', 'deals', 'ads', 'projects', 'invoices', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
+  me: ['home', 'focus', 'tasks', 'habits', 'health', 'money', 'wolt', 'goals', 'schedule', 'notes', 'prefs'],
+  co: ['co', 'leads', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
 };
 export const TABS: Record<Mode, string[]> = { me: ['home', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
 const CO_ONLY = ['co', 'leads', 'ads', 'deals', 'projects', 'invoices', 'team'];
-const ME_ONLY = ['home', 'focus', 'habits', 'health', 'money', 'goals'];
+const ME_ONLY = ['home', 'focus', 'habits', 'health', 'money', 'wolt', 'goals'];
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
 export type ToastAction = { label: string; run: () => void };

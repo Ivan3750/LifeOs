@@ -17,13 +17,15 @@ export function ModeSeg() {
   );
 }
 
-function NavBtn({ k }: { k: string }) {
+const CO_FLOW = ['leads', 'deals', 'projects', 'invoices'];
+
+function NavBtn({ k, step }: { k: string; step?: number }) {
   const { S, view, go } = useStore();
   const [, l, i] = vinfo(k)!;
   const open = S.tasks.filter(t => !t.d).length;
   return (
     <button onClick={() => go(k)} aria-current={k === view ? 'page' : undefined}>
-      <Icon n={i as IconName} /><span className="nl">{l}</span>
+      {step ? <span className="stepn">{step}</span> : <Icon n={i as IconName} />}<span className="nl">{l}</span>
       {k === 'tasks' && open > 0 && <span className="badge">{open}</span>}
     </button>
   );
@@ -123,7 +125,17 @@ export function Shell({ children }: { children: ReactNode }) {
         <aside className="side">
           <div className="brand"><span className="logo"><Icon n="logo" /></span>LifeOs</div>
           <ModeSeg />
-          <nav className="nav">{NAV[m].map(k => <NavBtn key={k} k={k} />)}</nav>
+          <nav className="nav">
+            {m === 'co'
+              ? <>
+                  {NAV.co.slice(0, 1).map(k => <NavBtn key={k} k={k} />)}
+                  <span className="navh">Шлях клієнта</span>
+                  {CO_FLOW.map((k, i) => <NavBtn key={k} k={k} step={i + 1} />)}
+                  <span className="navh">Інструменти</span>
+                  {NAV.co.filter(k => k !== 'co' && !CO_FLOW.includes(k)).map(k => <NavBtn key={k} k={k} />)}
+                </>
+              : NAV[m].map(k => <NavBtn key={k} k={k} />)}
+          </nav>
           <MiniTimer />
         </aside>
         <main>

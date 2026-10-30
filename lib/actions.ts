@@ -102,6 +102,34 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     dropEmptyNote(id: number) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id || x.title.trim() || x.text.trim()); }); },
     pinNote(id: number) { update(s => { const n = s.noteList.find(x => x.id === id); if (n) n.pinned = !n.pinned; }); },
     delNote(id: number, quiet = false) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id); }); if (!quiet) toast('Нотатку видалено'); },
+    /** Ends the running Wolt shift with what it brought: the money becomes an income record on the Danish account. */
+    finishShift(v: { earned: number; orders: number; km: number }) {
+      const a = getS().act; if (!a) return;
+      const end = Date.now(), m = Math.round((end - a.start) / 6e4);
+      update(s => {
+        if (m >= 1) {
+          const id = s.nextId++;
+          s.activities.push({ id, ...a, end, ...(v.orders > 0 ? { orders: v.orders } : {}), ...(v.earned > 0 ? { earned: v.earned } : {}), ...(v.km > 0 ? { km: v.km } : {}) });
+          if (v.earned > 0) s.money.tx.push({ id: s.nextId++, type: 'in', amt: v.earned, cat: 'Wolt', note: `Зміна ${Math.floor(m / 60)} год ${m % 60} хв${v.orders ? `, ${v.orders} замовл.` : ''}`, date: ymd(new Date(end)), acc: 'dk', shift: id });
+        }
+        s.act = null;
+      });
+      toast(m >= 1 ? `Зміну записано: ${Math.floor(m / 60)} год ${m % 60} хв${v.earned ? ' · ' + fmtCur(v.earned, 'DKK') : ''}` : 'Менше хвилини, не записано');
+    },
+    /** A shift that was not timed: when it was and what it brought. */
+    addShift(v: { start: number; end: number; earned: number; orders: number; km: number }) {
+      if (v.end <= v.start) { toast('Кінець має бути пізніше за початок'); return false; }
+      update(s => {
+        const id = s.nextId++;
+        s.activities.push({ id, kind: 'Wolt', title: 'Зміна', start: v.start, end: v.end, ...(v.orders > 0 ? { orders: v.orders } : {}), ...(v.earned > 0 ? { earned: v.earned } : {}), ...(v.km > 0 ? { km: v.km } : {}) });
+        s.activities.sort((a, b) => a.start - b.start);
+        if (v.earned > 0) s.money.tx.push({ id: s.nextId++, type: 'in', amt: v.earned, cat: 'Wolt', note: `Зміна${v.orders ? `, ${v.orders} замовл.` : ''}`, date: ymd(new Date(v.end)), acc: 'dk', shift: id });
+      });
+      toast('Зміну додано'); return true;
+    },
+    /** Deletes a shift together with the income it recorded. */
+    delShift(id: number) { del(s => { s.activities = s.activities.filter(x => x.id !== id); s.money.tx = s.money.tx.filter(x => x.shift !== id); }, 'Зміну видалено'); },
+    setWoltGoal(n: number) { update(s => { s.woltGoal = Math.max(0, Math.round(n)); }); },
     startAct(kind: string, title: string) { update(s => { s.act = { kind, title: title.trim(), start: Date.now() }; }); },
     /** Saves the running activity; runs shorter than a minute are dropped. */
     stopAct() {
@@ -173,18 +201,27 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     },
     delGoal(id: number) { del(s => { s.goals = s.goals.filter(x => x.id !== id); s.tasks.forEach(t => { if (t.goal === id) delete t.goal; }); }); },
     addDeal(v: { title: string; client: string; amt: number; stage: string }) { update(s => { s.co.deals.push({ id: s.nextId++, title: v.title, client: v.client, amt: v.amt || 0, stage: (v.stage || 'lead') as 'lead' }); }); toast('Угоду додано'); },
+    /** Moves a deal one stage. Winning it starts the rest of the chain by itself: a project to do the work and an invoice to get paid (only once per deal). */
     moveDeal(id: number, dir: number) {
-        const d = getS().co.deals.find(x => x.id === id); if (!d) return;
-        const billed = getS().co.invoices.some(i => i.deal === d.id);
+      const d = getS().co.deals.find(x => x.id === id); if (!d) return;
+      const hadProject = getS().co.projects.some(p => p.deal === d.id), billed = getS().co.invoices.some(i => i.deal === d.id);
       const i = STAGES.findIndex(st => st[0] === d.stage), n = Math.max(0, Math.min(3, i + dir));
       if (n === i) return;
       const won = STAGES[n][0] === 'won';
       update(s => {
         const x = s.co.deals.find(y => y.id === id)!; x.stage = STAGES[n][0]; delete x.demo;
-        // winning a deal again (after moving it back) does not bill twice
-        if (won && !s.co.invoices.some(i => i.deal === x.id)) { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: x.client || x.title, amt: x.amt, issued: TK(), due: ymd(addD(new Date(), 14)), paid: false, paidAt: '', deal: x.id }); }
+        if (!won) return;
+        let proj = s.co.projects.find(p => p.deal === x.id);
+        if (!proj) { proj = { id: s.nextId++, name: x.title, client: x.client, due: ymd(addD(new Date(), 30)), progress: 0, status: 'active', budget: x.amt, deal: x.id }; s.co.projects.push(proj); }
+        if (!s.co.invoices.some(i => i.deal === x.id)) { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: x.client || x.title, amt: x.amt, issued: TK(), due: ymd(addD(new Date(), 14)), paid: false, paidAt: '', deal: x.id, project: proj.id }); }
       });
-      if (won) notify(billed ? `Угоду виграно: ${d.title}` : `Угоду виграно: ${d.title}. Рахунок створено автоматично`);
+      if (won) notify(`Угоду виграно: ${d.title}.${hadProject && billed ? '' : ` Створено ${hadProject ? '' : 'проєкт'}${!hadProject && !billed ? ' і ' : ''}${billed ? '' : 'рахунок'}.`}`);
+    },
+    /** Bills a project that has no invoice yet, for its budget. */
+    invoiceProject(id: number) {
+      const p = getS().co.projects.find(x => x.id === id); if (!p || getS().co.invoices.some(i => i.project === id)) return;
+      update(s => { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: p.client || p.name, amt: p.budget, issued: TK(), due: ymd(addD(new Date(), 14)), paid: false, paidAt: '', project: id, ...(p.deal ? { deal: p.deal } : {}) }); });
+      toast('Рахунок створено');
     },
     updateDeal(id: number, v: Partial<Pick<Deal, 'title' | 'client' | 'amt' | 'stage'>>) { update(s => { const x = s.co.deals.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Угоду оновлено'); },
     delDeal(id: number) { del(s => { s.co.deals = s.co.deals.filter(x => x.id !== id); }); },

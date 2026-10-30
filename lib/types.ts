@@ -21,7 +21,8 @@ export type AccId = 'dk' | 'ua';
 export type Account = { id: AccId; name: string; cur: Cur; opening: number; budget: number };
 /** amt is in the currency of its account (acc, 'dk' for records saved before accounts existed).
     xfer links the two halves of a transfer between accounts; transfers are not income or spending. */
-export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; demo?: 1 };
+/** shift: id of the Wolt shift (activity) this income came from, so deleting the shift removes it too. */
+export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; shift?: number; demo?: 1 };
 export type GoalStep = { id: number; t: string; d: boolean };
 /** A goal is measured either by a number (cur of target) or, when it has steps, by the share of steps done. */
 /** kind 'rating': a goal for a life area that cannot be counted (relationships, rest): it is reached when the area's wheel rating
@@ -29,9 +30,10 @@ export type GoalStep = { id: number; t: string; d: boolean };
 export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; steps?: GoalStep[]; kind?: 'rating'; from?: number; demo?: 1 };
 export type Stage = 'lead' | 'talk' | 'proposal' | 'won' | 'lost';
 export type Deal = { id: number; title: string; client: string; amt: number; stage: Stage; demo?: 1 };
-export type Project = { id: number; name: string; client: string; due: string; progress: number; status: 'active' | 'paused' | 'done'; budget: number; demo?: 1 };
+/** deal: the deal this project came from. */
+export type Project = { id: number; name: string; client: string; due: string; progress: number; status: 'active' | 'paused' | 'done'; budget: number; deal?: number; demo?: 1 };
 /** deal: the deal this invoice was created from, so winning it again does not bill twice. */
-export type Invoice = { id: number; no: string; client: string; amt: number; issued: string; due: string; paid: boolean; paidAt: string; deal?: number; demo?: 1 };
+export type Invoice = { id: number; no: string; client: string; amt: number; issued: string; due: string; paid: boolean; paidAt: string; deal?: number; project?: number; demo?: 1 };
 export type LeadStatus = 'new' | 'contacted' | 'replied' | 'meeting' | 'won' | 'dead';
 /** A possible client. next: date of the next contact ('' when none planned); value: expected deal size in kr. */
 export type Lead = { id: number; name: string; contact: string; source: string; status: LeadStatus; value: number; next: string; note: string; created: string; demo?: 1 };
@@ -65,6 +67,8 @@ export type State = {
   offDays?: Record<string, DayOff>;
   /** Daily goals for the body: glasses of water (default 8) and minutes of movement (default 30). */
   waterGoal?: number; moveGoal?: number;
+  /** Weekly earnings goal for Wolt, in kr. (0 or missing: no goal). */
+  woltGoal?: number;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;

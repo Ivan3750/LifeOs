@@ -104,7 +104,7 @@ const hms = (sec: number) => `${Math.floor(sec / 3600)}:${pad2(Math.floor(sec / 
 
 /** Stopwatch for errands: start when you leave, stop when you are back. */
 function ActTimer() {
-  const { S, A } = useStore();
+  const { S, A, go } = useStore();
   const now = useNow(1000, !!S.act);
   const [kind, setKind] = useState(ACT_KINDS[0]);
   const [title, setTitle] = useState('');
@@ -116,7 +116,9 @@ function ActTimer() {
         <>
           <div className="actrun"><span className="dot" /><div><b>{a.kind}{a.title && <span className="muted"> · {a.title}</span>}</b><small>з {hhmm(new Date(a.start))}</small></div><span className="num">{hms(Math.max(0, Math.round((now - a.start) / 1000)))}</span></div>
           <div className="row">
-            <button className="btn acc" onClick={A.stopAct}><Icon n="check" />Завершити</button>
+            {a.kind === 'Wolt'
+              ? <button className="btn acc" onClick={() => go('wolt')}><Icon n="check" />Завершити в Wolt</button>
+              : <button className="btn acc" onClick={A.stopAct}><Icon n="check" />Завершити</button>}
             <button className="btn ghost" onClick={A.cancelAct}>Скасувати</button>
           </div>
         </>

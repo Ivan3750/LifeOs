@@ -10,12 +10,13 @@ import { Health } from './views/Health';
 import { Notes } from './views/Notes';
 import { Schedule } from './views/Schedule';
 import { Tasks } from './views/Tasks';
+import { WoltPage } from './views/Wolt';
 import { Money } from './views/Money';
 import { Ads, CoOverview, Deals, Invoices, Leads, Projects, Team } from './views/Company';
 import { Prefs } from './views/Prefs';
 
 const VIEW_COMPONENTS: Record<string, () => React.JSX.Element> = {
-  home: Home, focus: Focus, tasks: Tasks, habits: Habits, health: Health, money: Money, goals: Goals,
+  home: Home, focus: Focus, tasks: Tasks, habits: Habits, health: Health, money: Money, wolt: WoltPage, goals: Goals,
   schedule: Schedule, notes: Notes, prefs: Prefs,
   co: CoOverview, leads: Leads, ads: Ads, deals: Deals, projects: Projects, invoices: Invoices, team: Team,
 };

@@ -132,7 +132,7 @@ function AddGoal({ area, onDone }: { area: string; onDone: () => void }) {
       )}
       {how === 'rating' && (
         <div className="field">
-          <span>Сфера «{v.area}» зараз на <b className="num">{now}</b>. До скількох хочеш її підняти?</span>
+          <span>Сфера «{v.area}» зараз на <b className="num">{now}</b>. До скількох хочеш її підняти? Мета: <b className="num">{want}</b></span>
           <Dots value={want} onPick={setWant} label="Мета для сфери" />
         </div>
       )}

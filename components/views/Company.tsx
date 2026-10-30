@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import type { Invoice } from '@/lib/types';
 import type { Lead, LeadStatus } from '@/lib/types';
 import { addD, daysInMonth, daysTo, kfmt, LEAD_SOURCES, LEAD_STATUS, MON, MONTHN, money, pctW, STAGES, sum, TK, ymd } from '@/lib/util';
-import { Icon } from '../Icon';
+import { Icon, type IconName } from '../Icon';
 import { RevenueChart, Ring } from '../charts';
 import { DelBtn, Empty, loadC, sumA } from '../shared';
 
@@ -28,8 +28,128 @@ function adStats(S: ReturnType<typeof useStore>['S'], mk = '') {
   return { spend, leads: leads.length, clients: clients.length, wonValue: sumV(clients), cpl: leads.length && spend ? spend / leads.length : null, cac: clients.length && spend ? spend / clients.length : null, channels };
 }
 
-function Head({ title, sub, children }: { title: string; sub: string; children?: React.ReactNode }) {
-  return <div className="vh"><div><h2>{title}</h2><p>{sub}</p></div><div className="row" style={{ marginLeft: 'auto' }}>{children}</div></div>;
+/** The path of one client through the business, in the order the work really happens. */
+const FLOW: [string, string, IconName, string][] = [
+  ['leads', 'Клієнти', 'leads', 'Хто може купити'],
+  ['deals', 'Угоди', 'deals', 'Що саме продаєш'],
+  ['projects', 'Проєкти', 'projects', 'Робота для клієнта'],
+  ['invoices', 'Рахунки', 'invoice', 'Отримати гроші'],
+];
+
+function flowCounts(S: ReturnType<typeof useStore>['S']) {
+  const C = S.co;
+  return {
+    leads: C.leads.filter(l => l.status !== 'won' && l.status !== 'dead').length,
+    deals: C.deals.filter(d => OPEN.includes(d.stage)).length,
+    projects: C.projects.filter(p => p.status === 'active').length,
+    invoices: C.invoices.filter(i => !i.paid).length,
+  } as Record<string, number>;
+}
+
+/** Four steps in a row with how many items wait in each; the current step is marked. Shown on every step so you always know where you are. */
+function FlowBar({ at }: { at: string }) {
+  const { S, go } = useStore();
+  const n = flowCounts(S), i0 = FLOW.findIndex(f => f[0] === at);
+  return (
+    <nav className="flowbar" aria-label="Шлях клієнта">
+      {FLOW.map(([k, l, , hint], i) => (
+        <button key={k} className={`fstep${k === at ? ' cur' : ''}${i < i0 ? ' past' : ''}`} aria-current={k === at ? 'step' : undefined} onClick={() => go(k)}>
+          <span className="fn">{i + 1}</span>
+          <span className="ft"><b>{l}</b><small>{hint}</small></span>
+          <span className="fc num">{n[k]}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function Head({ title, sub, flow, children }: { title: string; sub: string; flow?: string; children?: React.ReactNode }) {
+  return (
+    <>
+      <div className="vh"><div><h2>{title}</h2><p>{sub}</p></div><div className="row" style={{ marginLeft: 'auto' }}>{children}</div></div>
+      {flow && <FlowBar at={flow} />}
+    </>
+  );
+}
+
+type Task2 = { key: string; tone: 'bad' | 'warn' | 'info'; icon: IconName; title: string; sub: string; label: string; run: () => void };
+
+/** What to do next, across the whole business, most urgent first. Each line has the one button that does it. */
+function useNext(): Task2[] {
+  const { S, A, go } = useStore();
+  const C = S.co, today = TK(), q: Task2[] = [];
+  for (const i of C.invoices.filter(x => !x.paid && x.due < today)) q.push({ key: 'i' + i.id, tone: 'bad', icon: 'invoice', title: `Рахунок ${i.no} прострочено на ${-daysTo(i.due)} дн`, sub: `${i.client} · ${money(i.amt)}`, label: 'Нагадати клієнту', run: () => go('invoices') });
+  for (const p of C.projects.filter(x => x.status !== 'done' && x.due && x.due < today)) q.push({ key: 'pd' + p.id, tone: 'bad', icon: 'projects', title: `Проєкт «${p.name}» прострочено`, sub: `${p.client || 'без клієнта'} · ${p.progress}% готово`, label: 'Відкрити проєкт', run: () => go('projects') });
+  for (const l of C.leads.filter(x => x.next && x.next <= today && x.status !== 'won' && x.status !== 'dead')) q.push({ key: 'l' + l.id, tone: 'warn', icon: 'leads', title: `Звʼяжись з ${l.name}`, sub: `${LEAD_STATUS.find(x => x[0] === l.status)![1]} · ${l.source}${l.next < today ? ' · чекає ' + -daysTo(l.next) + ' дн' : ''}`, label: 'Відкрити клієнтів', run: () => go('leads') });
+  for (const p of C.projects.filter(x => (x.status === 'done' || x.progress >= 100) && !C.invoices.some(i => i.project === x.id || (x.deal && i.deal === x.deal)))) q.push({ key: 'pi' + p.id, tone: 'warn', icon: 'invoice', title: `Проєкт «${p.name}» готовий, рахунку нема`, sub: `${p.client || ''} · ${money(p.budget)}`, label: 'Виставити рахунок', run: () => A.invoiceProject(p.id) });
+  for (const i of C.invoices.filter(x => !x.paid && x.due >= today && daysTo(x.due) <= 3)) q.push({ key: 'is' + i.id, tone: 'warn', icon: 'invoice', title: `Оплата ${i.no} через ${daysTo(i.due)} дн`, sub: `${i.client} · ${money(i.amt)}`, label: 'До рахунків', run: () => go('invoices') });
+  for (const p of C.projects.filter(x => x.status === 'active' && x.due && x.due >= today && daysTo(x.due) <= 3)) q.push({ key: 'ps' + p.id, tone: 'warn', icon: 'projects', title: `Дедлайн проєкту «${p.name}» через ${daysTo(p.due)} дн`, sub: `${p.progress}% готово`, label: 'До проєктів', run: () => go('projects') });
+  for (const d of C.deals.filter(x => x.stage === 'proposal')) q.push({ key: 'd' + d.id, tone: 'info', icon: 'deals', title: `Дотисни угоду «${d.title}»`, sub: `${d.client} · ${money(d.amt)} · пропозицію надіслано`, label: 'До угод', run: () => go('deals') });
+  for (const l of C.leads.filter(x => x.status === 'new' && !(x.next && x.next <= today))) q.push({ key: 'ln' + l.id, tone: 'info', icon: 'leads', title: `Ще не писав: ${l.name}`, sub: `${l.source}${l.value ? ' · ' + money(l.value) : ''}`, label: 'До клієнтів', run: () => go('leads') });
+  const rank = { bad: 0, warn: 1, info: 2 } as const;
+  return q.sort((a, b) => rank[a.tone] - rank[b.tone]);
+}
+
+/** The whole business as four steps, each with a plain explanation, its numbers and the button for the first thing to do. */
+function Journey() {
+  const { S, go, setSheet } = useStore();
+  const n = flowCounts(S), C = S.co;
+  const cta: Record<string, [string, () => void]> = {
+    leads: ['+ Клієнт', () => setSheet({ kind: 'form', key: 'lead' })],
+    deals: ['+ Угода', () => setSheet({ kind: 'form', key: 'deal' })],
+    projects: ['+ Проєкт', () => setSheet({ kind: 'form', key: 'project' })],
+    invoices: ['+ Рахунок', () => setSheet({ kind: 'form', key: 'invoice' })],
+  };
+  const text: Record<string, string> = {
+    leads: 'Запиши кожного, хто може купити, і дату наступного контакту. Коли людина готова, натисни «В угоду».',
+    deals: 'Рухай угоду вправо: розмова, пропозиція, виграно. Виграна угода сама створить проєкт і рахунок.',
+    projects: 'Роби роботу й відмічай прогрес. Коли проєкт готовий, виставляй рахунок.',
+    invoices: 'Став «Оплачено», коли гроші прийшли. Прострочені підсвітяться, і буде готовий текст нагадування.',
+  };
+  const stat: Record<string, string> = {
+    leads: `${n.leads} у роботі · ${C.leads.filter(l => l.status === 'won').length} стали клієнтами`,
+    deals: `${n.deals} відкритих на ${money(sumA(C.deals.filter(d => OPEN.includes(d.stage))))}`,
+    projects: `${n.projects} активних · ${C.projects.filter(p => p.status === 'done').length} завершено`,
+    invoices: `${n.invoices} чекають · оплачено ${money(sumA(C.invoices.filter(i => i.paid)))}`,
+  };
+  return (
+    <div className="journey">
+      {FLOW.map(([k, l, ic], i) => (
+        <div className="jstep card" key={k}>
+          <div className="jh"><span className="fn">{i + 1}</span><Icon n={ic} className="ic" /><h3>{l}</h3></div>
+          <p>{text[k]}</p>
+          <b className="num jstat">{stat[k]}</b>
+          <div className="row">
+            <button className="btn ghost sm" onClick={() => go(k)}>Відкрити</button>
+            <button className="btn acc sm" onClick={cta[k][1]}>{cta[k][0]}</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NextCard() {
+  const q = useNext();
+  const { S } = useStore();
+  const empty = !S.co.leads.length && !S.co.deals.length && !S.co.projects.length && !S.co.invoices.length;
+  return (
+    <div className="card nextcard">
+      <div className="ch"><Icon n="check" className="ic" /><div><h3>Що робити зараз</h3><p>{empty ? 'Почни з першого кроку' : q.length ? `${q.length} ${q.length === 1 ? 'справа' : 'справ'} по порядку важливості` : 'Усе під контролем'}</p></div></div>
+      {empty && <Empty icon="leads" title="Бізнес ще порожній" text="Почни зверху: запиши першого потенційного клієнта. Далі система сама підкаже, що робити з ним, поки він не заплатить." />}
+      {!empty && !q.length && <Empty icon="check" title="Термінових справ нема" text="Прострочень нема, звʼязатися нікому. Час шукати нових клієнтів." />}
+      <div className="list">
+        {q.slice(0, 7).map(t => (
+          <div className={`item nx ${t.tone}`} key={t.key}>
+            <span className="nxi"><Icon n={t.icon} /></span>
+            <span className="t"><b>{t.title}</b><br /><small className="muted">{t.sub}</small></span>
+            <button className={`btn sm ${t.tone === 'bad' ? 'acc' : 'ghost'}`} onClick={t.run}>{t.label}</button>
+          </div>
+        ))}
+      </div>
+      {q.length > 7 && <p className="muted" style={{ margin: '10px 0 0', fontSize: 12 }}>І ще {q.length - 7}. Відкрий потрібний крок зверху, щоб побачити все.</p>}
+    </div>
+  );
 }
 
 export function CoOverview() {
@@ -64,7 +184,10 @@ export function CoOverview() {
         <button className="btn ghost" onClick={() => setSheet({ kind: 'form', key: 'lead' })}>+ Клієнт</button>
         <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'deal' })}>+ Угода</button>
       </Head>
-      <div className="grid" style={{ marginTop: 18 }}>
+      <Journey />
+      <NextCard />
+      <h3 className="sech">Показники</h3>
+      <div className="grid">
         {kpi.map(([l, v, s, c]) => <div key={l} className="card s3 stat"><div className="k">{l}</div><div className="v num" style={{ color: c }}>{v}</div><div className="k" style={{ marginTop: 4 }}>{s}</div></div>)}
       </div>
       <div className="grid" style={{ marginTop: 18 }}>
@@ -116,11 +239,11 @@ export function CoOverview() {
 }
 
 export function Deals() {
-  const { S, A, setSheet } = useStore();
+  const { S, A, setSheet, go } = useStore();
   const C = S.co, open = C.deals.filter(d => OPEN.includes(d.stage)), lost = C.deals.filter(d => d.stage === 'lost');
   return (
     <section className="view">
-      <Head title="Угоди" sub={`${open.length} відкритих на ${money(sumA(open))} (прогноз ≈ ${money(open.reduce((a, d) => a + d.amt * (STAGE_P[d.stage] ?? 0), 0))}) · виграно ${C.deals.filter(d => d.stage === 'won').length} · програно ${C.deals.filter(d => d.stage === 'lost').length}`}>
+      <Head flow="deals" title="Угоди" sub={`${open.length} відкритих на ${money(sumA(open))} (прогноз ≈ ${money(open.reduce((a, d) => a + d.amt * (STAGE_P[d.stage] ?? 0), 0))}) · виграно ${C.deals.filter(d => d.stage === 'won').length} · програно ${C.deals.filter(d => d.stage === 'lost').length}`}>
         <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'deal' })}>+ Угода</button>
       </Head>
       <div className="kanban" style={{ marginTop: 18 }}>
@@ -132,6 +255,7 @@ export function Deals() {
               {ds.map(d => (
                 <div className="kcard" key={d.id}>
                   <b>{d.title}</b><small className="muted">{d.client}</small>
+                  {d.stage === 'won' && S.co.projects.some(p => p.deal === d.id) && <small className="klink" onClick={() => go('projects')} role="link" tabIndex={0} onKeyDown={e => e.key === 'Enter' && go('projects')}>→ проєкт і рахунок створено</small>}
                   <div className="kfoot">
                     <span className="num" style={{ fontWeight: 600 }}>{money(d.amt)}</span>
                     <span className="kact">
@@ -179,7 +303,7 @@ export function Projects() {
   const P = S.co.projects;
   return (
     <section className="view">
-      <Head title="Проєкти" sub={`${P.filter(p => p.status === 'active').length} активних · ${P.filter(p => p.status === 'done').length} завершених. Тягни повзунок, щоб оновити прогрес`}>
+      <Head flow="projects" title="Проєкти" sub={`${P.filter(p => p.status === 'active').length} активних · ${P.filter(p => p.status === 'done').length} завершених. Тягни повзунок, щоб оновити прогрес`}>
         <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'project' })}>+ Проєкт</button>
       </Head>
       <div className="grid" style={{ marginTop: 18 }}>
@@ -195,6 +319,12 @@ export function Projects() {
                 <button className={`pillst ${stl[1]}`} title="Змінити статус" onClick={() => A.cycleProject(p.id)}>{stl[0]}</button>
               </div>
               <ProgressSlider key={p.progress} id={p.id} value={p.progress} />
+              {(() => {
+                const inv = S.co.invoices.find(i => i.project === p.id || (p.deal && i.deal === p.deal));
+                return inv
+                  ? <div className="plink"><Icon n="invoice" /><span>{inv.no} · {money(inv.amt)}</span><b className={inv.paid ? 'ok' : invState(inv) === 'over' ? 'bad' : ''}>{inv.paid ? 'оплачено' : invState(inv) === 'over' ? 'прострочено' : 'чекаємо оплату'}</b></div>
+                  : p.budget > 0 && <div className="plink"><Icon n="invoice" /><span>Рахунку ще нема</span><button className="linkbtn" onClick={() => A.invoiceProject(p.id)}>Виставити на {money(p.budget)}</button></div>;
+              })()}
               <div className="row" style={{ justifyContent: 'space-between', fontSize: 12, marginTop: 10, flexWrap: 'nowrap' }}>
                 <span className="muted">{p.budget ? money(p.budget) : ''}</span>
                 <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}><span className={`pillst ${dueCls}`}>{dueTxt}</span><button className="ib" aria-label={`Змінити проєкт ${p.name}`} onClick={() => edit(setSheet, 'editProject', { id: String(p.id), name: p.name, client: p.client, budget: String(p.budget || ''), due: p.due })} title="Змінити"><Icon n="edit" /></button><DelBtn label="Видалити проєкт" onDelete={() => A.delProject(p.id)} /></span>
@@ -222,7 +352,7 @@ export function Invoices() {
   const lbl = { paid: ['Оплачено', 'ok'], wait: ['Очікує', 'warn'], over: ['Прострочено', 'bad'] } as const;
   return (
     <section className="view">
-      <Head title="Рахунки" sub={`Оплачено цього місяця ${money(sumA(L.filter(i => i.paid && i.paidAt.slice(0, 7) === mk)))} · очікуємо ${money(sumA(wait))} · прострочено ${money(sumA(over))}`}>
+      <Head flow="invoices" title="Рахунки" sub={`Оплачено цього місяця ${money(sumA(L.filter(i => i.paid && i.paidAt.slice(0, 7) === mk)))} · очікуємо ${money(sumA(wait))} · прострочено ${money(sumA(over))}`}>
         <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'invoice' })}>+ Рахунок</button>
       </Head>
       <div className="card" style={{ marginTop: 18 }}>
@@ -308,7 +438,7 @@ export function Leads() {
   const contactLink = (c: string) => (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c) ? 'mailto:' + c : /^\+?[\d\s()-]{7,}$/.test(c) ? 'tel:' + c.replace(/[^\d+]/g, '') : /^@\w+$/.test(c) ? '' : /^https?:\/\//.test(c) ? c : '');
   return (
     <section className="view">
-      <Head title="Можливі клієнти" sub={`${live.length} у роботі на ${money(sumV(live))} · ${due.length ? `треба звʼязатися: ${due.length}` : 'нічого термінового'} · ${closed ? `конверсія ${Math.round((won / closed) * 100)}%` : 'ще нічого не закрито'}`}>
+      <Head flow="leads" title="Можливі клієнти" sub={`${live.length} у роботі на ${money(sumV(live))} · ${due.length ? `треба звʼязатися: ${due.length}` : 'нічого термінового'} · ${closed ? `конверсія ${Math.round((won / closed) * 100)}%` : 'ще нічого не закрито'}`}>
         <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'lead' })}>+ Клієнт</button>
       </Head>
       <div className="grid" style={{ marginTop: 18 }}>
