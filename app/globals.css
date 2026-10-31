@@ -1370,3 +1370,7 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
   .carr{width:auto;height:26px;transform:rotate(90deg)}
   .cn{max-width:none}
 }
+.socday input[type="date"]{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:9px 12px;color:var(--ink);outline:none}
+.scbars button{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;height:100%;font-size:11px;color:var(--muted);border-radius:10px;padding:2px 0}
+.scbars button.sel{background:var(--bg)}
+.scbars button.sel span,.scbars button.today span{color:var(--ink);font-weight:600}

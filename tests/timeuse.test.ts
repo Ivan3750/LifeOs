@@ -108,3 +108,16 @@ describe('sleep rhythm', () => {
     expect(r.windDown).toBe('22:50');
   });
 });
+
+describe('social media for past days', () => {
+  it('saves an entry on the chosen day and ignores nonsense', async () => {
+    const { makeActions } = await import('@/lib/actions');
+    const S = blank();
+    const A = makeActions({ update: fn => fn(S), getS: () => S, toast: () => {}, notify: () => {}, del: fn => fn(S) });
+    expect(A.addSocial({ platform: 'Instagram', min: 25, date: '2026-03-10' })).toBe(true);
+    expect(A.addSocial({ platform: 'YouTube', min: 0 })).toBe(false);
+    expect(S.social).toHaveLength(1);
+    expect(S.social[0]).toMatchObject({ date: '2026-03-10', platform: 'Instagram', min: 25 });
+    expect(socialOn(S, '2026-03-10').total).toBe(25);
+  });
+});

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { PLATFORMS, socialGoal, socialOn, socialPeriod } from '@/lib/social';
-import { DN, hmPlain, pctW, TK, weekdayIdx } from '@/lib/util';
+import { addD, DN, hmPlain, MON, pctW, TK, WD, weekdayIdx, ymd } from '@/lib/util';
 import { Icon } from './Icon';
 import { DelBtn } from './shared';
 
@@ -12,10 +12,11 @@ const barColor = (m: number, g: number) => (g > 0 && m > g ? 'var(--m1)' : g > 0
 /** Time on social media: quick log, today against the limits, the week, and what the time was for. */
 export function SocialCard() {
   const { S, A } = useStore();
-  const k = TK(), d = socialOn(S, k), w = socialPeriod(S, 7);
+  const today = TK(), [k, setK] = useState(today), d = socialOn(S, k), w = socialPeriod(S, 7);
+  const dt = new Date(k + 'T00:00'), isToday = k === today, label = isToday ? 'сьогодні' : `${WD[dt.getDay()].toLowerCase()}, ${dt.getDate()} ${MON[dt.getMonth()]}`;
   const [platform, setPlatform] = useState<string>('Instagram');
   const [custom, setCustom] = useState('');
-  const log = (min: number) => { if (A.addSocial({ platform, min })) setCustom(''); };
+  const log = (min: number) => { if (A.addSocial({ platform, min, date: k })) setCustom(''); };
   const platforms = PLATFORMS;
   const pre = w.perDay.slice(-7);
   const maxDay = Math.max(60, ...pre.map(p => p.total));
@@ -29,6 +30,13 @@ export function SocialCard() {
 
       <div>
         <div className="subh" style={{ margin: '0 0 10px' }}>Записати час</div>
+        <div className="row socday" style={{ marginBottom: 12 }}>
+          <button className="btn ghost cal-nav" aria-label="Попередній день" onClick={() => setK(ymd(addD(dt, -1)))}>‹</button>
+          <input type="date" aria-label="День, за який записуєш" value={k} max={today} onChange={e => e.target.value && e.target.value <= today && setK(e.target.value)} />
+          <button className="btn ghost cal-nav" aria-label="Наступний день" disabled={isToday} onClick={() => setK(ymd(addD(dt, 1)))}>›</button>
+          {!isToday && <button className="btn ghost sm" onClick={() => setK(today)}>Сьогодні</button>}
+          <span className="muted" style={{ fontSize: 13 }}>Записую за: <b style={{ color: 'var(--ink)' }}>{label}</b></span>
+        </div>
         <div className="tags" role="group" aria-label="Платформа">{platforms.map(p => <button key={p} type="button" aria-pressed={platform === p} onClick={() => setPlatform(p)}>{p}</button>)}</div>
         <div className="row" style={{ marginTop: 12 }}>
           {[5, 15, 30, 60].map(m => <button key={m} className="btn ghost sm" onClick={() => log(m)}>+{m} хв</button>)}
@@ -39,7 +47,7 @@ export function SocialCard() {
       </div>
 
       <div>
-        <div className="subh" style={{ margin: '0 0 10px' }}>Сьогодні й ліміти</div>
+        <div className="subh" style={{ margin: '0 0 10px' }}>{isToday ? 'Сьогодні' : label.charAt(0).toUpperCase() + label.slice(1)} і ліміти</div>
         <div className="sclist">
           {platforms.map(p => {
             const m = d.by[p] || 0, g = socialGoal(S, p);
@@ -73,7 +81,7 @@ export function SocialCard() {
           <div><span className="k">Порівняння</span><span className="v num">{w.compared}<small>{w.compared === 1 ? 'день' : 'днів'}</small></span></div>
         </div>
         <div className="scbars" aria-label="Хвилини по днях">
-          {pre.map(p => { const dt = new Date(p.k + 'T00:00'); return <div key={p.k} className={p.k === k ? 'today' : ''} title={`${p.k}: ${p.total} хв`}><i style={{ height: Math.max(3, (p.total / maxDay) * 64), background: p.over > 0 ? 'var(--m1)' : p.total ? 'var(--good)' : 'var(--bar)' }} /><span>{DN[weekdayIdx(dt)]}</span></div>; })}
+          {pre.map(p => { const x = new Date(p.k + 'T00:00'); return <button key={p.k} className={`${p.k === today ? 'today' : ''}${p.k === k ? ' sel' : ''}`} aria-pressed={p.k === k} title={`${p.k}: ${p.total} хв. Натисни, щоб відкрити цей день`} onClick={() => setK(p.k)}><i style={{ height: Math.max(3, (p.total / maxDay) * 64), background: p.over > 0 ? 'var(--m1)' : p.total ? 'var(--good)' : 'var(--bar)' }} /><span>{DN[weekdayIdx(x)]}</span></button>; })}
         </div>
         {w.compared >= 2 && <p className="help" style={{ margin: '12px 0 0' }}>Уже {w.compared} {w.compared < 5 ? 'дні' : 'днів'} цього тижня ти ловив себе на порівнянні. Якщо після відео тобі гірше, а не краще, це знак: закрий застосунок і зроби один крок до власної цілі.</p>}
       </div>

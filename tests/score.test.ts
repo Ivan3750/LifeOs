@@ -48,7 +48,7 @@ describe('dayScore', () => {
     const s = blank();
     s.health[K] = { water: 0, sleep: 7.5, mood: 0, steps: 0, workout: 0, weight: 0 };
     const r = dayScore(s, K, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'sleep')?.got).toBe(15);
+    expect(r.parts.find(p => p.key === 'sleep')?.got).toBe(14);
     expect(r.skipped.some(x => x.key === 'sleepreg')).toBe(true);
     expect(r.skipped.some(x => x.key === 'mood')).toBe(true);
   });
@@ -62,18 +62,42 @@ describe('dayScore: steady sleep, business and social media', () => {
     const good = blank(); good.health[day] = night('23:40', '07:30');
     const late = blank(); late.health[day] = night('02:30', '10:30');
     const g = dayScore(good, day, [], [], NOW), l = dayScore(late, day, [], [], NOW);
-    expect(g.parts.find(p => p.key === 'sleepreg')?.got).toBe(10);
+    expect(g.parts.find(p => p.key === 'sleepreg')?.got).toBe(8);
     expect(l.parts.find(p => p.key === 'sleepreg')?.got).toBe(0);
     // both slept 8 hours, so the length part is the same
-    expect(l.parts.find(p => p.key === 'sleep')?.got).toBe(15);
+    expect(l.parts.find(p => p.key === 'sleep')?.got).toBe(14);
   });
 
   it('counts time logged on the business as work', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     s.activities.push({ id: 5, kind: 'Бізнес', title: '', start: new Date(day + 'T10:00').getTime(), end: new Date(day + 'T14:00').getTime() });
     const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(25);
+    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(22);
     expect(r.parts.some(p => p.key === 'biz')).toBe(false);
+  });
+
+  it('counts a Wolt shift as work too', () => {
+    const s = blank(); s.health[day] = night('23:30', '07:30');
+    s.activities.push({ id: 6, kind: 'Wolt', title: 'Зміна', start: new Date(day + 'T12:00').getTime(), end: new Date(day + 'T16:00').getTime() });
+    const r = dayScore(s, day, [], [], NOW);
+    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(22);
+    expect(r.parts.find(p => p.key === 'focus')?.hint).toContain('Wolt');
+  });
+
+  it('judges the tasks of the day: closed against due and still open', () => {
+    const s = blank(); s.health[day] = night('23:30', '07:30');
+    expect(dayScore(s, day, [], [], NOW).skipped.some(x => x.key === 'tasks')).toBe(true);
+    s.tasks.push({ id: 1, t: 'a', p: 'lo', d: true, doneAt: new Date(day + 'T14:00').getTime() }, { id: 2, t: 'b', p: 'lo', d: false, due: day });
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'tasks')?.got).toBe(3);
+  });
+
+  it('counts social media added afterwards for a past day', () => {
+    const s = blank(); s.health[day] = night('23:30', '07:30');
+    const before = dayScore(s, day, [], [], NOW);
+    expect(before.skipped.some(x => x.key === 'social')).toBe(true);
+    s.social.push({ id: 9, date: day, platform: 'YouTube', min: 200 });
+    const after = dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'social')!;
+    expect(after.got).toBe(0);
   });
 
   it('judges social media against the limit of each platform', () => {
