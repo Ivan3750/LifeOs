@@ -48,7 +48,7 @@ function HabitCard({ h, now }: { h: BadHabit; now: number }) {
 
 /** Trigger Tracker: tap the reason of a craving and whether it was held; below, what sets cravings off and when. */
 function Triggers() {
-  const { S, A } = useStore();
+  const { S, A, go } = useStore();
   const now = useNow(60_000);
   const [hid, setHid] = useState<number | undefined>(undefined);
   const [trigger, setTrigger] = useState('');
@@ -74,7 +74,7 @@ function Triggers() {
             <div><span className="k">Найчастіше</span><span className="v" style={{ fontSize: 17 }}>{st.top ?? '—'}</span></div>
           </div>
           <div className="cats">{Object.entries(st.by).sort((a, b) => b[1].n - a[1].n).map(([t, x]) => <div className="catrow" key={t}><span>{t}</span><div className="bar"><i style={{ width: pctW(x.n, max) + '%' }} /></div><span className="num" style={{ textAlign: 'right' }}>{x.n}{x.held < x.n ? ` · зрив ${x.n - x.held}` : ''}</span></div>)}</div>
-          {st.peak >= 0 && <p className="help" style={{ margin: 0 }}>Потяги найчастіше бувають о <b>{String(st.peak).padStart(2, '0')}:00</b>. Заплануй на цей час щось інше: прогулянку, дзвінок, душ.</p>}
+          {st.peak >= 0 && <p className="help" style={{ margin: 0 }}>Потяги найчастіше бувають о <b>{String(st.peak).padStart(2, '0')}:00</b>. Заплануй на цей час щось інше: прогулянку, дзвінок, душ. <button className="linkbtn" onClick={() => go('prefs')}>Налаштувати нагадування</button></p>}
           <div className="list">
             {last.map(c => { const d = new Date(c.t); return (
               <div className="item" key={c.id}>

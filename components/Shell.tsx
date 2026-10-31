@@ -6,6 +6,7 @@ import { fmt, MON, pad2, WD } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { SheetHost } from './Sheets';
 import { Palette } from './Palette';
+import { RemindHost } from './Reminders';
 
 export function ModeSeg() {
   const { S, setMode } = useStore();
@@ -140,6 +141,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </aside>
         <main>
           <TopBar />
+          <RemindHost />
           {children}
         </main>
       </div>

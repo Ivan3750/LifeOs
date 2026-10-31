@@ -2,6 +2,7 @@
 
 import { StoreProvider, useStore } from '@/lib/store';
 import { Shell } from './Shell';
+import { PinGate } from './PinLock';
 import { Home } from './views/Home';
 import { Focus } from './views/Focus';
 import { TimePage } from './views/Time';
@@ -33,7 +34,7 @@ function Current() {
 export default function App({ db }: { db: boolean }) {
   return (
     <StoreProvider db={db}>
-      <Shell><Current /></Shell>
+      <PinGate><Shell><Current /></Shell></PinGate>
     </StoreProvider>
   );
 }

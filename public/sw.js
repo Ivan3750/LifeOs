@@ -37,3 +37,13 @@ self.addEventListener('fetch', e => {
     })());
   }
 });
+
+// Tapping a reminder brings the app forward and opens the SOS sheet (or opens the app on the section when it was closed).
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil((async () => {
+    const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (list.length) { const c = list[0]; await c.focus(); c.postMessage({ type: 'open-sos' }); return; }
+    await self.clients.openWindow('/#quit');
+  })());
+});

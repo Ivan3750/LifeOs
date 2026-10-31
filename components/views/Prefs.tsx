@@ -10,6 +10,8 @@ import { Icon } from '../Icon';
 import { ExportCard } from '../ExportCard';
 import { CalStatusChip } from './Schedule';
 import { SYNC_TEXT } from '../Shell';
+import { PinSettings } from '../PinLock';
+import { ReminderSettings } from '../ReminderSettings';
 
 /** Hides the secret part of a calendar address so it can be shown on screen. */
 const maskUrl = (u: string) => {
@@ -231,6 +233,9 @@ export function Prefs() {
             </div>
           </div>
         </div>
+
+        <div className="s6"><ReminderSettings /></div>
+        <div className="s6"><PinSettings /></div>
 
         <div className="card s12 cardcol">
           <div className="ch" style={{ margin: 0 }}><Icon n="clock" className="ic" /><div><h3>День і їжа</h3><p>Від цього залежать вільні години й оцінка дня</p></div></div>
