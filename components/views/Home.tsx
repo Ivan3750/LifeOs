@@ -10,6 +10,7 @@ import { Icon, type IconName } from '../Icon';
 import { AdviceCard } from '../Advice';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
+import { bestStreak, streakDays, streakHours } from '@/lib/quit';
 import { CatBars, dayMinutes, habStreak, lanes, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
 
 const QUOTES: [string, string, string][] = [['Маленькі кроки', 'щодня', 'дають великий результат.'], ['Фокус —', 'це вміння', 'сказати «ні» зайвому.'], ['Краще', 'зроблено,', 'ніж ідеально.'], ['Сьогоднішня', 'робота —', 'завтрашня свобода.']];
@@ -263,7 +264,7 @@ function ScoreCard() {
   const endK = ymd(addD(dt, 3)) > today ? today : ymd(addD(dt, 3));
   const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : scoreOn(d, now).total }));
   const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
-  const to: Record<string, string> = { focus: 'focus', goals: 'goals', sleep: 'health', sleepreg: 'health', water: 'health', move: 'health', habits: 'habits', mood: 'health', money: 'money', social: 'time', tasks: 'tasks' };
+  const to: Record<string, string> = { focus: 'focus', goals: 'goals', sleep: 'health', sleepreg: 'health', water: 'health', move: 'health', habits: 'habits', mood: 'health', money: 'money', social: 'time', tasks: 'tasks', quit: 'quit' };
   const [how, setHow] = useState(false);
   return (
     <div className="card s6" id="score-card">
@@ -315,13 +316,14 @@ function ScoreCard() {
       <button className="howbtn" aria-expanded={how} onClick={() => setHow(!how)}>{how ? 'Сховати, як рахується' : 'Як рахується оцінка?'}</button>
       {how && (
         <ul className="howlist">
-          <li>Оцінка 0–100 складається з п’яти частин: <b>Робота й цілі</b> (робота 22, цілі 8, задачі 6), <b>Сон і тіло</b> (скільки спав 14, режим сну 8, вода 4, рух 4), <b>Настрій і увага</b> (настрій 8, соцмережі 6), <b>Звички</b> (12), <b>Гроші</b> (8). Усе, що ти записуєш у застосунку, входить в оцінку, у тому числі за минулі дні.</li>
+          <li>Оцінка 0–100 складається з п’яти частин: <b>Робота й цілі</b> (робота 22, цілі 8, задачі 6), <b>Сон і тіло</b> (скільки спав 14, режим сну 8, вода 4, рух 4), <b>Настрій і увага</b> (настрій 8, соцмережі 6), <b>Звички</b> (звички 8, без зривів 6), <b>Гроші</b> (6). Усе, що ти записуєш у застосунку, входить в оцінку, у тому числі за минулі дні.</li>
           <li><b>Робота.</b> Тижнева ціль ділиться на робочі дні, але не більше 60% вільного часу. Фокус, час, записаний як «Бізнес», і зміни Wolt рахуються як робота. Сьогодні очікується лише та частина дня, що вже минула. У вихідний будь-яка робота лише плюс: 20 хв дають повний бал.</li>
           <li><b>Задачі.</b> Закриті за день проти тих, що мали термін цього дня й досі відкриті. Дні без задач не оцінюються.</li>
           <li><b>Цілі.</b> Фокус на задачах, прив’язаних до цілі: повний бал за 20+ хв, якщо є відкрита ціль.</li>
           <li><b>Сон: скільки.</b> 7–9 годин дають повний бал. <b>Сон: режим.</b> Засинання не пізніше ніж за 30 хв після цільового часу (Налаштування → Здоровʼя) і підйом у межах 45 хв від цільового: так сон рахується стабільним, а не просто довгим. Пізніше, ніж на 2 години за ціль, дає нуль.</li>
           <li><b>Вода й рух.</b> 8 склянок і 30 хв руху (або твої цілі) дають повні бали.</li>
           <li><b>Звички.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора.</li>
+          <li><b>Без зривів.</b> Якщо ти відстежуєш шкідливі звички: день без зриву дає повний бал, зрив забирає його (бал ділиться між звичками, які відстежувались того дня).</li>
           <li><b>Соцмережі.</b> Рахуються, лише коли ти їх записав. Кожна платформа має свій ліміт (за замовчуванням Instagram 30, YouTube 60 хв); 60 хв понад ліміти разом дають нуль. Записи за минулі дні теж враховуються.</li>
           <li><b>Настрій і гроші.</b> 7/10 і краще дає повний бал. Житло віднімається від місячного бюджету, решта ділиться на денний ліміт.</li>
           <li>Частина, яку не можна оцінити (вихідний, ще рано, не записано), не дає нуля: її просто немає, а решта перераховується до 100. Дні до початку записів і майбутні дні не оцінюються взагалі.</li>
@@ -356,6 +358,22 @@ function WeekSummary() {
     <div className="card s12">
       <div className="ch"><Icon n="trend" className="ic" /><div><h3>Тиждень у цифрах</h3><p>Останні 7 днів. Дні без записів і не робочі дні не псують середнє</p></div></div>
       <div className="woltstats">{tiles.map(([l, v, sub]) => <div key={l}><span>{l}</span><b className="num">{v}</b><span style={{ marginTop: 2 }}>{sub}</span></div>)}</div>
+    </div>
+  );
+}
+
+/** Habits to quit on the home page: the streaks and the SOS button. */
+function QuitMini() {
+  const { S, go, setSheet } = useStore();
+  const now = useNow(60_000);
+  return (
+    <div className="card s12 quitmini">
+      <div className="ch" style={{ margin: 0 }}><Icon n="flame" className="ic" /><div><h3>Без шкідливих звичок</h3><p>{S.badHabits.length ? 'Дні без зривів. Зрив перезапускає серію, але рекорд лишається' : 'Додай звичку, від якої хочеш відмовитись'}</p></div></div>
+      <div className="qmini">
+        {S.badHabits.slice(0, 4).map(h => { const d = streakDays(h, now); return <button key={h.id} onClick={() => go('quit')}><b className="num">{d || streakHours(h, now)}<small>{d ? 'дн' : 'год'}</small></b><span>{h.name}</span><em>рекорд {bestStreak(h, now)} дн</em></button>; })}
+        {!S.badHabits.length && <button onClick={() => go('quit')}><span>Почати відстежувати</span></button>}
+      </div>
+      <button className="sosbtn sm" onClick={() => setSheet({ kind: 'sos' })}><Icon n="alert" />SOS</button>
     </div>
   );
 }
@@ -422,6 +440,8 @@ export function Home() {
           ))}
           {!gs.length && <p className="muted">Постав першу ціль у розділі «Цілі».</p>}
         </div>
+
+        <QuitMini />
 
         <div className="card s4">
           <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div><span className="sel">Цей тиждень</span></div>

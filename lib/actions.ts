@@ -197,6 +197,24 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     /** Marks that after this entry you compared your life with someone else's. */
     toggleCompare(id: number) { update(s => { const x = s.social.find(e => e.id === id); if (!x) return; if (x.cmp) delete x.cmp; else x.cmp = 1; delete x.demo; }); },
     setSocialGoal(platform: string, min: number) { update(s => { s.socialGoals[platform] = Math.max(0, Math.min(600, Math.round(min))); }); },
+    /** A habit to quit; the clean streak starts now. */
+    addBad(name: string) { name = name.trim(); if (!name) return false; update(s => { s.badHabits.push({ id: s.nextId++, name, start: Date.now(), best: 0, slips: [] }); }); toast('Рахую дні без зривів із цього моменту'); return true; },
+    renameBad(id: number, name: string) { name = name.trim(); if (name) update(s => { const h = s.badHabits.find(x => x.id === id); if (h) { h.name = name; delete h.demo; } }); },
+    delBad(id: number) { del(s => { s.badHabits = s.badHabits.filter(x => x.id !== id); s.cravings = s.cravings.filter(x => x.habit !== id); }, 'Звичку видалено'); },
+    /** A craving: noted with what set it off, and whether it was held. A held craving costs nothing; a slip restarts the streak but keeps the best one and the total. */
+    logCraving(habit: number, trigger: string, outcome: 'resisted' | 'slipped' = 'resisted', tool?: string) {
+      update(s => { s.cravings.push({ id: s.nextId++, t: Date.now(), habit, trigger, outcome, ...(tool ? { tool } : {}) }); });
+      if (outcome === 'resisted') toast('Витримав. Кожен такий раз робить наступний легшим');
+    },
+    slipBad(habit: number, trigger = 'Інше', tool?: string) {
+      const before = getS().badHabits.find(x => x.id === habit); if (!before) return;
+      del(s => {
+        const h = s.badHabits.find(x => x.id === habit); if (!h) return;
+        h.best = Math.max(h.best, Math.floor((Date.now() - Math.max(h.start, ...h.slips)) / 864e5)); h.slips.push(Date.now()); delete h.demo;
+        s.cravings.push({ id: s.nextId++, t: Date.now(), habit, trigger, outcome: 'slipped', ...(tool ? { tool } : {}) });
+      }, 'Зрив записано. Найкраща серія й усі чисті дні збережені');
+    },
+    delCraving(id: number) { del(s => { s.cravings = s.cravings.filter(x => x.id !== id); }); },
     delActivity(id: number) { del(s => { s.activities = s.activities.filter(x => x.id !== id); }); },
     /** Focus time entered by hand, e.g. work done away from the timer. */
     addFocus(start: number, end: number) {

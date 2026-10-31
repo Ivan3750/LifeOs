@@ -3,6 +3,7 @@ import { addD, sod, toMin, ymd } from './util';
 import { goalFocusOn, goalProgress } from './goals';
 import { budgetDKK, monthOf, txDKK } from './money';
 import { keepsRhythm } from './sleep';
+import { quitOn } from './quit';
 import { socialOn } from './social';
 
 export const MOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність', 'Втома', 'Стрес', 'Тривога', 'Сум', 'Злість', 'Нудьга', 'Самотність'];
@@ -220,6 +221,11 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
     else add('habits', 'Звички', 20, done / (total * need * Math.max(elapsed, 0.5)), `${done} з ${total}${need < 1 ? ` (${O!.label.toLowerCase()}: досить ${Math.max(1, Math.round(total * need))})` : ''}${isToday && elapsed < 1 ? ', день ще триває' : ''}`);
   }
 
+  // Habits to quit: a day without a slip is a full mark, a slip takes it away (shared between the habits that were tracked that day).
+  const q = quitOn(S, k);
+  if (q.active.length) add('quit', 'Без зривів', 6, 1 - q.slipped.length / q.active.length, q.slipped.length ? `зрив: ${q.slipped.map(h => h.name).join(', ')}` : `без зривів (${q.active.length})`, 'habits');
+  else skip('quit', 'Без зривів', 'шкідливих звичок не відстежується');
+
   // Mood: 7/10 and better is a full score, 5/10 ("нормально") still gives more than half.
   const mood = dayMood(S, k);
   if (mood) add('mood', 'Настрій', 8, (mood - 2) / 5, `${mood.toFixed(1)} з 10`, 'mind');
@@ -240,7 +246,7 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
     const fixed = monthTx.filter(t => FIXED_CATS.includes(t.cat)).reduce((a, t) => a + txDKK(S, t), 0);
     const lim = Math.max(0, budget - fixed) / dim;
     const spent = monthTx.filter(t => t.date === k && !FIXED_CATS.includes(t.cat)).reduce((a, t) => a + txDKK(S, t), 0);
-    add('money', 'Витрати', 8, !lim ? (spent ? 0 : 1) : spent <= lim ? 1 : 2 - spent / lim, `${Math.round(spent)} з ${Math.round(lim)} kr. денного ліміту${fixed ? ', без житла' : ''}`, 'money');
+    add('money', 'Витрати', 6, !lim ? (spent ? 0 : 1) : spent <= lim ? 1 : 2 - spent / lim, `${Math.round(spent)} з ${Math.round(lim)} kr. денного ліміту${fixed ? ', без житла' : ''}`, 'money');
   } else skip('money', 'Витрати', budget > 0 ? 'цього місяця витрат не записано' : 'бюджет не задано');
 
   // The total is the weighted average of the big items that could be judged, scaled to 100.

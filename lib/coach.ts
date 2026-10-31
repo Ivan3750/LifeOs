@@ -3,6 +3,7 @@ import { dayMood, energyLevel, moodsOn, waterGoal, moveGoal, isWorkDay } from '.
 import { clock, sleepStability } from './sleep';
 import { socialGoal, socialOn, socialPeriod } from './social';
 import { classify } from './timeuse';
+import { cravingStats, nextMilestone, streakDays, TRIGGERS } from './quit';
 import { goalProgress } from './goals';
 import { budgetDKK, fmtCur, monthOf, txDKK } from './money';
 import { addD, daysInMonth, hmPlain, plural, sod, toMin, ymd } from './util';
@@ -268,6 +269,23 @@ export function coach(S: State, eventsOn: (k: string) => UiEvent[], now = new Da
       facts: ev.length ? ev.map(e => 'У такі дні: ' + e) : [], why: 'Мозок після інтенсивної роботи не вимикається одразу: засинання відсувається, а сон стає поверхневим.',
       action: `Склади складні й бізнес-задачі на ранок, а ввечері став жорсткий «стоп» о ${st.windDown}.`, to: 'focus' });
   }
+
+  /* ---- habits to quit ---- */
+  const nowMs = now.getTime();
+  const fresh = S.badHabits.find(h => h.slips.some(t => nowMs - t < 2 * 864e5));
+  const cs = cravingStats(S, 30, nowMs);
+  if (fresh) add({ id: 'slip', area: 'Цілі й розвиток', tone: 'info', weight: 84, title: `Зрив у «${fresh.name}»: серія перезапущена, прогрес лишився`,
+    facts: [`Найкраща серія: ${Math.max(fresh.best, 0)} дн`, ...(cs.top ? [`Найчастіша причина потягів: ${cs.top.toLowerCase()}`] : [])],
+    why: 'Зрив рідко буває випадковим: зазвичай за ним стоїть причина (втома, стрес, нудьга, певний час). Якщо її знайти, наступного разу її можна обійти. Самокритика ж лише підсилює потяг.',
+    action: cs.top ? `Заздалегідь придумай, чим замінити момент «${cs.top.toLowerCase()}», і тримай SOS-кнопку під рукою.` : 'Відмічай причину кожного потягу, щоб побачити закономірність.', to: 'quit' });
+  else {
+    const near = S.badHabits.map(h => ({ h, n: nextMilestone(streakDays(h, nowMs)) })).filter(x => x.n && x.n.left <= 2 && x.n.target >= 7)[0];
+    if (near) add({ id: 'milestone', area: 'Цілі й розвиток', tone: 'good', weight: 56, title: `До ${near.n!.target} днів без «${near.h.name}» лишилось ${near.n!.left} ${plural(near.n!.left, 'день', 'дні', 'днів')}`,
+      facts: [`Зараз ${streakDays(near.h, nowMs)} ${plural(streakDays(near.h, nowMs), 'день', 'дні', 'днів')} поспіль`], why: 'Чим довша серія, тим слабший потяг: мозок поступово перебудовує звичний сигнал на нову реакцію.', action: 'Бережи цей вечір: дай собі заздалегідь план на години, коли потяг найсильніший.', to: 'quit' });
+  }
+  if (cs.peak >= 0 && cs.total >= 5) add({ id: 'craving-peak', area: 'Цілі й розвиток', tone: 'info', weight: 58, title: `Потяги найчастіше бувають о ${String(cs.peak).padStart(2, '0')}:00`,
+    facts: [`${cs.total} потягів за 30 днів, витримано ${Math.round((cs.rate ?? 0) * 100)}%`, ...(cs.top && TRIGGERS.includes(cs.top as never) ? [`Причина №1: ${cs.top.toLowerCase()}`] : [])],
+    why: 'Потяг прив’язаний до часу й ситуації, тому його можна передбачити. Передбачене легше обійти, ніж терпіти зненацька.', action: 'Запиши на цю годину прогулянку, дзвінок або вправи у розклад: так мозок отримає інший сценарій.', to: 'quit' });
 
   /* ---- mood ---- */
   const recentMood = rows.slice(-3).map(r => r.mood).filter((v): v is number => v !== null);

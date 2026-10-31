@@ -59,6 +59,11 @@ export type Timer = { mode: 'focus' | 'break'; left: number; running: boolean; e
 export type Meal = { key: 'breakfast' | 'lunch' | 'dinner'; label: string; s: string; e: string; on: boolean };
 /** Time on a social network or video platform. why: what it was for (learning, fun, news, work); cmp: afterwards you caught yourself comparing your life with other people's. */
 export type SocialEntry = { id: number; date: string; platform: string; min: number; why?: string; cmp?: 1; demo?: 1 };
+/** A habit to quit. start: when the current clean streak began; best: the longest streak that was ended by a slip; slips: when it went wrong.
+    A slip restarts the streak but the best streak and the total of clean days stay, so progress is never lost. */
+export type BadHabit = { id: number; name: string; start: number; best: number; slips: number[]; demo?: 1 };
+/** A craving for a bad habit. trigger: what set it off (boredom, stress, social media…), outcome: held on or slipped, tool: what helped (exercise, breathing, game). */
+export type Craving = { id: number; t: number; habit: number; trigger: string; outcome: 'resisted' | 'slipped'; tool?: string; demo?: 1 };
 export type Mode = 'me' | 'co';
 export type Theme = 'system' | 'light' | 'dark';
 
@@ -97,6 +102,7 @@ export type State = {
   /** What the events mean. evCats: exact (normalised) title → category; evWords: word stem → category → how often it was chosen. The app learns from both. */
   evCats: Record<string, string>; evWords: Record<string, Record<string, number>>;
   social: SocialEntry[];
+  badHabits: BadHabit[]; cravings: Craving[];
   /** Daily limit in minutes per platform (0 = no limit). */
   socialGoals: Record<string, number>;
   /** Wanted bedtime and wake-up time: sleep is judged on keeping to them, not only on length. */

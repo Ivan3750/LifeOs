@@ -8,7 +8,7 @@ import { LEAD_STATUS, STAGES } from './util';
 export const SECTIONS = [
   ['focus', 'Фокус і сесії'], ['tasks', 'Задачі'], ['habits', 'Звички'], ['health', 'Сон, вода, рух'], ['moods', 'Настрій'],
   ['acts', 'Справи і зміни Wolt'], ['money', 'Фінанси'], ['events', 'Події: мої і з календарів'], ['goals', 'Цілі і сфери життя'],
-  ['notes', 'Нотатки'], ['company', 'Компанія: ліди, клієнти, угоди, проєкти, рахунки, реклама'],
+  ['notes', 'Нотатки'], ['quit', 'Відмова від звичок і потяги'], ['company', 'Компанія: ліди, клієнти, угоди, проєкти, рахунки, реклама'],
 ] as const;
 export type SectionKey = (typeof SECTIONS)[number][0];
 
@@ -41,6 +41,8 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
     S.habits.flatMap(h => Object.keys(h.days).filter(d => inP(d, p)).map(d => [d, h.name])).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
   add('health', 'Здоровʼя', 'zdorovya', ['Дата', 'Заснув', 'Прокинувся', 'Сон, год', 'Вода, склянок', 'Рух, хв', 'Вага, кг'],
     Object.keys(S.health).filter(d => inP(d, p)).sort().map(d => { const h = S.health[d]; return [d, h.bed || '', h.wake || '', h.sleep || '', h.water || '', h.workout || '', h.weight || '']; }));
+  add('quit', 'Відмова від звичок', 'vidmova', ['Дата', 'Час', 'Звичка', 'Що сталося', 'Причина', 'Допомогло'],
+    S.cravings.filter(c => inP(day(c.t), p)).sort((a, b) => a.t - b.t).map(c => [day(c.t), clock(c.t), S.badHabits.find(h => h.id === c.habit)?.name || '', c.outcome === 'resisted' ? 'витримав' : 'зрив', c.trigger, c.tool ? ({ exercise: 'вправи', breath: 'дихання', game: 'гра' } as Record<string, string>)[c.tool] || c.tool : '']));
   add('moods', 'Настрій', 'nastrij', ['Дата', 'Час', 'Настрій 1–10', 'Сили', 'Теги', 'Нотатка'],
     S.moods.filter(m => inP(day(m.t), p)).sort((a, b) => a.t - b.t).map(m => [day(m.t), clock(m.t), m.v, m.energy ? ({ 1: 'мало', 3: 'нормально', 5: 'багато' } as Record<number, string>)[m.energy <= 2 ? 1 : m.energy === 3 ? 3 : 5] : '', m.tags.join('; '), m.note]));
   add('acts', 'Справи', 'spravy', ['Дата', 'Початок', 'Кінець', 'Хвилин', 'Тип', 'Що', 'Замовлень', 'Заробіток, kr.', 'Км'],

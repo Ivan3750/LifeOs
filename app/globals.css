@@ -1374,3 +1374,50 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .scbars button{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;height:100%;font-size:11px;color:var(--muted);border-radius:10px;padding:2px 0}
 .scbars button.sel{background:var(--bg)}
 .scbars button.sel span,.scbars button.today span{color:var(--ink);font-weight:600}
+
+/* habits to quit, SOS */
+.sosbanner{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--accent-soft)}
+.sosbanner>div{flex:1 1 260px}
+.sosbanner b{font-size:17px}
+.sosbanner p{margin:4px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
+.sosbtn{display:inline-flex;align-items:center;gap:10px;padding:16px 28px;border-radius:99px;background:var(--accent);color:#fff;font-weight:800;font-size:18px;letter-spacing:.04em;box-shadow:0 10px 28px rgba(255,91,31,.35);transition:transform .12s}
+.sosbtn:hover{transform:translateY(-1px)}.sosbtn:active{transform:scale(.97)}
+.qwrap>.card{height:100%}
+.qhead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.qname{display:block;font-size:17px;overflow-wrap:anywhere}.qsub{display:block;font-size:12px;margin-top:2px}
+.qmain{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.qnum{font-size:48px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.qnum small{font-size:16px;color:var(--muted);font-weight:500;margin-left:8px;font-family:var(--f-ui)}
+.qdays{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:4px}
+.qdays i{height:22px;border-radius:6px;background:var(--bar)}
+.qdays i.ok{background:var(--good)}.qdays i.slip{background:var(--m1)}
+.tags.small span{font-size:11px}
+.sos{display:flex;flex-direction:column;gap:16px}
+.sos-wave{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:var(--r-in);background:var(--bg)}
+.sostools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.sostools button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border-radius:var(--r-in);background:var(--bg);text-align:left;border:1.5px solid transparent;transition:border-color .15s}
+.sostools button:hover{border-color:var(--accent)}
+.sostools .ic{width:34px;height:34px;border-radius:10px;background:var(--nav-active);color:var(--on-active);display:grid;place-items:center;margin-bottom:6px}
+.sostools small{font-size:12px;color:var(--muted)}
+.sos-tool{display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0}
+.sos-msg{padding:16px;border-radius:var(--r-in);background:var(--good-soft)}.sos-msg b{font-size:17px}.sos-msg p{margin:6px 0 0;font-size:14px;line-height:1.55}
+.sos-end{padding-top:14px;border-top:1px solid var(--line)}
+.breath{width:190px;height:190px;border-radius:50%;display:grid;place-content:center;text-align:center;background:var(--accent-soft);border:4px solid var(--accent);transition:transform 4s linear}
+.breath b{font-size:20px}.breath span{font-size:32px;font-weight:600}
+.breath.p0{transform:scale(1.1)}.breath.p1{transform:scale(1.1)}.breath.p2,.breath.p3{transform:scale(.8)}
+.moveq{display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px;border-radius:var(--r-in);background:var(--bg);width:100%;text-align:center}
+.moveq .num{font-size:54px;font-weight:600;line-height:1;color:var(--accent)}.moveq b{font-size:22px}.moveq small{font-size:13px;color:var(--muted)}
+.movedots{display:flex;gap:8px}.movedots i{width:34px;height:6px;border-radius:99px;background:var(--bar)}.movedots i.done{background:var(--good)}.movedots i.cur{background:var(--accent)}
+.gamebar{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;font-size:13px;color:var(--muted)}.gamebar b{font-size:24px;color:var(--ink)}
+.gamegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:min(300px,100%)}
+.gamegrid button{aspect-ratio:1;border-radius:14px;background:var(--bg);transition:background .08s}
+.gamegrid button.on{background:var(--accent);box-shadow:0 6px 16px rgba(255,91,31,.4)}
+@media (max-width:760px){.sostools{grid-template-columns:1fr}.sostools button{flex-direction:row;align-items:center;gap:12px}.sostools .ic{margin:0}.sostools button>b{flex:1}.sosbtn{width:100%;justify-content:center}.breath{width:160px;height:160px}}
+.quitmini{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.quitmini .ch{flex:1 1 240px}
+.qmini{display:flex;gap:10px;flex-wrap:wrap;flex:2 1 320px}
+.qmini button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 14px;border-radius:var(--r-in);background:var(--bg);min-width:120px;text-align:left}
+.qmini b{font-size:24px;font-weight:600}.qmini b small{font-size:12px;color:var(--muted);margin-left:4px;font-weight:500;font-family:var(--f-ui)}
+.qmini span{font-size:13px}.qmini em{font-style:normal;font-size:11px;color:var(--muted)}
+.sosbtn.sm{padding:12px 22px;font-size:15px}
+@media (max-width:760px){.quitmini .sosbtn{width:100%;justify-content:center}.qmini button{flex:1 1 40%}}

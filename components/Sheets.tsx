@@ -9,6 +9,7 @@ import { PLATFORMS } from '@/lib/social';
 import { AD_CHANNELS, addD, CATS, COLORS, LEAD_SOURCES, LEAD_STATUS, STAGES, TK, ymd } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { ModeSeg } from './Shell';
+import { SosBody } from './Sos';
 
 type Field = { k: string; label: string; type?: 'text' | 'number' | 'date' | 'time' | 'select' | 'textarea' | 'hidden'; req?: boolean; half?: boolean; ph?: string; val?: string; opts?: readonly (readonly [string, string])[] };
 /** del: shown as a two-click «Видалити» button in edit forms. */
@@ -46,7 +47,7 @@ function forms(st: Store): Record<string, FormSpec> {
 }
 
 const QA: Record<'me' | 'co', [string, string, IconName][]> = {
-  me: [['task', 'Задача', 'tasks'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['habit', 'Звичка', 'habits'], ['social', 'Соцмережі', 'wave'], ['note', 'Нотатка', 'notes']],
+  me: [['task', 'Задача', 'tasks'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['habit', 'Звичка', 'habits'], ['social', 'Соцмережі', 'wave'], ['sos', 'SOS потяг', 'alert'], ['note', 'Нотатка', 'notes']],
   co: [['lead', 'Лід', 'leads'], ['client', 'Клієнт', 'user'], ['ad', 'Реклама', 'ads'], ['deal', 'Угода', 'deals'], ['invoice', 'Рахунок', 'invoice'], ['project', 'Проєкт', 'projects'], ['task', 'Задача', 'tasks'], ['event', 'Подія', 'schedule'], ['member', 'Учасник', 'team']],
 };
 
@@ -100,7 +101,7 @@ export function SheetHost() {
         <div className="qa-grid">
           {QA[m].map(([k, l, i]) => (
             <button key={k} onClick={() => {
-              setSheet({ kind: 'form', key: k });
+              setSheet(k === 'sos' ? { kind: 'sos' } : { kind: 'form', key: k });
             }}><Icon n={i} className="ic" />{l}</button>
           ))}
         </div>
@@ -117,6 +118,9 @@ export function SheetHost() {
         </div>
       </>
     );
+  } else if (sheet.kind === 'sos') {
+    title = 'SOS: сильний потяг';
+    body = <SosBody close={close} habit={sheet.habit} />;
   } else {
     const base = forms(st)[sheet.key];
     if (!base) return null;
