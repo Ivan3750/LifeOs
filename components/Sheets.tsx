@@ -5,6 +5,7 @@ import { NAV, useStore, vinfo, type Store } from '@/lib/store';
 import type { AccId } from '@/lib/types';
 import type { LeadStatus } from '@/lib/types';
 import { parseTask } from '@/lib/tasks';
+import { PLATFORMS, SOCIAL_WHY } from '@/lib/social';
 import { AD_CHANNELS, addD, CATS, COLORS, LEAD_SOURCES, LEAD_STATUS, STAGES, TK, ymd } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { ModeSeg } from './Shell';
@@ -24,6 +25,7 @@ function forms(st: Store): Record<string, FormSpec> {
     lead: { t: 'Новий лід', f: [{ k: 'name', label: 'Хто / яка компанія', req: true, ph: 'Кавʼярня «Zorya»' }, { k: 'contact', label: 'Контакт', half: true, ph: '@нік, телефон або email' }, { k: 'source', label: 'Звідки', type: 'select', half: true, opts: LEAD_SOURCES.map(c => [c, c] as const) }, { k: 'value', label: 'Можлива сума, kr.', type: 'number', half: true, ph: '20000' }, { k: 'next', label: 'Звʼязатися', type: 'date', half: true, val: ymd(addD(new Date(), 2)) }, { k: 'note', label: 'Нотатка', ph: 'Що обіцяв, про що говорили' }], ok: v => A.addLead({ name: v.name, contact: v.contact, source: v.source, value: num(v.value), next: v.next, note: v.note }) },
     ad: { t: 'Витрата на рекламу', f: [{ k: 'channel', label: 'Канал', type: 'select', half: true, opts: AD_CHANNELS.map(c => [c, c] as const) }, { k: 'amt', label: 'Сума, kr.', type: 'number', req: true, half: true, ph: '1500' }, { k: 'date', label: 'Дата', type: 'date', val: TK(), half: true }, { k: 'note', label: 'Що рекламував', half: true, ph: 'Таргет, Reels…' }], ok: v => A.addAd({ date: v.date || TK(), channel: v.channel, amt: num(v.amt), note: v.note }) },
     client: { t: 'Новий клієнт', f: [{ k: 'name', label: 'Хто / яка компанія', req: true, ph: 'Кавʼярня «Zorya»' }, { k: 'contact', label: 'Контакт', half: true, ph: '@zorya, email чи телефон' }, { k: 'source', label: 'Звідки прийшов', type: 'select', half: true, opts: LEAD_SOURCES.map(c => [c, c] as const) }, { k: 'note', label: 'Нотатка', ph: 'Що важливо памʼятати про клієнта' }], ok: v => A.addClient({ name: v.name, contact: v.contact, source: v.source, note: v.note }) },
+    social: { t: 'Час у соцмережах', f: [{ k: 'platform', label: 'Платформа', type: 'select', half: true, opts: PLATFORMS.map(c => [c, c] as const) }, { k: 'min', label: 'Хвилин', type: 'number', req: true, half: true, ph: '20' }, { k: 'why', label: 'Для чого', type: 'select', opts: [['', 'Не вказувати'], ...SOCIAL_WHY.map(c => [c, c] as const)] }], ok: v => A.addSocial({ platform: v.platform, min: num(v.min), why: v.why }) },
     habit: { t: 'Нова звичка', f: [{ k: 'name', label: 'Звичка', req: true, ph: '10 хвилин медитації' }], ok: v => A.addHabit(v.name) },
     note: { t: 'Швидка нотатка', f: [{ k: 'text', label: 'Текст', type: 'textarea', req: true, ph: 'Ідея, думка, список…' }], ok: v => { A.addNote(v.text); } },
     deal: { t: 'Нова угода', f: [{ k: 'title', label: 'Що продаємо', req: true, ph: 'Сайт для кавʼярні' }, { k: 'client', label: 'Клієнт', half: true, ph: 'Назва компанії' }, { k: 'amt', label: 'Сума, kr.', type: 'number', half: true, ph: '40000' }, { k: 'stage', label: 'Етап', type: 'select', opts: STAGES, val: 'lead' }], ok: v => A.addDeal({ title: v.title, client: v.client, amt: num(v.amt), stage: v.stage }) },
@@ -44,7 +46,7 @@ function forms(st: Store): Record<string, FormSpec> {
 }
 
 const QA: Record<'me' | 'co', [string, string, IconName][]> = {
-  me: [['task', 'Задача', 'tasks'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['habit', 'Звичка', 'habits'], ['note', 'Нотатка', 'notes']],
+  me: [['task', 'Задача', 'tasks'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['habit', 'Звичка', 'habits'], ['social', 'Соцмережі', 'wave'], ['note', 'Нотатка', 'notes']],
   co: [['lead', 'Лід', 'leads'], ['client', 'Клієнт', 'user'], ['ad', 'Реклама', 'ads'], ['deal', 'Угода', 'deals'], ['invoice', 'Рахунок', 'invoice'], ['project', 'Проєкт', 'projects'], ['task', 'Задача', 'tasks'], ['event', 'Подія', 'schedule'], ['member', 'Учасник', 'team']],
 };
 

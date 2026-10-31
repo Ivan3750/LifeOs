@@ -4,6 +4,7 @@ import { StoreProvider, useStore } from '@/lib/store';
 import { Shell } from './Shell';
 import { Home } from './views/Home';
 import { Focus } from './views/Focus';
+import { TimePage } from './views/Time';
 import { Goals } from './views/Goals';
 import { Habits } from './views/Habits';
 import { Health } from './views/Health';
@@ -16,7 +17,7 @@ import { Ads, Clients, CoOverview, Deals, Invoices, Leads, Projects, Team } from
 import { Prefs } from './views/Prefs';
 
 const VIEW_COMPONENTS: Record<string, () => React.JSX.Element> = {
-  home: Home, focus: Focus, tasks: Tasks, habits: Habits, health: Health, money: Money, wolt: WoltPage, goals: Goals,
+  home: Home, focus: Focus, time: TimePage, tasks: Tasks, habits: Habits, health: Health, money: Money, wolt: WoltPage, goals: Goals,
   schedule: Schedule, notes: Notes, prefs: Prefs,
   co: CoOverview, leads: Leads, clients: Clients, ads: Ads, deals: Deals, projects: Projects, invoices: Invoices, team: Team,
 };

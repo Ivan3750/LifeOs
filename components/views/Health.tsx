@@ -10,6 +10,7 @@ import { Face } from '../Face';
 import { LinksCard } from '../Advice';
 import { Bars, Trend } from '../charts';
 import { HealthExtras } from '../HealthExtras';
+import { clock, sleepNights, sleepStability } from '@/lib/sleep';
 import { avg, DelBtn, LifeTiles } from '../shared';
 
 /** Tags that lift the mood and tags that weigh on it, so they can be shown in two calm groups. */
@@ -232,6 +233,63 @@ function HealthWeek() {
   );
 }
 
+/** Bedtime of the last nights against the wanted window: the shape matters more than the length of the sleep. */
+function BedChart({ target }: { target: number }) {
+  const { S } = useStore();
+  const nights = sleepNights(S, 14).filter(x => x.bed !== undefined);
+  if (nights.length < 2) return null;
+  const vals = nights.map(x => x.bed!), lo = Math.min(...vals, target) - 30, hi = Math.max(...vals, target + 30) + 30;
+  const W = 420, H = 150, L = 40, B = 8, T = 8, y = (m: number) => T + (H - T - B) * ((m - lo) / (hi - lo)), x = (i: number) => L + ((W - L - 8) * i) / Math.max(1, nights.length - 1);
+  const ticks = [lo, (lo + hi) / 2, hi].map(m => Math.round(m / 30) * 30);
+  return (
+    <svg className="trendsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Час засинання по ночах">
+      <rect x={L} y={y(target)} width={W - L - 8} height={y(target + 30) - y(target)} fill="var(--good)" opacity=".18" rx="4" />
+      {ticks.map(m => <g key={m}><line x1={L} x2={W - 8} y1={y(m)} y2={y(m)} stroke="var(--line)" strokeDasharray="3 4" /><text className="chart-text" x="0" y={y(m) + 4}>{clock(m)}</text></g>)}
+      <polyline points={nights.map((n, i) => `${x(i).toFixed(1)},${y(n.bed!).toFixed(1)}`).join(' ')} fill="none" stroke="var(--muted)" strokeWidth="1.4" opacity=".6" />
+      {nights.map((n, i) => <circle key={n.k} cx={x(i)} cy={y(n.bed!)} r="4.5" fill={n.bed! <= target + 30 ? 'var(--good)' : n.bed! <= target + 90 ? 'var(--accent-2)' : 'var(--m1)'}><title>{`${n.k}: заснув о ${clock(n.bed!)}`}</title></circle>)}
+    </svg>
+  );
+}
+
+/** Sleep as a rhythm: how steady the bedtime and wake time are, where you are against the wanted times, and what to do about it. */
+function SleepRhythmCard() {
+  const { S } = useStore();
+  const r = sleepStability(S, 14), word = r.steady === null ? '—' : r.steady >= 75 ? 'Стабільний' : r.steady >= 50 ? 'Нерівний' : 'Хаотичний';
+  const tone = r.steady === null ? undefined : r.steady >= 75 ? 'var(--good)' : r.steady >= 50 ? 'var(--accent)' : 'var(--m1)';
+  const bedWindow = `${clock(r.target)}–${clock(r.target + 30)}`;
+  return (
+    <div className="card cardcol">
+      <div className="ch" style={{ margin: 0 }}><Icon n="bed" className="ic" /><div><h3>Режим сну</h3><p>Мета: сон стабільний, а не просто довгий. Ціль: засинати о {bedWindow}, прокидатися о {S.wakeTarget}</p></div></div>
+      {r.bedNights >= 3 ? (
+        <>
+          <div className="kv">
+            <div><span className="k">Середній сон</span><span className="v num">{r.avgHours ? r.avgHours.toFixed(1) : '—'}<small>год</small></span></div>
+            <div><span className="k">Засинаєш у середньому</span><span className="v num">{clock(r.avgBed!)}</span></div>
+            <div><span className="k">Від і до</span><span className="v num" style={{ fontSize: 16 }}>{clock(r.earliestBed!)}–{clock(r.latestBed!)}</span></div>
+            <div><span className="k">Прокидаєшся</span><span className="v num">{r.avgWake !== null ? clock(r.avgWake) : '—'}</span></div>
+            <div><span className="k">Стабільність</span><span className="v" style={{ color: tone, fontSize: 18 }}>{word}<small style={{ display: 'block', margin: '2px 0 0' }}>{r.steady}/100</small></span></div>
+            <div><span className="k">Пізніше за ціль</span><span className="v num">{r.lateNights}<small>з {r.bedNights} ночей</small></span></div>
+          </div>
+          <div className="bedchart"><BedChart target={r.target} /></div>
+          {r.earlier >= 30 && <p className="help" style={{ margin: 0 }}><b>Добрий рух:</b> останнім часом ти засинаєш приблизно на {Math.round(r.earlier)} хв раніше, ніж на початку періоду. Продовжуй саме це.</p>}
+          {r.earlier <= -30 && <p className="help" style={{ margin: 0 }}><b>Увага:</b> останнім часом ти засинаєш приблизно на {Math.round(-r.earlier)} хв пізніше, ніж на початку періоду.</p>}
+          {r.avgHours >= 7 && r.lateNights > r.bedNights / 2 && <p className="help" style={{ margin: 0 }}>Тривалість сну в нормі, але час засинання «плаває» і часто пізній: це і є головна проблема, а не кількість годин.</p>}
+        </>
+      ) : <p className="help" style={{ margin: 0 }}>Запиши, коли заснув і прокинувся, у плитці «Сон» хоча б 3 ночі, і я покажу, наскільки твій режим стабільний.</p>}
+      <div>
+        <div className="subh" style={{ margin: '0 0 8px' }}>Що робити</div>
+        <ul className="howlist" style={{ margin: 0 }}>
+          <li>Орієнтуйся на засинання о <b>{bedWindow}</b>.</li>
+          <li>Прокидайся в один і той самий час: ціль <b>{S.wakeTarget}</b>, у вихідні теж (різниця до 45 хв).</li>
+          <li>За 30–45 хвилин до сну завершуй роботу: закривай ноутбук о <b>{r.windDown}</b>.</li>
+          <li>Не переносити складні бізнес-завдання на пізню ніч: став їх на ранок чи день.</li>
+          <li>Не скорочуй сон заради додаткових годин роботи: година сну дає більше, ніж година втомленої роботи.</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 export function Health() {
   const { S } = useStore();
   const [moodDay, setMoodDay] = useState(TK);
@@ -269,6 +327,7 @@ export function Health() {
         <h4 className="subh">Ще за день</h4>
         <HealthExtras key={healthDay} k={healthDay} />
       </div>
+      <SleepRhythmCard />
       <HealthWeek />
       <div className="grid">
         <div className="card s5" ref={formCard}>

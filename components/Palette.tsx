@@ -36,6 +36,7 @@ function PaletteDialog() {
       { l: 'Записати витрату на рекламу', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'ad' }) },
       ...(Object.entries(OFF_KINDS) as [OffKind, (typeof OFF_KINDS)[OffKind]][]).map(([kind, o]) => ({ l: `Сьогодні: ${o.label.toLowerCase()}`, k: 'День', run: () => A.setDayOff(TK(), kind) })),
       ...(S.offDays?.[TK()] ? [{ l: 'Сьогодні звичайний день (зняти позначку)', k: 'День', run: () => A.setDayOff(TK(), null) }] : []),
+      { l: 'Записати час у соцмережах', k: 'Час', run: () => setSheet({ kind: 'form', key: 'social' }) },
       { l: 'Нова подія', k: 'Розклад', run: () => setSheet({ kind: 'form', key: 'event' }) },
       ...S.tasks.filter(t => !t.d).map(t => ({ l: 'Фокус на: ' + t.t, k: 'Задача', run: () => { update(s => { s.timer.task = t.t; }); go('focus'); } })),
       ...S.habits.filter(h => !h.days[TK()]).map(h => ({ l: 'Відмітити звичку: ' + h.name, k: 'Звичка', run: () => A.toggleHabit(h.id) })),

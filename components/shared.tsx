@@ -8,6 +8,7 @@ import type { State, Tx, UiEvent } from '@/lib/types';
 import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
 import { dayMood, moveGoal, waterGoal, ENERGY3, energyWord, moodsOn, moodWord } from '@/lib/score';
 import { budgetDKK, monthOf, sumIn, txDKK } from '@/lib/money';
+import { SocialTile } from './SocialTile';
 
 export const today = () => TK();
 export const hdayOf = (S: State, k = TK()) => S.health[k] || { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0, bed: undefined, wake: undefined };
@@ -156,6 +157,7 @@ export function LifeTiles({ full, k = TK() }: { full: boolean; k?: string }) {
       {isToday && <MoodTile />}
       <WaterTile k={k} />
       <MoveTile k={k} />
+      {!full && <SocialTile />}
       {full ? (
         <WeightTile key={k} k={k} />
       ) : (

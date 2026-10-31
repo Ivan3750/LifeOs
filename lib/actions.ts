@@ -1,3 +1,4 @@
+import { catOf, learn, unlearn } from './timeuse';
 import type { AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
 import { XFER_CAT, account, fmtCur, pendingRecurring, potSaved, recDate, shiftMk, toDKK } from './money';
 import { addD, AREAS, money, STAGES, TK, toMin, ymd } from './util';
@@ -181,6 +182,21 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       update(s => { s.activities.push({ id: s.nextId++, ...v, title: v.title.trim() }); s.activities.sort((a, b) => a.start - b.start); });
       toast(`${v.kind}: ${Math.round((v.end - v.start) / 6e4)} хв записано`); return true;
     },
+    /** The user says what an event is; the app remembers it for the same title and for similar words. */
+    assignEvent(title: string, cat: string) { update(s => learn(s, title, cat)); toast(`«${title}»: ${catOf(cat).label}`); },
+    /** Teaches several titles at once (the whole question list answered in one tap). */
+    assignEvents(titles: string[], cat: string) { update(s => { for (const t of titles) learn(s, t, cat); }); toast(`${titles.length} ${titles.length === 1 ? 'подію' : 'подій'}: ${catOf(cat).label}`); },
+    forgetEvent(title: string) { update(s => unlearn(s, title)); },
+    /** Time on a social network. Minutes are rounded to whole minutes; one entry is at most 12 hours. */
+    addSocial(v: { platform: string; min: number; why?: string; cmp?: boolean; date?: string }) {
+      const min = Math.round(v.min); if (!(min > 0)) return false;
+      update(s => { s.social.push({ id: s.nextId++, date: v.date || TK(), platform: v.platform, min: Math.min(720, min), ...(v.why ? { why: v.why } : {}), ...(v.cmp ? { cmp: 1 as const } : {}) }); });
+      toast(`${v.platform}: ${min} хв записано`); return true;
+    },
+    delSocial(id: number) { del(s => { s.social = s.social.filter(x => x.id !== id); }); },
+    /** Marks that after this entry you compared your life with someone else's. */
+    toggleCompare(id: number) { update(s => { const x = s.social.find(e => e.id === id); if (!x) return; if (x.cmp) delete x.cmp; else x.cmp = 1; delete x.demo; }); },
+    setSocialGoal(platform: string, min: number) { update(s => { s.socialGoals[platform] = Math.max(0, Math.min(600, Math.round(min))); }); },
     delActivity(id: number) { del(s => { s.activities = s.activities.filter(x => x.id !== id); }); },
     /** Focus time entered by hand, e.g. work done away from the timer. */
     addFocus(start: number, end: number) {

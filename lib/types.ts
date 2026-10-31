@@ -59,6 +59,8 @@ export type Member = { id: number; name: string; role: string; load: number; dem
 export type Timer = { mode: 'focus' | 'break'; left: number; running: boolean; endAt: number; task: string; sid?: number };
 /** A daily meal that takes time out of the free hours. s/e are 'HH:MM'. */
 export type Meal = { key: 'breakfast' | 'lunch' | 'dinner'; label: string; s: string; e: string; on: boolean };
+/** Time on a social network or video platform. why: what it was for (learning, fun, news, work); cmp: afterwards you caught yourself comparing your life with other people's. */
+export type SocialEntry = { id: number; date: string; platform: string; min: number; why?: string; cmp?: 1; demo?: 1 };
 export type Mode = 'me' | 'co';
 export type Theme = 'system' | 'light' | 'dark';
 
@@ -94,6 +96,13 @@ export type State = {
   mode: Mode; view: string;
   co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[] };
   icalUrls: string[];
+  /** What the events mean. evCats: exact (normalised) title → category; evWords: word stem → category → how often it was chosen. The app learns from both. */
+  evCats: Record<string, string>; evWords: Record<string, Record<string, number>>;
+  social: SocialEntry[];
+  /** Daily limit in minutes per platform (0 = no limit). */
+  socialGoals: Record<string, number>;
+  /** Wanted bedtime and wake-up time: sleep is judged on keeping to them, not only on length. */
+  bedTarget: string; wakeTarget: string;
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */

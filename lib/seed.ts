@@ -1,5 +1,5 @@
 import type { State, Invoice } from './types';
-import { addD, rng, sod, wStart, ymd } from './util';
+import { addD, pad2, rng, sod, wStart, ymd } from './util';
 import { DEFAULT_ACCOUNTS, DEFAULT_UAH_PER_DKK } from './money';
 
 /** Fresh state. With demo=true it is filled with clearly marked example data (amounts in DKK). */
@@ -35,9 +35,20 @@ export function makeState(demo: boolean): State {
   const health: State['health'] = {};
   if (demo) {
     for (let i = 0; i < 14; i++) {
+      // bedtime between 23:00 and 01:30, wake time follows from the length of the night
+      const bedM = 1380 + Math.floor(r() * 30) * 5, sl = Math.round((6 + r() * 2.5) * 2) / 2, hm = (m: number) => `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
       health[ymd(addD(now, -i))] = i
-        ? { water: Math.round(4 + r() * 5), sleep: Math.round((5.5 + r() * 3) * 2) / 2, mood: 0, steps: 0, workout: r() < 0.45 ? 0 : 10 * (1 + Math.floor(r() * 6)), weight: 0, demo: 1 }
+        ? { water: Math.round(4 + r() * 5), sleep: sl, mood: 0, steps: 0, workout: r() < 0.45 ? 0 : 10 * (1 + Math.floor(r() * 6)), weight: 0, bed: hm(bedM), wake: hm(bedM + sl * 60), demo: 1 }
         : { water: 3, sleep: 7.5, mood: 0, steps: 0, workout: 0, weight: 0, bed: '23:30', wake: '07:00', demo: 1 };
+    }
+  }
+
+  const social: State['social'] = [];
+  if (demo) {
+    for (let i = 0; i < 7; i++) {
+      const d = ymd(addD(now, -i));
+      social.push({ id: id(), date: d, platform: 'Instagram', min: 15 + Math.floor(r() * 5) * 10, why: r() < 0.5 ? 'Розваги' : 'Інформація', ...(r() < 0.3 ? { cmp: 1 as const } : {}), demo: 1 });
+      social.push({ id: id(), date: d, platform: 'YouTube', min: 30 + Math.floor(r() * 6) * 15, why: r() < 0.5 ? 'Навчання' : 'Розваги', demo: 1 });
     }
   }
 
@@ -151,6 +162,7 @@ export function makeState(demo: boolean): State {
     money: { budget: 9000, tx, accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a, budget: a.id === 'ua' && demo ? 3000 : a.budget, opening: demo ? (a.id === 'dk' ? 4200 : 8500) : 0 })), budgetMode: 'fixed', saveRate: 20, catBudgets: {}, recurring: [], pots: [], uahPerDkk: DEFAULT_UAH_PER_DKK, rateAt: 0, rateSrc: 'manual' },
     wheel: demo ? [7, 6, 5, 8, 6, 4, 7, 6] : [5, 5, 5, 5, 5, 5, 5, 5],
     mode: 'me', view: 'home', co, icalUrls: [],
+    evCats: {}, evWords: {}, social, socialGoals: { Instagram: 30, YouTube: 60 }, bedTarget: '23:30', wakeTarget: '07:30',
   };
 }
 
@@ -162,6 +174,7 @@ export function stripDemo(s: State) {
   s.moods = s.moods.filter(x => !x.demo);
   s.activities = s.activities.filter(x => !x.demo);
   s.noteList = s.noteList.filter(x => !x.demo);
+  s.social = s.social.filter(x => !x.demo);
   s.habits = s.habits.filter(x => !x.demo);
   s.goals = s.goals.filter(x => !x.demo);
   s.money.tx = s.money.tx.filter(x => !x.demo);

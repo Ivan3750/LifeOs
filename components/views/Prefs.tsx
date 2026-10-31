@@ -223,6 +223,14 @@ export function Prefs() {
             <NumField id="pMove" label="Рух, хв на день" value={S.moveGoal || 30} min={5} max={300} onSave={n => update(s => { s.moveGoal = n; })} />
             <NumField id="pSteps" label="Кроки на день" value={S.stepsGoal || 8000} min={1000} max={50000} onSave={n => update(s => { s.stepsGoal = n; })} />
           </div>
+          <div>
+            <div className="fl">Режим сну</div>
+            <p className="help" style={{ marginBottom: 10 }}>Сон у оцінці дня рахується не лише за довжиною, а й за тим, чи ти засинаєш і прокидаєшся вчасно. Засинання до 30 хв після цільового часу ще вважається добрим.</p>
+            <div className="fgrid">
+              <label className="field" htmlFor="pBed">Засинати о<input id="pBed" type="time" value={S.bedTarget} onChange={e => e.target.value && update(s => { s.bedTarget = e.target.value; })} /></label>
+              <label className="field" htmlFor="pWake">Прокидатися о<input id="pWake" type="time" value={S.wakeTarget} onChange={e => e.target.value && update(s => { s.wakeTarget = e.target.value; })} /></label>
+            </div>
+          </div>
         </div>
 
         <div className="card s12 cardcol">

@@ -21,18 +21,18 @@ const LOCAL_KEYS = ['view', 'mode', 'theme', 'log', 'unread'] as const;
 const keepLocal = (next: State, cur: State): State => { const o = { ...next } as Record<string, unknown>; for (const k of LOCAL_KEYS) o[k] = cur[k]; return o as State; };
 
 export const VIEWS: [string, string, string][] = [
-  ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
+  ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['time', 'Час', 'clock'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
   ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['wolt', 'Wolt', 'wolt'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
   ['co', 'Огляд', 'company'], ['leads', 'Ліди', 'leads'], ['clients', 'Клієнти', 'user'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
 ];
 export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'focus', 'tasks', 'habits', 'health', 'money', 'wolt', 'goals', 'schedule', 'notes', 'prefs'],
+  me: ['home', 'focus', 'time', 'tasks', 'habits', 'health', 'money', 'wolt', 'goals', 'schedule', 'notes', 'prefs'],
   co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
 };
 export const TABS: Record<Mode, string[]> = { me: ['home', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
 const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
-const ME_ONLY = ['home', 'focus', 'habits', 'health', 'money', 'wolt', 'goals'];
+const ME_ONLY = ['home', 'focus', 'time', 'habits', 'health', 'money', 'wolt', 'goals'];
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
 export type ToastAction = { label: string; run: () => void };
