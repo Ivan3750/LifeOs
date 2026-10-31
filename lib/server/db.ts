@@ -1,17 +1,8 @@
-import fs from 'node:fs';
 import mysql from 'mysql2/promise';
 
 type G = typeof globalThis & { __pulsePool?: mysql.Pool; __pulseReady?: Promise<void> };
 
 export const dbConfigured = () => !!(process.env.DATABASE_URL || (process.env.DB_HOST && process.env.DB_USER));
-
-/** CA certificate from DB_CA_CERT: either the PEM text itself or a path to a .pem file. */
-function caCert(): string | undefined {
-  const v = process.env.DB_CA_CERT?.trim();
-  if (!v) return undefined;
-  if (v.startsWith('-----BEGIN')) return v.replace(/\\n/g, '\n');
-  return fs.readFileSync(v, 'utf8');
-}
 
 function config(): mysql.PoolOptions {
   let o: mysql.PoolOptions, sslWanted: boolean;
@@ -26,10 +17,9 @@ function config(): mysql.PoolOptions {
     sslWanted = process.env.DB_SSL === 'true';
   }
   if (sslWanted) {
-    const ca = caCert();
-    // The server certificate is always verified. Aiven uses its own CA: download "CA certificate" from the
-    // service page and point DB_CA_CERT at it. Only DB_SSL_INSECURE=true turns the check off (encryption stays).
-    o.ssl = process.env.DB_SSL_INSECURE === 'true' ? { rejectUnauthorized: false } : ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: true };
+    // The connection is encrypted and no certificate file is needed (as requested by the owner). The server's certificate is not checked,
+    // so this does not protect against someone impersonating the database server. DB_SSL_VERIFY=true turns the check on.
+    o.ssl = { rejectUnauthorized: process.env.DB_SSL_VERIFY === 'true' };
   }
   return { ...o, connectionLimit: 5, waitForConnections: true, connectTimeout: 10000, enableKeepAlive: true, charset: 'utf8mb4' };
 }
@@ -61,10 +51,10 @@ export function dbError(e: unknown) {
     ENOTFOUND: 'хост бази не знайдено, перевір DB_HOST',
     ECONNREFUSED: 'база не приймає зʼєднання, перевір хост і порт',
     ETIMEDOUT: 'база не відповідає, перевір хост, порт і доступ з твоєї IP-адреси',
-    HANDSHAKE_SSL_ERROR: 'помилка SSL, перевір DB_SSL і DB_CA_CERT',
-    SELF_SIGNED_CERT_IN_CHAIN: 'сертифікат бази не довірений, вкажи CA-сертифікат у DB_CA_CERT',
-    UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'сертифікат бази не довірений, вкажи CA-сертифікат у DB_CA_CERT',
-    DEPTH_ZERO_SELF_SIGNED_CERT: 'сертифікат бази не довірений, вкажи CA-сертифікат у DB_CA_CERT',
+    HANDSHAKE_SSL_ERROR: 'помилка SSL: якщо база без SSL, постав DB_SSL=false',
+    SELF_SIGNED_CERT_IN_CHAIN: 'сертифікат бази не пройшов перевірку: прибери DB_SSL_VERIFY',
+    UNABLE_TO_VERIFY_LEAF_SIGNATURE: 'сертифікат бази не пройшов перевірку: прибери DB_SSL_VERIFY',
+    DEPTH_ZERO_SELF_SIGNED_CERT: 'сертифікат бази не пройшов перевірку: прибери DB_SSL_VERIFY',
     ER_NET_PACKET_TOO_LARGE: 'дані завеликі для max_allowed_packet на сервері бази',
     ER_BAD_DB_ERROR: 'бази з такою назвою немає, перевір DB_NAME',
   };

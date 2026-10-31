@@ -1,6 +1,5 @@
 // Checks the database settings from .env without printing any secrets.
 // Usage: npm run db:check
-import fs from 'node:fs';
 import mysql from 'mysql2/promise';
 
 const env = process.env;
@@ -17,12 +16,10 @@ if (url) {
   console.error('✗ База не налаштована: заповни DB_HOST, DB_USER, DB_PASSWORD, DB_NAME або DATABASE_URL у .env');
   process.exit(1);
 }
-const caRaw = env.DB_CA_CERT?.trim();
-const ca = caRaw ? (caRaw.startsWith('-----BEGIN') ? caRaw.replace(/\\n/g, '\n') : fs.readFileSync(caRaw, 'utf8')) : undefined;
-const insecure = env.DB_SSL_INSECURE === 'true';
-if (ssl) o.ssl = insecure ? { rejectUnauthorized: false } : ca ? { ca, rejectUnauthorized: true } : { rejectUnauthorized: true };
+const verify = env.DB_SSL_VERIFY === 'true';
+if (ssl) o.ssl = { rejectUnauthorized: verify };
 
-console.log(`→ ${o.host}:${o.port} / ${o.database || '(без бази)'} · SSL: ${ssl ? (insecure ? 'так, БЕЗ перевірки сертифіката (DB_SSL_INSECURE)' : ca ? 'так, з перевіркою CA' : 'так, перевірка за системними CA (для Aiven потрібен DB_CA_CERT)') : 'ні'}`);
+console.log(`→ ${o.host}:${o.port} / ${o.database || '(без бази)'} · SSL: ${ssl ? (verify ? 'так, з перевіркою сертифіката' : 'так, шифрування без сертифіката') : 'ні'}`);
 console.log(`→ APP_PASSWORD: ${env.APP_PASSWORD ? 'задано' : 'НЕ задано (вхід у дашборд не працюватиме)'}`);
 try {
   const c = await mysql.createConnection({ ...o, connectTimeout: 10000 });
