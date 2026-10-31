@@ -8,7 +8,6 @@ import { makeActions, goalStep } from './actions';
 import { mergeStates } from './merge';
 import { addD, hhmm, sod, ymd } from './util';
 import { dayScore } from './score';
-import { achievementBadges } from './achievements';
 
 export { goalStep };
 
@@ -493,19 +492,6 @@ function useStoreValue(dbOn: boolean) {
   // getS only reads the ref when an action runs, never while rendering
   // eslint-disable-next-line react-hooks/refs
   const A = useMemo(() => makeActions({ update, getS, toast, notify, del }), [update, getS, toast, notify, del]);
-
-  // new badges are celebrated once; the first run only records what was already earned, so nothing pops up for old data
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const got = achievementBadges(Sref.current).filter(b => b.done), have = Sref.current.badges;
-      if (!have) { update(s => { s.badges = got.map(b => b.id); }, true); return; }
-      const fresh = got.filter(b => !have.includes(b.id));
-      if (!fresh.length) return;
-      update(s => { s.badges = [...(s.badges || []), ...fresh.map(b => b.id)]; });
-      notify(`Нове досягнення: ${fresh.map(b => b.title).join(', ')}`);
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [S, update, notify]);
 
   // regular payments come due by themselves: checked on start and whenever the page is shown again
   // (not before the first contact with the server: another device may already have created them)

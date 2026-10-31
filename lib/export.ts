@@ -39,8 +39,8 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
     S.tasks.filter(t => !t.d || !t.doneAt || inP(day(t.doneAt), p)).map(t => [t.t, t.d ? 'виконано' : 'відкрита', t.p === 'hi' ? 'так' : '', t.due || '', t.doneAt ? day(t.doneAt) : '', S.goals.find(g => g.id === t.goal)?.title || '']));
   add('habits', 'Звички', 'zvychky', ['Дата', 'Звичка'],
     S.habits.flatMap(h => Object.keys(h.days).filter(d => inP(d, p)).map(d => [d, h.name])).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
-  add('health', 'Здоровʼя', 'zdorovya', ['Дата', 'Заснув', 'Прокинувся', 'Сон, год', 'Вода, склянок', 'Рух, хв', 'Вага, кг'],
-    Object.keys(S.health).filter(d => inP(d, p)).sort().map(d => { const h = S.health[d]; return [d, h.bed || '', h.wake || '', h.sleep || '', h.water || '', h.workout || '', h.weight || '']; }));
+  add('health', 'Здоровʼя', 'zdorovya', ['Дата', 'Заснув', 'Прокинувся', 'Сон, год', 'Вода, склянок', 'Рух, хв', 'Кроки', 'Вага, кг', 'Пульс', 'Кава, чашок', 'Овочі й фрукти, порцій', 'На вулиці, хв', 'Тиша, хв', 'Екран, год', 'Вітаміни'],
+    Object.keys(S.health).filter(d => inP(d, p)).sort().map(d => { const h = S.health[d]; return [d, h.bed || '', h.wake || '', h.sleep || '', h.water || '', h.workout || '', h.steps || '', h.weight || '', h.pulse || '', h.coffee || '', h.veg || '', h.outdoor || '', h.mind || '', h.screen || '', h.vitamins ? 'так' : '']; }));
   add('moods', 'Настрій', 'nastrij', ['Дата', 'Час', 'Настрій 1–10', 'Сили', 'Теги', 'Нотатка'],
     S.moods.filter(m => inP(day(m.t), p)).sort((a, b) => a.t - b.t).map(m => [day(m.t), clock(m.t), m.v, m.energy ? ({ 1: 'мало', 3: 'нормально', 5: 'багато' } as Record<number, string>)[m.energy <= 2 ? 1 : m.energy === 3 ? 3 : 5] : '', m.tags.join('; '), m.note]));
   add('acts', 'Справи', 'spravy', ['Дата', 'Початок', 'Кінець', 'Хвилин', 'Тип', 'Що', 'Замовлень', 'Заробіток, kr.', 'Км'],

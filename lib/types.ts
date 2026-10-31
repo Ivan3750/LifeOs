@@ -7,7 +7,12 @@ export type LocalEvent = { id: number; date: string; s: string; e: string; title
 export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 1 };
 /** One day, keyed by the date you woke up. bed/wake are 'HH:MM'; sleep hours are derived from them when both are set.
     mood and steps are kept only for data saved by older versions (mood is now logged in State.moods). */
-export type HealthDay = { water: number; sleep: number; mood: number; steps: number; workout: number; weight: number; bed?: string; wake?: string; demo?: 1 };
+export type HealthDay = {
+  water: number; sleep: number; mood: number; steps: number; workout: number; weight: number; bed?: string; wake?: string;
+  /** Extra daily marks: coffee cups, vegetable/fruit portions, minutes outdoors, minutes of calm/meditation, leisure screen hours, resting pulse, vitamins taken (0/1). */
+  coffee?: number; veg?: number; outdoor?: number; mind?: number; screen?: number; pulse?: number; vitamins?: number;
+  demo?: 1;
+};
 export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake'>;
 /** A mood check-in at a moment of the day. v: 1–10, energy: 1–5 (0 = not set). */
 export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
@@ -73,7 +78,7 @@ export type State = {
   /** Days marked as not normal (sick, emergency…), keyed by date. */
   offDays?: Record<string, DayOff>;
   /** Daily goals for the body: glasses of water (default 8) and minutes of movement (default 30). */
-  waterGoal?: number; moveGoal?: number;
+  waterGoal?: number; moveGoal?: number; stepsGoal?: number;
   /** Weekly earnings goal for Wolt, in kr. (0 or missing: no goal). */
   woltGoal?: number;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
@@ -89,8 +94,6 @@ export type State = {
   mode: Mode; view: string;
   co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[] };
   icalUrls: string[];
-  /** Ids of the achievements already celebrated. */
-  badges?: string[];
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */

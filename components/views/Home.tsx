@@ -7,7 +7,6 @@ import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } 
 import type { OffKind } from '@/lib/types';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon, type IconName } from '../Icon';
-import { LevelCard } from '../Achievements';
 import { AdviceCard } from '../Advice';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
@@ -176,10 +175,10 @@ function HeatMap() {
   });
   const nh = (n.getHours() + 24 - 6) % 24;
   return (
-    <div className="heat">
+    <div className="fmap">
       <div className="ylab"><span>06:00</span><span>10:00</span><span>14:00</span><span>18:00</span><span>22:00</span></div>
       <div>
-        <div className="dots">
+        <div className="fdots">
           {grid.map((row, r) => row.map((mm, c) => {
             const l = mm >= 45 ? 3 : mm >= 25 ? 2 : mm > 0 ? 1 : 0;
             const isNow = nh < 20 && Math.floor(nh / 4) === r && c === ti * 4 + (nh % 4);
@@ -188,7 +187,7 @@ function HeatMap() {
         </div>
         <div className="xlab">{DN.map((d, i) => <span key={d} className={i === ti ? 'today' : ''}>{d}</span>)}</div>
       </div>
-      <div className="legend"><span><i style={{ background: 'var(--accent)' }} />Висока</span><span><i style={{ background: 'var(--accent-2)' }} />Середня</span><span><i style={{ background: 'var(--bar)' }} />Низька</span></div>
+      <div className="fleg"><span><i style={{ background: 'var(--accent)' }} />Висока</span><span><i style={{ background: 'var(--accent-2)' }} />Середня</span><span><i style={{ background: 'var(--bar)' }} />Низька</span></div>
     </div>
   );
 }
@@ -206,7 +205,7 @@ function FreeTimeCard() {
   const week = lastDays(7).map(d => ({ d, ...scoreOn(d, now).ft }));
   const maxFree = Math.max(60, ...week.map(w => w.free));
   return (
-    <div className="card s7">
+    <div className="card s7 fillcard">
       <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з годин, вільних від подій і їжі, ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {hhmm(new Date(t.start))}–{hhmm(new Date(t.fullEnd))}</button></div>
       <div className="bigstat"><span className="v num">{hrs(t.worked)}<small>/</small>{hrs(t.free)}<small>год</small></span><span className={`delta ${pct >= 60 ? 'up' : 'dn'}`}>{pct}%</span></div>
       <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
@@ -359,12 +358,17 @@ function WeekSummary() {
 }
 
 export function Home() {
-  const { S, A, go } = useStore();
-  const ti = weekdayIdx(), w = weekMinutes(S), lw = weekMinutes(S, -1), tot = w.reduce((a, b) => a + b, 0);
-  const lwSoFar = lw.slice(0, ti + 1).reduce((a, b) => a + b, 0), pct = lwSoFar ? Math.round(((tot - lwSoFar) / lwSoFar) * 100) : 0;
+  const { S: S0, A, go } = useStore();
+  const now = useNow(30_000);
+  // every number below counts the focus run that is still going, the same as the day score does
+  const S = { ...S0, sessions: liveSessions(S0, now) };
+  const ti = weekdayIdx(), w = weekMinutes(S), lw = weekMinutes(S, -1), tot = Math.round(w.reduce((a, b) => a + b, 0));
+  const lwSoFar = lw.slice(0, ti + 1).reduce((a, b) => a + b, 0), pct = lwSoFar ? Math.round(((tot - lwSoFar) / lwSoFar) * 100) : null;
   const ws = wStart().getTime(), blocks = [...Array(7)].map(() => Array(6).fill(0) as number[]);
   S.sessions.forEach(s => { const i = Math.floor((sod(s.t).getTime() - ws) / DAY); if (i >= 0 && i < 7) blocks[i][Math.floor(new Date(s.t).getHours() / 4)] += s.m; });
-  const goalMin = S.goal * 60, tdone = S.tasks.filter(t => t.d).length, tall = S.tasks.length || 1, st = streak(S);
+  const goalMin = Math.max(1, S.goal * 60), st = streak(S);
+  // tasks: done this week against what is still open
+  const taskDone = S.tasks.filter(t => t.d && (t.doneAt ?? 0) >= ws).length, taskOpen = S.tasks.filter(t => !t.d).length;
   const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
   const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S);
   const gs = [...S.goals].sort((a, c) => goalProgress(c) - goalProgress(a)).slice(0, 4);
@@ -380,8 +384,6 @@ export function Home() {
         <AdviceCard />
 
         <WeekSummary />
-
-        <LevelCard />
 
         <div className="card s12">
           <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
@@ -420,8 +422,8 @@ export function Home() {
 
         <div className="card s4">
           <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div><span className="sel">Цей тиждень</span></div>
-          <div className="bigstat"><span className="v num">{Math.floor(tot / 60) > 0 && <>{Math.floor(tot / 60)}<small>год</small></>}{tot % 60}<small>хв</small></span><span className={`delta ${pct >= 0 ? 'up' : 'dn'}`}>{pct >= 0 ? '↑ ' : '↓ '}{Math.abs(pct)}%</span></div>
-          <div className="muted" style={{ fontSize: 12 }}>порівняно з минулим тижнем</div>
+          <div className="bigstat"><span className="v num">{Math.floor(tot / 60) > 0 && <>{Math.floor(tot / 60)}<small>год</small></>}{tot % 60}<small>хв</small></span>{pct !== null && <span className={`delta ${pct >= 0 ? 'up' : 'dn'}`}>{pct >= 0 ? '↑ ' : '↓ '}{Math.abs(pct)}%</span>}</div>
+          <div className="muted" style={{ fontSize: 12 }}>{pct === null ? 'минулого тижня ще не було записів' : 'порівняно з минулим тижнем до цього дня'}</div>
           <FocusArea week={w} today={ti} />
         </div>
         <div className="card s8">
@@ -434,11 +436,11 @@ export function Home() {
           <HeatMap />
         </div>
         <div className="card s5">
-          <div className="ch"><Icon n="trend" className="ic" /><div><h3>Результати</h3><p>Баланс твоєї активності</p></div><span className="sel">Цей тиждень</span></div>
+          <div className="ch"><Icon n="trend" className="ic" /><div><h3>Результати</h3><p>Ціль тижня, задачі цього тижня та серія фокусу</p></div><span className="sel">Цей тиждень</span></div>
           <div className="rings">
             <div><Ring pct={tot / goalMin} color="var(--good)" label="Ціль тижня" value={Math.round((tot / goalMin) * 100) + '%'} /></div>
-            <div><Ring pct={tdone / tall} color="var(--ink)" label="Задачі" value={Math.round((tdone / tall) * 100) + '%'} /></div>
-            <div><Ring pct={st / 7} color="var(--accent)" label="Серія" value={st + ' дн'} /></div>
+            <div><Ring pct={taskDone + taskOpen ? taskDone / (taskDone + taskOpen) : 0} color="var(--ink)" label="Задачі" value={`${taskDone}/${taskDone + taskOpen}`} /></div>
+            <div><Ring pct={st / 7} color="var(--accent)" label="Серія, 7 днів" value={st + ' дн'} /></div>
           </div>
         </div>
 

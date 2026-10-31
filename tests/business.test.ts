@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { makeActions } from '@/lib/actions';
 import { makeState } from '@/lib/seed';
 import { clientRows, leadHeat, leadScript } from '@/lib/clients';
-import { achievementBadges, levelName, xpOf } from '@/lib/achievements';
 import { ymd, addD } from '@/lib/util';
 import type { State } from '@/lib/types';
 
@@ -55,26 +54,5 @@ describe('leads and clients', () => {
   });
   it('fills the person in a message', () => {
     expect(leadScript({ id: 1, name: 'Dr. Jensen, стоматологія', contact: '', source: '', status: 'new', value: 0, next: '', note: '', created: '' }, 'Іван')).toContain('Dr. Jensen!');
-  });
-});
-
-describe('level and achievements', () => {
-  it('starts at level 1 and rises with work', () => {
-    const { S } = setup();
-    expect(xpOf(S)).toMatchObject({ xp: 0, level: 1 });
-    S.sessions.push({ t: Date.now(), m: 300 });
-    S.tasks.push({ id: 1, t: 'x', p: 'lo', d: true });
-    expect(xpOf(S).xp).toBe(70);
-    expect(xpOf(S).level).toBe(2);
-    expect(levelName(1)).toBe('Новачок');
-  });
-  it('unlocks a badge when its target is reached', () => {
-    const { S } = setup();
-    expect(achievementBadges(S).find(b => b.id === 'focus1')!.done).toBe(false);
-    S.sessions.push({ t: Date.now(), m: 30 });
-    expect(achievementBadges(S).find(b => b.id === 'focus1')!.done).toBe(true);
-    const b = achievementBadges(S).find(x => x.id === 'focus10')!;
-    expect(b.done).toBe(false);
-    expect(b.have).toBeCloseTo(0.5);
   });
 });

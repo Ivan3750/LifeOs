@@ -146,7 +146,7 @@ export function WoltPage() {
 
       <div className="card" style={{ marginTop: 18 }}>
         <div className="ch"><Icon n="trend" className="ic" /><div><h3>Останні 14 днів</h3><p>Скільки заробляв щодня</p></div></div>
-        <div className="wdays" role="img" aria-label="Заробіток за 14 днів">
+        <div className="wdaybars" role="img" aria-label="Заробіток за 14 днів">
           {days.map(d => (
             <div key={d.d} className="wd" title={`${d.d}: ${fmtCur(d.earned, 'DKK')}${d.hours ? ` за ${hm(d.hours)}` : ''}`}>
               <b className="num">{d.earned ? Math.round(d.earned) : ''}</b>

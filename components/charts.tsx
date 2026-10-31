@@ -17,22 +17,27 @@ export function Ring({ pct, color, label, value }: { pct: number; color: string;
   );
 }
 
-/** Weekly focus minutes as a smooth area. */
+/** Weekly focus minutes as a smooth area with the weekdays under it. The marker is plain HTML so it stays round when the area stretches. */
 export function FocusArea({ week, today }: { week: number[]; today: number }) {
   const max = Math.max(60, ...week), pts = week.map((v, i) => [i * 50, 100 - (v / max) * 80] as [number, number]);
   const line = smooth(pts);
   return (
-    <svg viewBox="0 0 300 110" style={{ width: 'calc(100% + 40px)', margin: '6px -20px -20px', height: 'auto' }} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="ftg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="var(--accent)" stopOpacity=".35" />
-          <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${line} L300,110 L0,110Z`} fill="url(#ftg)" />
-      <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" />
-      <circle cx={pts[today][0]} cy={pts[today][1]} r="4" fill="var(--card)" stroke="var(--accent)" strokeWidth="2" />
-    </svg>
+    <div className="farea">
+      <div className="farea-plot">
+        <svg viewBox="0 0 300 110" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="ftg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--accent)" stopOpacity=".35" />
+              <stop offset="1" stopColor="var(--accent)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={`${line} L300,110 L0,110Z`} fill="url(#ftg)" />
+          <path d={line} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        </svg>
+        <i className="farea-dot" style={{ left: `${(pts[today][0] / 300) * 100}%`, top: `${(pts[today][1] / 110) * 100}%` }} />
+      </div>
+      <div className="farea-days">{DN.map((d, i) => <span key={d} className={i === today ? 'today' : ''} title={`${d}: ${Math.round(week[i])} хв`}>{d}</span>)}</div>
+    </div>
   );
 }
 
@@ -145,6 +150,27 @@ export function RevenueChart({ months, rev, goal }: { months: Date[]; rev: numbe
           </g>
         );
       })}
+    </svg>
+  );
+}
+
+/** A line over the last days: used for weight. Gaps (days without a value) are skipped, min and max are labelled. */
+export function Trend({ vals, unit }: { vals: number[]; unit: string }) {
+  const W = 420, H = 150, L = 8, R = 8, T = 22, B = 22, n = vals.length;
+  const pts = vals.map((v, i) => ({ v, i })).filter(p => p.v > 0);
+  if (pts.length < 2) return null;
+  const lo = Math.min(...pts.map(p => p.v)), hi = Math.max(...pts.map(p => p.v)), pad = Math.max(0.5, (hi - lo) * 0.25);
+  const x = (i: number) => L + ((W - L - R) * i) / Math.max(1, n - 1), y = (v: number) => T + (H - T - B) * (1 - (v - (lo - pad)) / (hi - lo + 2 * pad));
+  const line = pts.map(p => `${x(p.i).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
+  const last = pts[pts.length - 1], first = pts[0];
+  return (
+    <svg className="trendsvg" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Від ${first.v} до ${last.v} ${unit}`}>
+      <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="var(--line)" />
+      <polyline points={line} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      {pts.map(p => <circle key={p.i} cx={x(p.i)} cy={y(p.v)} r={p === last ? 5 : 3} fill={p === last ? 'var(--accent)' : 'var(--card)'} stroke="var(--accent)" strokeWidth="2"><title>{`${addD(new Date(), p.i - n + 1).getDate()} ${MON[addD(new Date(), p.i - n + 1).getMonth()]}: ${p.v} ${unit}`}</title></circle>)}
+      <text className="chart-text" x={x(last.i)} y={Math.max(12, y(last.v) - 10)} textAnchor="end" style={{ fill: 'var(--ink)', fontWeight: 600 }}>{last.v} {unit}</text>
+      <text className="chart-text" x={L} y={H - 5}>{addD(new Date(), -n + 1).getDate()} {MON[addD(new Date(), -n + 1).getMonth()]}</text>
+      <text className="chart-text" x={W - R} y={H - 5} textAnchor="end">сьогодні</text>
     </svg>
   );
 }

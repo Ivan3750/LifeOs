@@ -124,6 +124,7 @@ export const OFF_KINDS: Record<OffKind, { label: string; icon: string; why: stri
 };
 export const waterGoal = (S: State) => S.waterGoal || 8;
 export const moveGoal = (S: State) => S.moveGoal || 30;
+export const stepsGoal = (S: State) => S.stepsGoal || 8000;
 export const offOn = (S: State, k: string) => S.offDays?.[k];
 
 /** First day with any record at all. Earlier days have nothing to judge. */
