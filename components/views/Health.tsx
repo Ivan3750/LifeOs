@@ -2,14 +2,13 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 import type { MoodEntry } from '@/lib/types';
-import { dayMood, moveGoal, stepsGoal, waterGoal, ENERGY3, energyLevel, energyWord, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
+import { dayMood, moveGoal, waterGoal, ENERGY3, energyLevel, energyWord, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
 import { useNow, useStore } from '@/lib/store';
 import { addD, DAY, DN, hhmm, MON, pad2, plural, TK, toMin, WD, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Face } from '../Face';
 import { LinksCard } from '../Advice';
 import { Bars, Trend } from '../charts';
-import { HealthExtras } from '../HealthExtras';
 import { clock, sleepNights, sleepStability } from '@/lib/sleep';
 import { avg, DelBtn, LifeTiles } from '../shared';
 
@@ -216,14 +215,12 @@ function MoodInsights() {
 function HealthWeek() {
   const { S } = useStore();
   const keys = [...Array(7)].map((_, i) => ymd(addD(new Date(), i - 6))), H = keys.map(k => S.health[k]);
-  const mean = (f: 'sleep' | 'water' | 'workout' | 'steps' | 'veg' | 'outdoor' | 'mind' | 'coffee' | 'screen') => { const v = H.map(h => h?.[f] || 0).filter(x => x > 0); return v.length ? avg(v) : 0; };
+  const mean = (f: 'sleep' | 'water' | 'workout') => { const v = H.map(h => h?.[f] || 0).filter(x => x > 0); return v.length ? avg(v) : 0; };
   const moodV = avg(keys.map(k => dayMood(S, k)).filter(x => x > 0));
-  const logged = H.filter(h => h && (h.sleep || h.water || h.workout || h.steps)).length;
+  const logged = H.filter(h => h && (h.sleep || h.water || h.workout)).length;
   const items: [string, string, string][] = [
     ['Сон', mean('sleep') ? mean('sleep').toFixed(1) : '—', 'год'], ['Вода', mean('water') ? mean('water').toFixed(1) : '—', 'склянок'],
-    ['Рух', mean('workout') ? String(Math.round(mean('workout'))) : '—', 'хв'], ['Кроки', mean('steps') ? Math.round(mean('steps')).toLocaleString('uk') : '—', ''],
-    ['Настрій', moodV ? moodV.toFixed(1) : '—', '/10'], ['Овочі й фрукти', mean('veg') ? mean('veg').toFixed(1) : '—', 'порцій'],
-    ['На вулиці', mean('outdoor') ? String(Math.round(mean('outdoor'))) : '—', 'хв'], ['Кава', mean('coffee') ? mean('coffee').toFixed(1) : '—', 'чашок'],
+    ['Рух', mean('workout') ? String(Math.round(mean('workout'))) : '—', 'хв'], ['Настрій', moodV ? moodV.toFixed(1) : '—', '/10'],
   ];
   return (
     <div className="card">
@@ -299,7 +296,7 @@ export function Health() {
   const startEdit = (m: MoodEntry) => { setEditing(m); setTimeout(() => formCard.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 0); };
   const keys = [...Array(14)].map((_, i) => ymd(addD(new Date(), i - 13)));
   const days = keys.map(k => S.health[k]);
-  const ser = (f: 'sleep' | 'water' | 'workout' | 'steps') => days.map(d => (d ? d[f] || 0 : 0));
+  const ser = (f: 'sleep' | 'water' | 'workout') => days.map(d => (d ? d[f] || 0 : 0));
   const hday = S.health[healthDay];
   const dd = new Date(healthDay + 'T00:00'), isT = healthDay === TK();
   const wAll = keys.map(k => S.health[k]?.weight || 0), wts = wAll.filter(x => x > 0);
@@ -324,8 +321,6 @@ export function Health() {
           </div>
         </div>
         <LifeTiles full k={healthDay} />
-        <h4 className="subh">Ще за день</h4>
-        <HealthExtras key={healthDay} k={healthDay} />
       </div>
       <SleepRhythmCard />
       <HealthWeek />
@@ -342,7 +337,6 @@ export function Health() {
         <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
         <div className="card s6"><div className="ch"><div><h3>Вода</h3><p>{av('water') ? `У середньому ${av('water').toFixed(1)} склянки на день · ціль ${waterGoal(S)}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('water')} max={Math.max(12, waterGoal(S) + 2)} color={v => (v >= waterGoal(S) ? 'var(--good)' : 'var(--accent-2)')} target={waterGoal(S)} unit=" склянок" /></div>
         <div className="card s6"><div className="ch"><div><h3>Рух</h3><p>{av('workout') ? `У середньому ${Math.round(av('workout'))} хв на день · ціль ${moveGoal(S)}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('workout')} max={Math.max(90, moveGoal(S) * 2)} color={v => (v >= moveGoal(S) ? 'var(--good)' : 'var(--accent)')} target={moveGoal(S)} unit=" хв" /></div>
-        <div className="card s6"><div className="ch"><div><h3>Кроки</h3><p>{av('steps') ? `У середньому ${Math.round(av('steps')).toLocaleString('uk')} на день · ціль ${stepsGoal(S).toLocaleString('uk')}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('steps')} max={Math.max(12000, stepsGoal(S) * 1.5)} color={v => (v >= stepsGoal(S) ? 'var(--good)' : 'var(--accent-2)')} target={stepsGoal(S)} unit=" кроків" /></div>
         {wts.length > 1 && <div className="card s6"><div className="ch"><div><h3>Вага</h3><p>{wts[0]} → {wts[wts.length - 1]} кг за 14 днів ({wts[wts.length - 1] - wts[0] >= 0 ? '+' : ''}{(Math.round((wts[wts.length - 1] - wts[0]) * 10) / 10)} кг)</p></div></div><Trend vals={wAll} unit="кг" /></div>}
       </div>
     </section>

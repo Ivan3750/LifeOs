@@ -21,7 +21,7 @@ export type ActionDeps = {
 /** All the ways the UI changes the state. Each one is a small function over a draft copy of the state. */
 export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
   const hday = (s: State, k = TK()) => s.health[k] || (s.health[k] = { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0 });
-  const LIM: Record<HealthField, [number, number]> = { water: [0, 20], sleep: [0, 16], steps: [0, 80000], workout: [0, 600], weight: [0, 350], mood: [0, 5], coffee: [0, 20], veg: [0, 20], outdoor: [0, 600], mind: [0, 300], screen: [0, 24], pulse: [0, 250], vitamins: [0, 1] };
+  const LIM: Record<HealthField, [number, number]> = { water: [0, 20], sleep: [0, 16], steps: [0, 80000], workout: [0, 600], weight: [0, 350], mood: [0, 5] };
   function addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number, due?: string) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}), ...(due ? { due } : {}) }); }); toast('Задачу додано'); }
   return {
     setH(f: HealthField, v: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },

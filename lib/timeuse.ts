@@ -3,7 +3,8 @@ import { addD, sod, toMin, ymd } from './util';
 
 /** Where an event's time goes. Colours are fixed so a category looks the same everywhere. */
 export const EV_CATS: { key: string; label: string; color: string }[] = [
-  { key: 'work', label: 'Робота й бізнес', color: '#FF5B1F' },
+  { key: 'work', label: 'Робота', color: '#FF5B1F' },
+  { key: 'biz', label: 'Бізнес', color: '#C2410C' },
   { key: 'study', label: 'Навчання', color: '#6A4CE0' },
   { key: 'sport', label: 'Спорт і здоровʼя', color: '#3FB383' },
   { key: 'food', label: 'Їжа', color: '#F2B544' },
@@ -18,7 +19,8 @@ export const catOf = (key: string) => EV_CATS.find(c => c.key === key) || EV_CAT
 /** First guesses from the words in a title. Stems are the first 5 letters, so «лекція» and «лекції» are the same word.
     A guess is only a suggestion: the user confirms it once, and then the app knows. */
 const GUESS_WORDS: Record<string, string[]> = {
-  work: ['зустр', 'клієн', 'дзвін', 'call', 'meeti', 'проєк', 'проек', 'презе', 'бізне', 'робот', 'звіт', 'інтер', 'угода', 'нарад', 'stand', 'sprin', 'work'],
+  work: ['зустр', 'дзвін', 'call', 'meeti', 'проєк', 'проек', 'презе', 'робот', 'звіт', 'інтер', 'нарад', 'stand', 'sprin', 'work'],
+  biz: ['клієн', 'бізне', 'угода', 'угоди', 'продаж', 'лід', 'реклам', 'рахун', 'комер', 'партн', 'sales', 'clien', 'busin', 'таргет'],
   study: ['лекці', 'курс', 'урок', 'навча', 'універ', 'воркш', 'семін', 'екзам', 'лабор', 'вебін', 'class', 'lectu', 'study', 'практ', 'данськ'],
   sport: ['спорт', 'трену', 'зал', 'біг', 'пробі', 'йога', 'футбо', 'плава', 'басей', 'велос', 'gym', 'run', 'лікар', 'стома', 'аналі', 'масаж', 'терап', 'dentis'],
   food: ['обід', 'вечер', 'снід', 'сніда', 'кава', 'ланч', 'ресто', 'кафе', 'їжа', 'готув', 'lunch', 'dinne', 'break', 'brunc'],
@@ -109,7 +111,7 @@ export function timeLedger(S: State, days: string[], eventsOn: (k: string) => Ui
     let used = 0;
     for (const s of S.sessions) { const [a, b] = clip(s.t, s.t + s.m * 6e4); const m = add(a, b); put('focus', m); used += m; }
     const runs = S.act ? [{ kind: S.act.kind, start: S.act.start, end: now }] : [];
-    for (const a of [...S.activities, ...runs]) { const [x, y] = clip(a.start, a.end); const m = add(x, y); put('act', m); used += m; }
+    for (const a of [...S.activities, ...runs]) { const [x, y] = clip(a.start, a.end); const m = add(x, y); put(a.kind === 'Бізнес' ? 'ev:biz' : 'act', m); used += m; }
     for (const e of eventsOn(k)) {
       if (e.act !== undefined || e.allDay) continue;
       const day = new Date(k + 'T00:00'), a = new Date(day).setHours(Math.floor(toMin(e.s) / 60), toMin(e.s) % 60, 0, 0), b = e.e === '23:59' ? d1 : new Date(day).setHours(Math.floor(toMin(e.e) / 60), toMin(e.e) % 60, 0, 0);
@@ -122,7 +124,7 @@ export function timeLedger(S: State, days: string[], eventsOn: (k: string) => Ui
   const rows: LedgerRow[] = [];
   const meta: Record<string, [string, string]> = { sleep: ['Сон', '#8B7CF6'], focus: ['Фокус', '#FF5B1F'], act: ['Справи (Wolt, дорога…)', '#2B2723'], social: ['Соцмережі', '#E5484D'], rem: ['Без обліку', '#D8D3CC'] };
   for (const [key, min] of Object.entries(acc)) {
-    if (key.startsWith('ev:')) { const c = catOf(key.slice(3)); rows.push({ key, label: 'Події: ' + c.label.toLowerCase(), color: c.color, min }); }
+    if (key.startsWith('ev:')) { const c = catOf(key.slice(3)); rows.push({ key, label: c.label, color: c.color, min }); }
     else rows.push({ key, label: meta[key][0], color: meta[key][1], min });
   }
   rows.sort((a, b) => (a.key === 'rem' ? 1 : b.key === 'rem' ? -1 : b.min - a.min));

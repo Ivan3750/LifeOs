@@ -9,11 +9,20 @@ export function makeState(demo: boolean): State {
   const id = () => nextId++;
   const r = rng(42);
 
+  // Demo nights (i = days ago). A short night is followed by a later bedtime, and a short night makes the day worse:
+  // less focus, more scrolling, a lower mood. This gives the advice page real links to find.
+  const dr = rng(7), hmm = (m: number) => `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
+  const sleepH = [...Array(16)].map(() => 5.5 + Math.floor(dr() * 6) * 0.5);
+  const bedAt = (i: number) => Math.round((1410 + Math.max(0, 7.5 - (sleepH[i + 1] ?? 7.5)) * 45 + (dr() - 0.5) * 30) / 5) * 5; // bedtime of the night that ends on day i
+  const bedM = [...Array(15)].map((_, i) => bedAt(i));
+  const agoOf = (t: number) => Math.round((sod(now).getTime() - sod(t).getTime()) / 864e5);
+  const sleepOn = (t: number) => sleepH[agoOf(t)] ?? 7.5;
+
   const sessions: State['sessions'] = [];
   if (demo) {
     for (let d = addD(wStart(), -7); d <= now; d = addD(d, 1)) {
       const hours = [8, 9, 10, 11, 13, 14, 15, 16, 19, 20, 21];
-      const n = 1 + Math.floor(r() * 4);
+      const n = sleepOn(d.getTime()) < 6.5 ? 1 : 2 + Math.floor(r() * 3);
       for (let k = 0; k < n; k++) {
         const h = hours[Math.floor(r() * hours.length)], m = r() < 0.55 ? 50 : 25;
         const t = new Date(d); t.setHours(h, Math.floor(r() * 4) * 5, 0, 0);
@@ -35,10 +44,9 @@ export function makeState(demo: boolean): State {
   const health: State['health'] = {};
   if (demo) {
     for (let i = 0; i < 14; i++) {
-      // bedtime between 23:00 and 01:30, wake time follows from the length of the night
-      const bedM = 1380 + Math.floor(r() * 30) * 5, sl = Math.round((6 + r() * 2.5) * 2) / 2, hm = (m: number) => `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
+      const sl = sleepH[i];
       health[ymd(addD(now, -i))] = i
-        ? { water: Math.round(4 + r() * 5), sleep: sl, mood: 0, steps: 0, workout: r() < 0.45 ? 0 : 10 * (1 + Math.floor(r() * 6)), weight: 0, bed: hm(bedM), wake: hm(bedM + sl * 60), demo: 1 }
+        ? { water: Math.round(4 + r() * 5), sleep: sl, mood: 0, steps: 0, workout: r() < 0.45 ? 0 : 10 * (1 + Math.floor(r() * 6)), weight: 0, bed: hmm(bedM[i]), wake: hmm(bedM[i] + sl * 60), demo: 1 }
         : { water: 3, sleep: 7.5, mood: 0, steps: 0, workout: 0, weight: 0, bed: '23:30', wake: '07:00', demo: 1 };
     }
   }
@@ -47,8 +55,9 @@ export function makeState(demo: boolean): State {
   if (demo) {
     for (let i = 0; i < 7; i++) {
       const d = ymd(addD(now, -i));
-      social.push({ id: id(), date: d, platform: 'Instagram', min: 15 + Math.floor(r() * 5) * 10, why: r() < 0.5 ? 'Розваги' : 'Інформація', ...(r() < 0.3 ? { cmp: 1 as const } : {}), demo: 1 });
-      social.push({ id: id(), date: d, platform: 'YouTube', min: 30 + Math.floor(r() * 6) * 15, why: r() < 0.5 ? 'Навчання' : 'Розваги', demo: 1 });
+      const lack = Math.max(0, 7.5 - sleepH[i]);
+      social.push({ id: id(), date: d, platform: 'Instagram', min: Math.round((15 + lack * 22 + r() * 15) / 5) * 5, why: r() < 0.5 ? 'Розваги' : 'Інформація', ...(r() < 0.3 ? { cmp: 1 as const } : {}), demo: 1 });
+      social.push({ id: id(), date: d, platform: 'YouTube', min: Math.round((30 + lack * 25 + r() * 25) / 5) * 5, why: r() < 0.5 ? 'Навчання' : 'Розваги', demo: 1 });
     }
   }
 
@@ -58,7 +67,7 @@ export function makeState(demo: boolean): State {
     for (let i = 13; i >= 0; i--) {
       for (const h of i ? [9, 14, 20].filter(() => r() < 0.7) : [8, 11]) {
         const d = sod(addD(now, -i)); d.setHours(h, Math.floor(r() * 60));
-        if (d < now) moods.push({ id: id(), t: d.getTime(), v: 4 + Math.floor(r() * 6), energy: 2 + Math.floor(r() * 4), tags: [TAGS[Math.floor(r() * TAGS.length)]], note: '', demo: 1 });
+        if (d < now) moods.push({ id: id(), t: d.getTime(), v: Math.max(2, Math.min(10, Math.round(3 + (sleepH[i] - 5.5) * 1.5 + (bedM[i] > 1470 ? -1 : 0) + (r() - 0.5) * 2))), energy: 2 + Math.floor(r() * 4), tags: [TAGS[Math.floor(r() * TAGS.length)]], note: '', demo: 1 });
       }
     }
   }

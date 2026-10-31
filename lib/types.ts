@@ -9,8 +9,6 @@ export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 
     mood and steps are kept only for data saved by older versions (mood is now logged in State.moods). */
 export type HealthDay = {
   water: number; sleep: number; mood: number; steps: number; workout: number; weight: number; bed?: string; wake?: string;
-  /** Extra daily marks: coffee cups, vegetable/fruit portions, minutes outdoors, minutes of calm/meditation, leisure screen hours, resting pulse, vitamins taken (0/1). */
-  coffee?: number; veg?: number; outdoor?: number; mind?: number; screen?: number; pulse?: number; vitamins?: number;
   demo?: 1;
 };
 export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake'>;
@@ -80,7 +78,7 @@ export type State = {
   /** Days marked as not normal (sick, emergency…), keyed by date. */
   offDays?: Record<string, DayOff>;
   /** Daily goals for the body: glasses of water (default 8) and minutes of movement (default 30). */
-  waterGoal?: number; moveGoal?: number; stepsGoal?: number;
+  waterGoal?: number; moveGoal?: number;
   /** Weekly earnings goal for Wolt, in kr. (0 or missing: no goal). */
   woltGoal?: number;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];

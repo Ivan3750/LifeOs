@@ -1,10 +1,8 @@
 import type { SocialEntry, State } from './types';
 import { addD, sod, ymd } from './util';
 
-export const PLATFORMS = ['Instagram', 'YouTube', 'TikTok', 'Telegram', 'Facebook', 'X / Twitter', 'Інше'] as const;
-/** What the time was for. The point is not that all of it is wasted: some of it is learning, news or work. */
-export const SOCIAL_WHY = ['Навчання', 'Розваги', 'Інформація', 'Робота'] as const;
-
+/** Only the two that eat the time. */
+export const PLATFORMS = ['Instagram', 'YouTube'] as const;
 export const socialGoal = (S: State, platform: string) => S.socialGoals?.[platform] ?? 0;
 
 /** Everything logged on day k, per platform. over: minutes above the platforms' own daily limits. */

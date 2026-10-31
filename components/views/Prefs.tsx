@@ -221,7 +221,6 @@ export function Prefs() {
           <div className="fgrid">
             <NumField id="pWater" label="Вода, склянок (по 250 мл)" value={S.waterGoal || 8} min={1} max={20} onSave={n => update(s => { s.waterGoal = n; })} />
             <NumField id="pMove" label="Рух, хв на день" value={S.moveGoal || 30} min={5} max={300} onSave={n => update(s => { s.moveGoal = n; })} />
-            <NumField id="pSteps" label="Кроки на день" value={S.stepsGoal || 8000} min={1000} max={50000} onSave={n => update(s => { s.stepsGoal = n; })} />
           </div>
           <div>
             <div className="fl">Режим сну</div>
