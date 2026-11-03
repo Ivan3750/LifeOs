@@ -6,7 +6,7 @@ import { classify } from './timeuse';
 import { cravingStats, nextMilestone, streakDays, TRIGGERS } from './quit';
 import { goalProgress } from './goals';
 import { budgetDKK, fmtCur, monthOf, txDKK } from './money';
-import { addD, daysInMonth, hmPlain, plural, sod, toMin, ymd } from './util';
+import { addD, daysInMonth, hmPlain, money, plural, sod, toMin, ymd } from './util';
 
 /* The advice system. Every day becomes a row of numbers from all parts of the app (sleep, bedtime, mood, tasks, focus, habits, social media,
    events, goals, business…). A curated list of «this → that» pairs is tested on the person's own days: is there a clear trend in the expected
@@ -15,7 +15,7 @@ import { addD, daysInMonth, hmPlain, plural, sod, toMin, ymd } from './util';
 
 export type Metric = 'sleep' | 'bedTonight' | 'mood' | 'energy' | 'stress' | 'focus' | 'taskPace' | 'tasks' | 'habits' | 'water' | 'workout' | 'social' | 'lateWork' | 'goalMin' | 'bizMin' | 'load' | 'people' | 'spend';
 export type Row = { k: string } & Record<Metric, number | null>;
-export type Area = 'Сон і тіло' | 'Настрій' | 'Робота й бізнес' | 'Цілі й розвиток' | 'Увага й час' | 'Гроші' | 'Люди';
+export type Area = 'Сон і тіло' | 'Настрій' | 'Робота й бізнес' | 'Компанія' | 'Цілі й розвиток' | 'Увага й час' | 'Гроші' | 'Люди';
 
 const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
 const n1 = (v: number) => (Math.round(v * 10) / 10).toString().replace('.', ',');
@@ -38,7 +38,7 @@ export const METRICS: Record<Metric, { name: string; fmt: (v: number) => string;
   social: { name: 'соцмережі', fmt: min, better: -1, area: 'Увага й час' },
   lateWork: { name: 'робота пізно ввечері', fmt: min, better: -1, area: 'Увага й час' },
   goalMin: { name: 'час на цілі', fmt: min, better: 1, area: 'Цілі й розвиток' },
-  bizMin: { name: 'час на бізнес', fmt: min, better: 1, area: 'Робота й бізнес' },
+  bizMin: { name: 'час на бізнес', fmt: min, better: 1, area: 'Компанія' },
   load: { name: 'зайнятість подіями', fmt: min, better: -1, area: 'Увага й час' },
   people: { name: 'живе спілкування', fmt: min, better: 1, area: 'Люди' },
   spend: { name: 'витрати', fmt: v => `${Math.round(v)} kr.`, better: -1, area: 'Гроші' },
@@ -321,21 +321,37 @@ export function coach(S: State, eventsOn: (k: string) => UiEvent[], now = new Da
   if (risk.length && hour >= 16) add({ id: 'streak', area: 'Цілі й розвиток', tone: 'info', weight: 58, title: `Не обірви серію «${risk[0].h.name}» (${risk[0].n} дн)`,
     facts: [], why: 'Серія збільшує шанс повторити: кожен новий день легший за попередній, поки ти її не перервеш.', action: 'Навіть мінімальна версія (2 хвилини) зберігає серію.', to: 'habits' });
 
-  /* ---- business ---- */
-  const dueLeads = S.co.leads.filter(l => l.next && l.next < today && l.status !== 'won' && l.status !== 'dead');
-  if (dueLeads.length) add({ id: 'leads', area: 'Робота й бізнес', tone: 'warn', weight: 76, title: `${dueLeads.length} ${plural(dueLeads.length, 'лід', 'ліди', 'лідів')} чекає на відповідь довше, ніж планувалося`,
-    facts: dueLeads.slice(0, 3).map(l => l.name), why: 'Інтерес клієнта згасає за дні, а не за тижні. Швидка відповідь часто вирішує, хто отримає замовлення.', action: 'Напиши коротке повідомлення першому ліду зараз: скрипт є в розділі «Ліди».', to: 'leads' });
-  const unpaid = S.co.invoices.filter(i => !i.paid && i.due < today);
-  if (unpaid.length) add({ id: 'invoices', area: 'Робота й бізнес', tone: 'warn', weight: 77, title: `${unpaid.length} ${plural(unpaid.length, 'рахунок', 'рахунки', 'рахунків')} прострочено`,
-    facts: unpaid.slice(0, 3).map(i => `${i.client}: ${i.amt}`), why: 'Чим довше борг, тим менша ймовірність його повернути без неприємної розмови.', action: 'Надішли нагадування сьогодні, ввічливо, з номером рахунку й датою.', to: 'invoices' });
+  /* ---- company: every tip names the client, the amount and how long it has been waiting ---- */
+  const ago = (d: string) => Math.max(0, Math.round((sod(now).getTime() - new Date(d + 'T00:00').getTime()) / 864e5));
+  const days = (n: number) => `${n} ${plural(n, 'день', 'дні', 'днів')}`;
+  const dueLeads = S.co.leads.filter(l => l.next && l.next < today && l.status !== 'won' && l.status !== 'dead').sort((a, b) => a.next.localeCompare(b.next));
+  if (dueLeads.length) add({ id: 'leads', area: 'Компанія', tone: 'warn', weight: 76, title: `${dueLeads.length} ${plural(dueLeads.length, 'потенційний клієнт чекає', 'потенційні клієнти чекають', 'потенційних клієнтів чекають')} на твоє повідомлення`,
+    facts: dueLeads.slice(0, 3).map(l => `${l.name}: чекає ${days(ago(l.next))}${l.value ? ', ' + money(l.value) : ''}`),
+    why: 'Інтерес людини згасає за дні, а не за тижні. Хто відповів першим, той найчастіше й отримує замовлення.',
+    action: `Напиши коротке повідомлення «${dueLeads[0].name}» просто зараз. Готовий текст є в розділі «Ліди».`, to: 'leads' });
+  const unpaid = S.co.invoices.filter(i => !i.paid && i.due < today).sort((a, b) => a.due.localeCompare(b.due));
+  if (unpaid.length) add({ id: 'invoices', area: 'Компанія', tone: 'warn', weight: 77, title: `${unpaid.length} ${plural(unpaid.length, 'рахунок не оплачено', 'рахунки не оплачено', 'рахунків не оплачено')} вчасно: разом ${money(unpaid.reduce((a, i) => a + i.amt, 0))}`,
+    facts: unpaid.slice(0, 3).map(i => `${i.client}: ${money(i.amt)}, прострочено ${days(ago(i.due))}`),
+    why: 'Чим довше триває борг, тим менша ймовірність повернути гроші без неприємної розмови.',
+    action: `Надішли нагадування «${unpaid[0].client}» сьогодні: ввічливо, з номером рахунку й датою. Текст готовий у розділі «Рахунки».`, to: 'invoices' });
+  const lateProj = S.co.projects.filter(p => p.status !== 'done' && p.due && p.due < today);
+  if (lateProj.length) add({ id: 'projects-late', area: 'Компанія', tone: 'warn', weight: 75, title: `${lateProj.length} ${plural(lateProj.length, 'проєкт прострочено', 'проєкти прострочено', 'проєктів прострочено')}`,
+    facts: lateProj.slice(0, 3).map(p => `${p.name}${p.client ? ' (' + p.client + ')' : ''}: готово ${p.progress}%, прострочено ${days(ago(p.due))}`),
+    why: 'Клієнт, який чекає довше за обіцяне, рідко повертається. Краще попередити його самому, ніж чекати на питання.',
+    action: 'Напиши клієнту нову реалістичну дату й онови прогрес проєкту. Якщо потрібно, розбий залишок на маленькі кроки.', to: 'projects' });
+  const notBilled = S.co.projects.filter(p => (p.status === 'done' || p.progress >= 100) && !S.co.invoices.some(i => i.project === p.id || (p.deal && i.deal === p.deal)));
+  if (notBilled.length) add({ id: 'unbilled', area: 'Компанія', tone: 'warn', weight: 73, title: `${notBilled.length} ${plural(notBilled.length, 'готовий проєкт', 'готові проєкти', 'готових проєктів')} без рахунку`,
+    facts: notBilled.slice(0, 3).map(p => `${p.name}${p.client ? ' (' + p.client + ')' : ''}: ${money(p.budget)}`),
+    why: 'Робота зроблена, а гроші ще не запрошено: поки рахунку нема, їх ніхто не платить.',
+    action: 'Відкрий «Проєкти» й натисни «Виставити рахунок» біля готового проєкту.', to: 'projects' });
   const biz = rows.slice(-7).map(r => r.bizMin).filter((v): v is number => v !== null);
-  if (biz.length >= 5 && biz.reduce((a, b) => a + b, 0) < 60 && (S.co.deals.length || S.co.leads.length)) add({ id: 'biz-time', area: 'Робота й бізнес', tone: 'info', weight: 52, title: 'На бізнес цього тижня майже не було часу',
-    facts: [`За 7 днів: ${hmPlain(biz.reduce((a, b) => a + b, 0))}`], why: 'Бізнес росте від регулярного невеликого часу, а не від разових ривків перед дедлайном.', action: 'Заплануй 30–60 хв щодня на ліди й угоди та запиши це як активність «Бізнес».', to: 'co' });
+  if (biz.length >= 5 && biz.reduce((a, b) => a + b, 0) < 60 && (S.co.deals.length || S.co.leads.length)) add({ id: 'biz-time', area: 'Компанія', tone: 'info', weight: 52, title: 'На компанію цього тижня майже не було часу',
+    facts: [`За 7 днів записано: ${hmPlain(biz.reduce((a, b) => a + b, 0))}`], why: 'Бізнес росте від регулярного невеликого часу, а не від разових ривків перед дедлайном.', action: 'Заплануй 30–60 хв щодня на потенційних клієнтів і угоди та записуй це в розклад як «Бізнес».', to: 'co' });
 
   /* ---- money ---- */
   const b = budgetDKK(S), spent = monthOf(S, today.slice(0, 7)).filter(x => x.type === 'out' && !x.xfer && !x.pot).reduce((a, x) => a + txDKK(S, x), 0), share = now.getDate() / daysInMonth();
   if (b > 0 && spent > b * share * 1.15 && spent > b * 0.3) add({ id: 'spend', area: 'Гроші', tone: 'warn', weight: 68, title: `Витрати йдуть швидше за бюджет: ${Math.round((spent / b) * 100)}% при ${Math.round(share * 100)}% місяця`,
-    facts: [`Витрачено ${fmtCur(spent, 'DKK')} із ${fmtCur(b, 'DKK')}`], why: 'Бюджет рівномірний, а витрати зазвичай накопичуються першими днями. Якщо не гальмувати зараз, кінець місяця доведеться жити без запасу.', action: `Обмеж необовʼязкове до кінця тижня: тримай ≈ ${fmtCur(Math.max(0, b - spent) / Math.max(1, daysInMonth() - now.getDate() + 1), 'DKK')} на день.`, to: 'money' });
+    facts: [`Витрачено ${fmtCur(spent, 'DKK')} із ${fmtCur(b, 'DKK')}`], why: 'Бюджет рівномірний, а витрати зазвичай накопичуються першими днями. Якщо не гальмувати зараз, кінець місяця доведеться жити без запасу.', action: `Обмеж необовʼязкове до кінця місяця: тримай ≈ ${fmtCur(Math.max(0, b - spent) / Math.max(1, daysInMonth() - now.getDate() + 1), 'DKK')} на день.`, to: 'money' });
 
   /* ---- body today ---- */
   const hw = S.health[today];

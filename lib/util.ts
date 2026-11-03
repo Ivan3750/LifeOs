@@ -44,7 +44,7 @@ const dkk = new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK',
 export const money = (n: number) => dkk.format(Math.round(n));
 export const fmtN = (n: number) => (+n).toLocaleString('da-DK');
 export const kfmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.0', '') + 'm' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(Math.round(n)));
-export const hmPlain = (m: number) => { m = Math.round(m); const h = Math.floor(m / 60); return h ? `${h} год ${m % 60} хв` : `${m % 60} хв`; };
+export const hmPlain = (m: number) => { m = Math.round(m); const h = Math.floor(m / 60); return h ? (m % 60 ? `${h} год ${m % 60} хв` : `${h} год`) : `${m % 60} хв`; };
 export const plural = (n: number, one: string, few: string, many: string) =>
   n % 10 === 1 && n % 100 !== 11 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? few : many;
 

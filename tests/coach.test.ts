@@ -74,4 +74,16 @@ describe('advice system', () => {
     const ids = coach(S, () => [], NOW).tips.map(t => t.id);
     expect(ids).toEqual(expect.arrayContaining(['overdue', 'leads', 'invoices']));
   });
+
+  it('names the client, the amount and the wait in company tips', () => {
+    const S = makeState(false); S.meals = [];
+    S.co.leads = [{ id: 2, name: 'Магазин Pixel', contact: '', source: '', status: 'new', value: 12000, next: '2026-03-20', note: '', created: '2026-03-01' }];
+    S.co.invoices = [{ id: 3, no: '1', client: 'FitLab', amt: 18000, issued: '2026-03-01', due: '2026-03-10', paid: false, paidAt: '' }];
+    S.co.projects = [{ id: 4, name: 'Сайт', client: 'Bloom', budget: 5000, due: '2026-03-25', progress: 40, status: 'active' }] as never;
+    const tips = coach(S, () => [], NOW).tips.filter(t => t.area === 'Компанія');
+    expect(tips.map(t => t.id)).toEqual(expect.arrayContaining(['leads', 'invoices', 'projects-late']));
+    expect(tips.find(t => t.id === 'leads')!.facts[0]).toContain('Магазин Pixel: чекає 10 днів');
+    expect(tips.find(t => t.id === 'invoices')!.facts[0]).toContain('FitLab');
+    expect(tips.find(t => t.id === 'projects-late')!.facts[0]).toContain('прострочено 5 днів');
+  });
 });

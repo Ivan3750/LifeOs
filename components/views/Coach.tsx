@@ -1,23 +1,35 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNow, useStore } from '@/lib/store';
 import { coach, METRICS, type Area, type Chain, type Link, type Tip } from '@/lib/coach';
 import { plural } from '@/lib/util';
-import { Icon } from '../Icon';
+import { Icon, type IconName } from '../Icon';
 import { Empty } from '../shared';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function TipCard({ t, go }: { t: Tip; go: (v: string) => void }) {
+const AREA_ICON: Record<Area, IconName> = {
+  'Сон і тіло': 'moon', 'Настрій': 'wave', 'Робота й бізнес': 'focus', 'Компанія': 'company', 'Цілі й розвиток': 'goals', 'Увага й час': 'clock', 'Гроші': 'money', 'Люди': 'team',
+};
+
+/** One tip as a row: what to do on top, the facts and the reason one tap away. */
+function TipRow({ t, go }: { t: Tip; go: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className={`tipc ${t.tone}`}>
-      <div className="tipc-a">{t.area}</div>
-      <h4>{t.title}</h4>
-      {t.facts.length > 0 && <div className="tipfacts">{t.facts.map(f => <span key={f}>{f}</span>)}</div>}
-      <p className="tipc-why"><b>Чому це важливо.</b> {t.why}</p>
-      <p className="tipc-do"><b>Що зробити.</b> {t.action}</p>
-      {t.to && <button className="btn ghost sm" onClick={() => go(t.to!)}>Відкрити розділ <Icon n="arrow" /></button>}
+    <div className={`trow ${t.tone}${open ? ' open' : ''}`}>
+      <button className="trow-h" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+        <span className="nxi"><Icon n={t.tone === 'good' ? 'check' : AREA_ICON[t.area]} /></span>
+        <span className="t"><b>{t.title}</b><small><em>Що зробити:</em> {t.action}</small></span>
+        <span className="trow-c" aria-hidden="true"><Icon n="right" /></span>
+      </button>
+      {open && (
+        <div className="trow-b">
+          {t.facts.length > 0 && <div className="tipfacts">{t.facts.map(f => <span key={f}>{f}</span>)}</div>}
+          <p><b>Чому це важливо.</b> {t.why}</p>
+          {t.to && <button className="btn ghost sm" onClick={() => go(t.to!)}>Відкрити розділ <Icon n="arrow" /></button>}
+        </div>
+      )}
     </div>
   );
 }
@@ -58,37 +70,57 @@ function LinkRow({ l }: { l: Link }) {
 export function CoachPage() {
   const { S, eventsOn, go } = useStore();
   const now = useNow(60_000);
-  const day = Math.floor(now / 60_000);
+  const minute = Math.floor(now / 60_000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const r = useMemo(() => coach(S, eventsOn, new Date(now)), [S, eventsOn, day]);
+  const r = useMemo(() => coach(S, eventsOn, new Date(now)), [S, eventsOn, minute]);
   const areas = [...new Set(r.links.map(l => METRICS[l.d].area))] as Area[];
-  const top = r.tips.filter(t => t.tone !== 'good').slice(0, 6), rest = r.tips.filter(t => !top.includes(t));
+  const co = r.tips.filter(t => t.area === 'Компанія'), me = r.tips.filter(t => t.area !== 'Компанія');
+  const urgent = me.filter(t => t.tone !== 'good').slice(0, 5), rest = me.filter(t => !urgent.includes(t));
+  const warns = r.tips.filter(t => t.tone === 'warn').length, goods = r.tips.filter(t => t.tone === 'good').length;
+  const hasCo = S.co.leads.length + S.co.deals.length + S.co.projects.length + S.co.invoices.length > 0;
+  const stats: [string, string, string][] = [
+    ['Днів у записах', String(r.days), r.days >= 8 ? 'достатньо для висновків' : 'чим більше, тим точніше'],
+    ['Потребує уваги', String(warns), warns ? 'розкрий і почни з верхнього' : 'усе спокійно'],
+    ['Компанія', String(co.filter(t => t.tone !== 'good').length), hasCo ? 'справ, що чекають на тебе' : 'ще без записів'],
+    ['Іде добре', String(goods), goods ? 'тримай цей напрямок' : 'поки нічого не виділив'],
+  ];
   return (
     <section className="view">
-      <div className="vh"><div><h2>Поради</h2><p>Я зіставляю сон, настрій, звички, задачі, фокус, цілі, бізнес, події й соцмережі з твоїх днів, шукаю, що на що впливає, і підказую, що змінити та чому.</p></div></div>
+      <div className="vh"><div><h2>Поради</h2><p>Підказки з твоїх власних днів: що зробити, і чому саме це. Натисни на пораду, щоб побачити цифри й пояснення.</p></div></div>
 
-      <div className="card cardcol">
-        <div className="ch" style={{ margin: 0 }}><Icon n="trophy" className="ic" /><div><h3>Що зробити зараз</h3><p>{r.days ? `Рахую за ${r.days} ${plural(r.days, 'день', 'дні', 'днів')} записів. Найважливіше зверху` : 'Поки замало записів'}</p></div></div>
-        {top.length ? <div className="tipgrid">{top.map(t => <TipCard key={t.id} t={t} go={go} />)}</div>
-          : <Empty icon="check" title="Термінового нема" text="Нічого, що потребувало б уваги просто зараз. Продовжуй записувати день, і поради зʼявляться, щойно я помічу закономірність." />}
+      <div className="grid">
+        {stats.map(([l, v, s]) => <div key={l} className="card s3 stat"><div className="k">{l}</div><div className="v num">{v}</div><div className="k" style={{ marginTop: 4 }}>{s}</div></div>)}
       </div>
 
       <div className="card cardcol">
-        <div className="ch" style={{ margin: 0 }}><Icon n="wave" className="ic" /><div><h3>Ланцюжки в твоїх днях</h3><p>Як одне тягне за собою інше: з твоїх власних записів, а не з загальних порад</p></div></div>
-        {r.chains.length ? r.chains.map(c => <ChainCard key={c.id} c={c} />)
-          : <p className="help" style={{ margin: 0 }}>Поки не бачу стійких зв’язків. Для цього потрібно хоча б 6–8 днів із записаним сном, часом засинання, настроєм і задачами або фокусом. Що саме бракує, дивись внизу.</p>}
+        <div className="ch" style={{ margin: 0 }}><Icon n="company" className="ic" /><div><h3>Компанія</h3><p>{co.length ? 'Клієнти, рахунки й проєкти: із іменами, сумами та строками' : hasCo ? 'Прострочень і справ, що чекають, нема' : 'Додай першого потенційного клієнта в режимі «Компанія», і тут зʼявляться поради'}</p></div><button className="sel" onClick={() => go('co')}>Огляд компанії</button></div>
+        {co.length ? <div className="tlist">{co.map(t => <TipRow key={t.id} t={t} go={go} />)}</div>
+          : <Empty icon={hasCo ? 'check' : 'leads'} title={hasCo ? 'По компанії все гаразд' : 'Компанія ще порожня'} text={hasCo ? 'Нікому відповідати, прострочених рахунків і проєктів нема.' : 'Починай з «Ліди»: запиши людину, якій хочеш щось продати.'} />}
+      </div>
+
+      <div className="card cardcol">
+        <div className="ch" style={{ margin: 0 }}><Icon n="trophy" className="ic" /><div><h3>Що зробити зараз</h3><p>{r.days ? `Особисте, за ${r.days} ${plural(r.days, 'день', 'дні', 'днів')} записів. Найважливіше зверху` : 'Поки замало записів'}</p></div></div>
+        {urgent.length ? <div className="tlist">{urgent.map(t => <TipRow key={t.id} t={t} go={go} />)}</div>
+          : <Empty icon="check" title="Термінового нема" text="Продовжуй записувати день, і поради зʼявляться, щойно я помічу закономірність." />}
       </div>
 
       {rest.length > 0 && (
         <div className="card cardcol">
           <div className="ch" style={{ margin: 0 }}><Icon n="flag" className="ic" /><div><h3>Ще</h3><p>Менш термінове й те, що йде добре</p></div></div>
-          <div className="tipgrid">{rest.map(t => <TipCard key={t.id} t={t} go={go} />)}</div>
+          <div className="tlist">{rest.map(t => <TipRow key={t.id} t={t} go={go} />)}</div>
+        </div>
+      )}
+
+      {r.chains.length > 0 && (
+        <div className="card cardcol">
+          <div className="ch" style={{ margin: 0 }}><Icon n="wave" className="ic" /><div><h3>Що тягне за собою що</h3><p>Ланцюжки з твоїх записів: одне запускає інше</p></div></div>
+          {r.chains.map(c => <ChainCard key={c.id} c={c} />)}
         </div>
       )}
 
       {r.links.length > 0 && (
         <div className="card cardcol">
-          <div className="ch" style={{ margin: 0 }}><Icon n="map" className="ic" /><div><h3>Усі закономірності</h3><p>{r.links.length} {plural(r.links.length, 'зв’язок', 'зв’язки', 'зв’язків')}, що тримаються у твоїх днях. Це співвідношення, а не діагноз</p></div></div>
+          <div className="ch" style={{ margin: 0 }}><Icon n="map" className="ic" /><div><h3>Усі закономірності</h3><p>{r.links.length} {plural(r.links.length, 'зв’язок', 'зв’язки', 'зв’язків')} у твоїх днях. Це збіги, а не діагноз</p></div></div>
           {areas.map(a => (
             <div key={a}>
               <div className="subh" style={{ margin: '4px 0 6px' }}>{a}</div>
@@ -99,7 +131,7 @@ export function CoachPage() {
       )}
 
       <div className="card cardcol">
-        <div className="ch" style={{ margin: 0 }}><Icon n="edit" className="ic" /><div><h3>Що допоможе радити точніше</h3><p>Чим довше й повніше записи, тим впевненіші висновки</p></div></div>
+        <div className="ch" style={{ margin: 0 }}><Icon n="edit" className="ic" /><div><h3>Що допоможе радити точніше</h3><p>{r.chains.length || r.links.length ? 'Чим довше й повніше записи, тим впевненіші висновки' : 'Зв’язки між сном, настроєм і задачами зʼявляться, коли буде хоча б 6–8 днів записів'}</p></div></div>
         <div className="cover">
           {r.coverage.map(c => (
             <div key={c.m} className={c.days >= 8 ? 'ok' : ''}>

@@ -49,7 +49,7 @@ function flowCounts(S: ReturnType<typeof useStore>['S']) {
   } as Record<string, number>;
 }
 
-/** Four steps in a row with how many items wait in each; the current step is marked. Shown on every step so you always know where you are. */
+/** Five steps in a row with how many items wait in each; the current step is marked. Shown on every step so you always know where you are. */
 function FlowBar({ at }: { at: string }) {
   const { S, go } = useStore();
   const n = flowCounts(S), i0 = FLOW.findIndex(f => f[0] === at);
@@ -106,11 +106,11 @@ function Journey() {
     invoices: ['+ Рахунок', () => setSheet({ kind: 'form', key: 'invoice' })],
   };
   const text: Record<string, string> = {
-    leads: 'Лід це людина, яка ще не купила. Запиши її і дату наступного контакту: холодні, теплі й гарячі підсвічуються.',
-    clients: 'Лід, що купує, стає клієнтом. Тут видно, скільки кожен приніс і хто давно не купував.',
-    deals: 'Рухай угоду вправо: розмова, пропозиція, виграно. Виграна угода сама створить проєкт і рахунок.',
-    projects: 'Роби роботу й відмічай прогрес. Коли проєкт готовий, виставляй рахунок.',
-    invoices: 'Став «Оплачено», коли гроші прийшли. Прострочені підсвітяться, і буде готовий текст нагадування.',
+    leads: 'Лід це людина, яка ще не купила. Запиши її й дату, коли їй написати: ті, кому давно не писав, підсвітяться.',
+    clients: 'Хто вже купив, той клієнт. Тут видно, скільки кожен приніс і кому час нагадати про себе.',
+    deals: 'Угода це конкретне замовлення. Рухай її вправо: розмова, пропозиція, виграно. Виграна угода сама створить проєкт і рахунок.',
+    projects: 'Це сама робота для клієнта. Відмічай прогрес, а коли готово, виставляй рахунок.',
+    invoices: 'Тут гроші. Став «Оплачено», коли вони прийшли. Прострочені підсвітяться, і буде готовий текст нагадування.',
   };
   const stat: Record<string, string> = {
     leads: `${n.leads} у роботі · ${C.leads.filter(l => l.status === 'won').length} стали клієнтами`,
@@ -179,16 +179,16 @@ export function CoOverview() {
   const ad = adStats(S, mk), roi = ad.spend ? (paidM - ad.spend) / ad.spend : null;
   const forecast = open.reduce((a, d) => a + d.amt * (STAGE_P[d.stage] ?? 0), 0);
   const kpi: [string, string, string, string][] = [
-    ['Виручка за місяць', money(paidM), `${Math.round((paidM / C.goal) * 100)}% від цілі`, 'var(--ink)'],
-    ['Очікуємо оплату', money(sumA(wait)), `${wait.length} рахунків у роботі`, 'var(--ink)'],
-    ['Прострочено', money(sumA(over)), over.length ? `${over.length} — час нагадати клієнтам` : 'Усі оплати вчасно', over.length ? 'var(--m1)' : 'var(--good)'],
+    ['Виручка за місяць', money(paidM), `${Math.round((paidM / C.goal) * 100)}% від цілі місяця`, 'var(--ink)'],
+    ['Очікуємо оплату', money(sumA(wait)), `${wait.length} ${wait.length === 1 ? 'рахунок' : 'рахунків'} ще в межах строку`, 'var(--ink)'],
+    ['Прострочено', money(sumA(over)), over.length ? `${over.length} ${over.length === 1 ? 'рахунок' : 'рахунків'}: час нагадати клієнтам` : 'Усі оплати вчасно', over.length ? 'var(--m1)' : 'var(--good)'],
     ['У воронці', money(sumA(open)), `${open.length} відкритих угод · прогноз ≈ ${money(forecast)}`, 'var(--ink)'],
   ];
   return (
     <section className="view">
-      <Head title={C.name} sub={`${C.projects.filter(p => p.status === 'active').length} активних проєктів · ${C.team.length} у команді`}>
+      <Head title={C.name} sub={`Шлях клієнта: лід (ще не купив) → клієнт → угода → проєкт → рахунок. Зараз ${C.projects.filter(p => p.status === 'active').length} активних проєктів, у команді ${C.team.length}`}>
         <button className="btn ghost" onClick={() => setSheet({ kind: 'form', key: 'invoice' })}>+ Рахунок</button>
-        <button className="btn ghost" onClick={() => setSheet({ kind: 'form', key: 'lead' })}>+ Клієнт</button>
+        <button className="btn ghost" onClick={() => setSheet({ kind: 'form', key: 'lead' })}>+ Лід</button>
         <button className="btn acc" onClick={() => setSheet({ kind: 'form', key: 'deal' })}>+ Угода</button>
       </Head>
       <Journey />
@@ -205,10 +205,10 @@ export function CoOverview() {
           <p className="muted" style={{ margin: 0, textAlign: 'center', fontSize: 13 }}>{left ? `Ще ${money(left)} за ${dl} дн. У воронці ${money(sumA(open))}.` : 'Ціль місяця виконано!'}</p>
         </div>
         <div className="card s6">
-          <div className="ch"><Icon n="leads" className="ic" /><div><h3>Звʼязатися сьогодні</h3><p>{todo.length ? `${todo.length} ${todo.length === 1 ? 'клієнт чекає' : 'клієнтів чекають'} на відповідь` : 'Усіх, кому треба, вже написано'}</p></div><button className="sel" onClick={() => go('leads')}>Клієнти</button></div>
+          <div className="ch"><Icon n="leads" className="ic" /><div><h3>Кому написати сьогодні</h3><p>{todo.length ? `${todo.length} ${todo.length === 1 ? 'ліда чекає' : 'лідів чекають'} на твоє повідомлення` : 'Усім, кому треба, вже написано'}</p></div><button className="sel" onClick={() => go('leads')}>Ліди</button></div>
           <div className="list">
             {todo.slice(0, 5).map(l => { const dd = daysTo(l.next); return <div className="item" key={l.id}><span className="sw c4" /><span className="t">{l.name}<br /><small className="muted">{LEAD_STATUS.find(x => x[0] === l.status)![1]} · {l.source}{l.value ? ' · ' + money(l.value) : ''}</small></span><span className={`pillst ${dd < 0 ? 'bad' : 'warn'}`}>{dd < 0 ? `прострочено ${-dd} дн` : 'сьогодні'}</span></div>; })}
-            {!todo.length && <p className="muted">Додай потенційних клієнтів у розділі «Клієнти».</p>}
+            {!todo.length && <p className="muted">Додай потенційних клієнтів у розділі «Ліди».</p>}
           </div>
         </div>
         <div className="card s6">
