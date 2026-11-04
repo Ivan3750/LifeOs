@@ -2,7 +2,7 @@ import type { OffKind, State, UiEvent } from './types';
 import { addD, sod, toMin, ymd } from './util';
 import { goalFocusOn, goalProgress } from './goals';
 import { budgetDKK, monthOf, txDKK } from './money';
-import { keepsRhythm } from './sleep';
+import { keepsRhythm, napMinutes, sleepTotal } from './sleep';
 import { quitOn } from './quit';
 import { socialOn } from './social';
 
@@ -107,11 +107,11 @@ export function freeTime(S: State, k: string, events: UiEvent[], sessions = S.se
 
 export type ScorePart = { key: string; group: string; label: string; got: number; max: number; hint: string };
 /** The big items the day score is made of; each is the sum of its parts. */
-export const SCORE_GROUPS: { key: string; label: string }[] = [
-  { key: 'work', label: 'Робота й цілі' }, { key: 'body', label: 'Сон і тіло' }, { key: 'mind', label: 'Настрій і увага' },
-  { key: 'habits', label: 'Звички' }, { key: 'money', label: 'Гроші' },
+export const SCORE_GROUPS: { key: string; label: string; what: string }[] = [
+  { key: 'work', label: 'Робота', what: 'фокус, задачі, цілі' }, { key: 'sleep', label: 'Сон', what: 'скільки й коли' }, { key: 'body', label: 'Тіло', what: 'вода й рух' },
+  { key: 'habits', label: 'Звички', what: 'звички й без зривів' }, { key: 'mind', label: 'Голова', what: 'настрій і соцмережі' }, { key: 'money', label: 'Гроші', what: 'денний ліміт' },
 ];
-export type ScoreGroup = { key: string; label: string; got: number; max: number };
+export type ScoreGroup = { key: string; label: string; what: string; got: number; max: number };
 /** Minutes of one kind of logged activity on day k. */
 export const activityMinutesOn = (S: State, k: string, kind: string) => S.activities.filter(a => a.kind === kind && ymd(new Date(a.start)) === k).reduce((t, a) => t + Math.max(0, a.end - a.start) / 6e4, 0);
 /** Minutes of business time logged on day k. */
@@ -157,7 +157,7 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   const isToday = ymd(new Date(now)) === k;
   // a day in the future, or from before anything was recorded, has nothing to judge (no fake zeros)
   const first = firstDay(S);
-  if (k > ymd(new Date(now)) || !first || k < first) return { total: null as number | null, parts, groups: [] as ScoreGroup[], skipped, ft, off: offOn(S, k) };
+  if (k > ymd(new Date(now)) || !first || k < first) return { total: null as number | null, coverage: 0, parts, groups: [] as ScoreGroup[], skipped, ft, off: offOn(S, k) };
   const off = offOn(S, k), O = off ? OFF_KINDS[off.kind] : null;
   // share of the waking day that has passed (1 for past days)
   const elapsed = isToday ? clamp01((now - ft.start) / Math.max(1, ft.fullEnd - ft.start)) : 1;
@@ -174,42 +174,43 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   const biz = bizMinutesOn(S, k), wolt = activityMinutesOn(S, k, 'Wolt'), done = ft.worked + biz + wolt;
   const what = [`${Math.round(ft.worked)} хв фокусу`, biz >= 1 ? `${Math.round(biz)} хв бізнесу` : '', wolt >= 1 ? `${Math.round(wolt)} хв Wolt` : ''].filter(Boolean).join(' + ');
   // on a day without work what was done still counts, but 20 minutes already is a full mark
-  if (!work && done < 1) skip('focus', 'Робота', `${quiet}, роботу не очікуємо`);
-  else if (!work) add('focus', 'Робота', 22, done / 20, `${what} (${quiet}), це плюс; 20 хв уже повний бал`, 'work');
-  else if (target < 20 && done < 20) skip('focus', 'Робота', isToday ? 'ще рано: вільного часу майже не було' : 'вільного часу майже не було');
-  else add('focus', 'Робота', 22, done / Math.max(20, target), `${what} з ${Math.round(Math.max(20, target))} хв${isToday ? ' на цей час' : ''}`, 'work');
+  if (!work && done < 1) skip('focus', 'Фокус і робота', `${quiet}, роботу не очікуємо`);
+  else if (!work) add('focus', 'Фокус і робота', 20, done / 20, `${what} (${quiet}): що зроблено, те плюс, 20 хв уже повний бал`, 'work');
+  else if (target < 20 && done < 20) skip('focus', 'Фокус і робота', isToday ? 'ще рано: вільного часу майже не було' : 'вільного часу майже не було');
+  else add('focus', 'Фокус і робота', 20, done / Math.max(20, target), `${what} з ${Math.round(Math.max(20, target))} хв${isToday ? ' на цей час' : ''}`, 'work');
 
   // Goals: focus minutes spent on tasks linked to a goal; expected only when a goal is still open.
   const goalOpen = S.goals.some(g => goalProgress(g) < 1), gMin = goalFocusOn(S, k, sessions), gTarget = Math.max(20, fullTarget * 0.5 * (isToday && ft.freeDay ? ft.free / ft.freeDay : 1));
   if (!goalOpen) skip('goals', 'Цілі', 'активних цілей нема');
   else if (!work && gMin < 1) skip('goals', 'Цілі', quiet);
   else if (gMin < 1 && isToday && elapsed < 0.5) skip('goals', 'Цілі', 'ще рано');
-  else add('goals', 'Цілі', 8, work ? gMin / gTarget : gMin / 20, `${Math.round(gMin)} хв на цілі${work ? ` з ${Math.round(gTarget)}` : ', це плюс'}`, 'work');
+  else add('goals', 'Цілі', 5, work ? gMin / gTarget : gMin / 20, `${Math.round(gMin)} хв на цілі${work ? ` з ${Math.round(gTarget)}` : ', це плюс'}`, 'work');
 
   // Tasks: what was closed that day against what was due that day and is still open.
   const closed = S.tasks.filter(t => t.d && t.doneAt && ymd(new Date(t.doneAt)) === k).length, missed = S.tasks.filter(t => !t.d && t.due === k).length;
   if (closed + missed === 0) skip('tasks', 'Задачі', 'задач на цей день не було');
   else if (closed === 0 && isToday && elapsed < 0.5) skip('tasks', 'Задачі', 'ще рано');
-  else add('tasks', 'Задачі', 6, closed / (closed + missed), `закрито ${closed}${missed ? `, не зроблено до терміну ${missed}` : ''}`, 'work');
+  else add('tasks', 'Задачі', 5, closed / (closed + missed), `закрито ${closed}${missed ? `, не зроблено до терміну ${missed}` : ''}`, 'work');
 
-  // Sleep counts once it is logged: how long (7–9 hours), and how steady (bed and wake time close to the wanted ones).
-  const sl = h?.sleep || 0, slMax = O ? O.sleepMax : 9;
-  if (sl) add('sleep', 'Сон: скільки', 14, sl >= 7 && sl <= slMax ? 1 : sl < 7 ? (sl - 4) / 3 : (slMax + 3 - sl) / 3, `${sl} год (норма 7–${slMax})`, 'body');
-  else skip('sleep', 'Сон: скільки', 'не записано');
+  // Sleep counts once it is logged: how long (7–9 hours in a day, a nap after lunch counts too), and how steady (bed and wake time close to the wanted ones).
+  const night = h?.sleep || 0, nap = napMinutes(h), sl = sleepTotal(h), slMax = O ? O.sleepMax : 9;
+  const slWhy = nap > 0 ? `${sl} год (ніч ${night || 'не записана'}${night ? ' год' : ''} + день ${Math.round(nap)} хв), норма 7–${slMax}` : `${sl} год (норма 7–${slMax})`;
+  if (sl) add('sleep', 'Скільки спав', 14, sl >= 7 && sl <= slMax ? 1 : sl < 7 ? (sl - 4) / 3 : (slMax + 3 - sl) / 3, slWhy, 'sleep');
+  else skip('sleep', 'Скільки спав', 'не записано');
   const reg = keepsRhythm(S, h?.bed, h?.wake);
-  if (reg !== null) add('sleepreg', 'Сон: режим', 8, reg, `${h?.bed ? `заснув о ${h.bed} (ціль ${S.bedTarget})` : ''}${h?.bed && h?.wake ? ', ' : ''}${h?.wake ? `прокинувся о ${h.wake} (ціль ${S.wakeTarget})` : ''}`, 'body');
-  else skip('sleepreg', 'Сон: режим', 'запиши, коли заснув і прокинувся');
+  if (reg !== null) add('sleepreg', 'Режим сну', 8, reg, `${h?.bed ? `заснув о ${h.bed} (ціль ${S.bedTarget})` : ''}${h?.bed && h?.wake ? ', ' : ''}${h?.wake ? `прокинувся о ${h.wake} (ціль ${S.wakeTarget})` : ''}`, 'sleep');
+  else skip('sleepreg', 'Режим сну', 'запиши, коли заснув і прокинувся');
 
   // Water and movement count once logged (or when the day is over and nothing was logged for a day with other data).
   // A finished day that was otherwise tracked counts an empty water or movement log as zero:
   // otherwise leaving out the bad numbers would always be the best move. Today there is still time.
   const tracked = !isToday && !!(sl || dayMood(S, k) || ft.worked > 0 || S.habits.some(x => x.days[k]));
-  if (h?.water) add('water', 'Вода', 4, h.water / waterGoal(S), `${h.water} з ${waterGoal(S)} склянок`, 'body');
-  else if (tracked) add('water', 'Вода', 4, 0, 'не записано, рахується як 0', 'body');
+  if (h?.water) add('water', 'Вода', 6, h.water / waterGoal(S), `${h.water} з ${waterGoal(S)} склянок`, 'body');
+  else if (tracked) add('water', 'Вода', 6, 0, 'не записано, рахується як 0', 'body');
   else skip('water', 'Вода', 'не записано');
   if (O && !O.move && !h?.workout) skip('move', 'Рух', O.why);
-  else if (h?.workout) add('move', 'Рух', 4, h.workout / moveGoal(S), `${h.workout} з ${moveGoal(S)} хв руху`, 'body');
-  else if (tracked) add('move', 'Рух', 4, 0, 'не записано, рахується як 0', 'body');
+  else if (h?.workout) add('move', 'Рух', 8, h.workout / moveGoal(S), `${h.workout} з ${moveGoal(S)} хв руху`, 'body');
+  else if (tracked) add('move', 'Рух', 8, 0, 'не записано, рахується як 0', 'body');
   else skip('move', 'Рух', 'не записано');
 
   // Habits: today the expected number grows through the day; before midday they count only once something is done.
@@ -218,12 +219,12 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
     const need = O ? O.habits : 1;
     if (off?.kind === 'sick' && done === 0) skip('habits', 'Звички', O!.why);
     else if (isToday && done === 0 && elapsed < 0.5) skip('habits', 'Звички', 'ще є час, рахуються з середини дня');
-    else add('habits', 'Звички', 20, done / (total * need * Math.max(elapsed, 0.5)), `${done} з ${total}${need < 1 ? ` (${O!.label.toLowerCase()}: досить ${Math.max(1, Math.round(total * need))})` : ''}${isToday && elapsed < 1 ? ', день ще триває' : ''}`);
+    else add('habits', 'Звички', 12, done / (total * need * Math.max(elapsed, 0.5)), `${done} з ${total}${need < 1 ? ` (${O!.label.toLowerCase()}: досить ${Math.max(1, Math.round(total * need))})` : ''}${isToday && elapsed < 1 ? ', день ще триває' : ''}`);
   }
 
   // Habits to quit: a day without a slip is a full mark, a slip takes it away (shared between the habits that were tracked that day).
   const q = quitOn(S, k);
-  if (q.active.length) add('quit', 'Без зривів', 6, 1 - q.slipped.length / q.active.length, q.slipped.length ? `зрив: ${q.slipped.map(h => h.name).join(', ')}` : `без зривів (${q.active.length})`, 'habits');
+  if (q.active.length) add('quit', 'Без зривів', 5, 1 - q.slipped.length / q.active.length, q.slipped.length ? `зрив: ${q.slipped.map(h => h.name).join(', ')}` : `без зривів (${q.active.length})`, 'habits');
   else skip('quit', 'Без зривів', 'шкідливих звичок не відстежується');
 
   // Mood: 7/10 and better is a full score, 5/10 ("нормально") still gives more than half.
@@ -233,7 +234,7 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
 
   // Social media: judged against the limit of each platform. Counted only on days when something was logged.
   const soc = socialOn(S, k);
-  if (soc.total > 0) add('social', 'Соцмережі', 6, 1 - soc.over / 60, soc.over > 0 ? `${soc.total} хв, з них ${Math.round(soc.over)} хв понад ліміти` : `${soc.total} хв, у межах лімітів`, 'mind');
+  if (soc.total > 0) add('social', 'Соцмережі', 4, 1 - soc.over / 60, soc.over > 0 ? `${soc.total} хв, з них ${Math.round(soc.over)} хв понад ліміти` : `${soc.total} хв, у межах лімітів`, 'mind');
   else skip('social', 'Соцмережі', 'не записано');
 
   // Spending: fixed bills (housing) come off the month budget first; the rest is split into a daily limit.
@@ -246,16 +247,17 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
     const fixed = monthTx.filter(t => FIXED_CATS.includes(t.cat)).reduce((a, t) => a + txDKK(S, t), 0);
     const lim = Math.max(0, budget - fixed) / dim;
     const spent = monthTx.filter(t => t.date === k && !FIXED_CATS.includes(t.cat)).reduce((a, t) => a + txDKK(S, t), 0);
-    add('money', 'Витрати', 6, !lim ? (spent ? 0 : 1) : spent <= lim ? 1 : 2 - spent / lim, `${Math.round(spent)} з ${Math.round(lim)} kr. денного ліміту${fixed ? ', без житла' : ''}`, 'money');
+    add('money', 'Витрати', 5, !lim ? (spent ? 0 : 1) : spent <= lim ? 1 : 2 - spent / lim, `${Math.round(spent)} з ${Math.round(lim)} kr. денного ліміту${fixed ? ', без житла' : ''}`, 'money');
   } else skip('money', 'Витрати', budget > 0 ? 'цього місяця витрат не записано' : 'бюджет не задано');
 
   // The total is the weighted average of the big items that could be judged, scaled to 100.
+  // coverage: how much of the full 100 points could be judged. With little logged the number is only a first look.
   const groups: ScoreGroup[] = SCORE_GROUPS.map(g => {
     const ps = parts.filter(p => p.group === g.key);
     return { ...g, got: ps.reduce((a, p) => a + p.got, 0), max: ps.reduce((a, p) => a + p.max, 0) };
   }).filter(g => g.max > 0);
   const gMax = groups.reduce((a, g) => a + g.max, 0), gGot = groups.reduce((a, g) => a + g.got, 0);
-  return { total: gMax ? Math.round((gGot / gMax) * 100) : null as number | null, parts, groups, skipped, ft, off };
+  return { total: gMax ? Math.round((gGot / gMax) * 100) : null as number | null, coverage: gMax / 100, parts, groups, skipped, ft, off };
 }
 
 export const scoreWord = (n: number | null) => (n === null ? 'Ще нема що оцінювати' : n >= 85 ? 'Чудовий день' : n >= 70 ? 'Добрий день' : n >= 50 ? 'Непогано' : n >= 30 ? 'Слабко' : 'Дуже погано');

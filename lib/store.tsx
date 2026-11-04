@@ -6,6 +6,7 @@ import { makeState } from './seed';
 import { DEFAULT_ACCOUNTS } from './money';
 import { makeActions, goalStep } from './actions';
 import { mergeStates } from './merge';
+import { extOn, seriesSizes } from './extcal';
 import { addD, hhmm, sod, ymd } from './util';
 import { dayScore } from './score';
 
@@ -447,25 +448,13 @@ function useStoreValue(dbOn: boolean) {
     return () => { clearTimeout(first); clearInterval(t); document.removeEventListener('visibilitychange', onShow); };
   }, [urlsKey, refreshCal]);
 
+  const seriesSize = useMemo(() => seriesSizes(ext), [ext]);
+
   /** Our events plus subscribed-calendar events for one day, sorted by time. All-day events come first. */
   const eventsOn = useCallback((date: string): UiEvent[] => {
     if (!S) return [];
     const mine: UiEvent[] = S.events.filter(e => e.date === date).map(e => ({ id: 'l' + e.id, localId: e.id, date: e.date, s: e.s, e: e.e, title: e.title, c: e.c }));
-    const theirs: UiEvent[] = [];
-    for (const x of ext) {
-      const st = new Date(x.start), en = new Date(x.end);
-      if (x.allDay) {
-        // all-day events end on the (exclusive) next day
-        const d0 = x.start.slice(0, 10), d1 = x.end.slice(0, 10);
-        if (date >= d0 && date < d1) theirs.push({ id: 'x' + x.id + date, date, s: '00:00', e: '23:59', title: x.title, c: 'c4', ext: true, allDay: true, location: x.location });
-      } else {
-        // timed events also count on the following days they run into (night shifts, trips)
-        const d0 = new Date(date + 'T00:00'), d1 = addD(d0, 1);
-        if (st < d1 && en > d0) {
-          theirs.push({ id: 'x' + x.id + date, date, s: st > d0 ? hhmm(st) : '00:00', e: en < d1 ? hhmm(en) : '23:59', title: x.title, c: 'c4', ext: true, location: x.location });
-        }
-      }
-    }
+    const theirs = extOn(ext, S.hiddenExt, date, seriesSize);
     // errands and other logged activities take time too; the running one counts up to now
     const acts: UiEvent[] = [];
     const runs = S.act ? [{ id: 0, kind: S.act.kind, title: S.act.title, start: S.act.start, end: Date.now() }] : [];
@@ -474,8 +463,10 @@ function useStoreValue(dbOn: boolean) {
       if (ymd(st) !== date) continue;
       acts.push({ id: 'a' + a.id, date, s: hhmm(st), e: ymd(en) === date ? hhmm(en) : '23:59', title: a.title ? `${a.kind}: ${a.title}` : a.kind, c: 'c2', act: a.id });
     }
-    return [...mine, ...theirs, ...acts].sort((a, b) => Number(!a.allDay) - Number(!b.allDay) || a.s.localeCompare(b.s));
-  }, [S, ext]);
+    // a daytime sleep takes time out of the day like any other event
+    const naps: UiEvent[] = (S.health[date]?.naps || []).map(n => ({ id: 'n' + n.id, date, s: n.s, e: n.e, title: 'Денний сон', c: 'nap', nap: n.id }));
+    return [...mine, ...theirs, ...acts, ...naps].sort((a, b) => Number(!a.allDay) - Number(!b.allDay) || a.s.localeCompare(b.s));
+  }, [S, ext, seriesSize]);
 
   /** Day score (with its free-time numbers) for day k. Cached until the data changes, because the home page asks for ~20 of them per draw. */
   const scores = useRef<{ f: unknown; m: Map<string, ReturnType<typeof dayScore>> }>({ f: null, m: new Map() });

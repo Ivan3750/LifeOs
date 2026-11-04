@@ -119,6 +119,18 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       update(s => { const x = s.events.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Подію оновлено'); return true;
     },
     delEvent(id: number) { del(s => { s.events = s.events.filter(x => x.id !== id); }); },
+    /** Hides an event of a subscribed calendar on this site only: the calendar itself is not touched. key: one occurrence, or the whole series of a repeating event. */
+    hideExt(key: string, all = false) {
+      del(s => { (s.hiddenExt ||= {})[key] = 1; }, all ? 'Усі повтори приховано тут. У самому календарі вони лишились' : 'Подію приховано тут. У самому календарі вона лишилась');
+    },
+    showExt(key?: string) { update(s => { if (key) delete s.hiddenExt?.[key]; else delete s.hiddenExt; }); toast(key ? 'Подію показано знову' : 'Усі приховані події показано знову'); },
+    /** A daytime sleep (after lunch…) for day k, extra to the night's sleep. */
+    addNap(s0: string, e0: string, k = TK()) {
+      if (!s0 || !e0 || toMin(e0) <= toMin(s0)) { toast('Кінець денного сну має бути пізніше за початок'); return false; }
+      update(s => { const h = hday(s, k); (h.naps ||= []).push({ id: s.nextId++, s: s0, e: e0 }); h.naps.sort((a, b) => toMin(a.s) - toMin(b.s)); delete h.demo; });
+      toast('Денний сон додано'); return true;
+    },
+    delNap(id: number, k = TK()) { del(s => { const h = s.health[k]; if (h?.naps) { h.naps = h.naps.filter(n => n.id !== id); if (!h.naps.length) delete h.naps; } }, 'Денний сон видалено'); },
     addHabit(name: string) { name = name.trim(); if (!name) return; update(s => { s.habits.push({ id: s.nextId++, name, days: {} }); }); toast('Звичку додано'); },
     renameHabit(id: number, name: string) { name = name.trim(); if (!name) return; update(s => { const h = s.habits.find(x => x.id === id); if (h) { h.name = name; delete h.demo; } }); toast('Звичку перейменовано'); },
     toggleHabit(id: number, k = TK()) {

@@ -25,7 +25,7 @@ export function expand(text: string, from: Date, to: Date, src: number): ExtEven
     const allDay = start.isDate;
     const s = allDay ? `${start.toString()}T00:00:00` : start.toJSDate().toISOString();
     const e = allDay ? `${end.toString()}T00:00:00` : end.toJSDate().toISOString();
-    out.push({ id: `${src}-${uid}-${s}`, title: title || '(без назви)', start: s, end: e, allDay, location: location || undefined, src });
+    out.push({ id: `${src}-${uid}-${s}`, series: `${src}-${uid}`, title: title || '(без назви)', start: s, end: e, allDay, location: location || undefined, src });
   };
   const inRange = (start: Date, end: Date) => end >= from && start <= to;
 

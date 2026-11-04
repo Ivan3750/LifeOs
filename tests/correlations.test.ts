@@ -194,6 +194,19 @@ describe('advice for today, from any area', () => {
   });
 });
 
+describe('focus is never blamed for a bad mood', () => {
+  // the mood is low the day after a very long focus day, which is how a made-up «focus → mood» link would look
+  const S = world(i => ({ focus: third(i) ? 330 : 90, mood: after(i) ? 4 : 8 }));
+  it('does not report a focus → mood link', () => {
+    expect(find(S, 'focus-mood')).toBeUndefined();
+  });
+  it('does not offer a long focus day as the reason for a low mood', () => {
+    S.sessions.push({ t: new Date(key(1) + 'T09:00').getTime(), m: 340 });
+    expect(moodCause(S, NOW)?.cause ?? '').not.toContain('фокус');
+    expect(adviceList(S, NOW).every(a => !(a.topic === 'focus' && a.forMood))).toBe(true);
+  });
+});
+
 describe('explaining a low mood when it is logged', () => {
   it('names a short night', () => {
     const real = new Date(), S = world(i => ({ sleep: third(i) ? 5.2 : 7.6, mood: third(i) ? 4 : 8 }), 30, real);

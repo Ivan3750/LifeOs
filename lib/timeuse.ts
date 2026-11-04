@@ -1,5 +1,6 @@
 import type { State, UiEvent } from './types';
 import { addD, sod, toMin, ymd } from './util';
+import { sleepTotal } from './sleep';
 
 /** Where an event's time goes. Colours are fixed so a category looks the same everywhere. */
 export const EV_CATS: { key: string; label: string; color: string }[] = [
@@ -73,7 +74,7 @@ export type EventGroup = { norm: string; title: string; count: number; min: numb
 export function eventGroups(S: State, days: string[], eventsOn: (k: string) => UiEvent[]): EventGroup[] {
   const m = new Map<string, EventGroup>();
   for (const k of days) for (const e of eventsOn(k)) {
-    if (e.act !== undefined || e.allDay) continue;
+    if (e.act !== undefined || e.nap !== undefined || e.allDay) continue;
     const n = normTitle(e.title); if (!n) continue;
     const g = m.get(n) || { norm: n, title: e.title, count: 0, min: 0, ...classify(S, e.title) };
     g.count++; g.min += evMin(e); m.set(n, g);
@@ -113,11 +114,11 @@ export function timeLedger(S: State, days: string[], eventsOn: (k: string) => Ui
     const runs = S.act ? [{ kind: S.act.kind, start: S.act.start, end: now }] : [];
     for (const a of [...S.activities, ...runs]) { const [x, y] = clip(a.start, a.end); const m = add(x, y); put(a.kind === 'Бізнес' ? 'ev:biz' : 'act', m); used += m; }
     for (const e of eventsOn(k)) {
-      if (e.act !== undefined || e.allDay) continue;
+      if (e.act !== undefined || e.nap !== undefined || e.allDay) continue;
       const day = new Date(k + 'T00:00'), a = new Date(day).setHours(Math.floor(toMin(e.s) / 60), toMin(e.s) % 60, 0, 0), b = e.e === '23:59' ? d1 : new Date(day).setHours(Math.floor(toMin(e.e) / 60), toMin(e.e) % 60, 0, 0);
       const [x, y] = clip(a, b); const m = add(x, y); put('ev:' + (classify(S, e.title).cat || 'other'), m); used += m;
     }
-    const sleep = Math.min(Math.max(0, win - used), (S.health[k]?.sleep || 0) * 60); put('sleep', sleep); used += sleep;
+    const sleep = Math.min(Math.max(0, win - used), sleepTotal(S.health[k]) * 60); put('sleep', sleep); used += sleep;
     const soc = Math.min(Math.max(0, win - used), S.social.filter(x => x.date === k).reduce((a, x) => a + x.min, 0)); put('social', soc); used += soc;
     put('rem', Math.max(0, win - used));
   }

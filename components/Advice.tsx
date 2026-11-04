@@ -4,33 +4,40 @@ import { useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { adviceList, describe, findings, dayRows } from '@/lib/correlations';
 import { TK } from '@/lib/util';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
+import type { Card } from '@/lib/advice';
 
-/** The tips of the day: what the logged numbers and the person's own history say, from every area, and one thing to do about each. */
-export function AdviceCard() {
-  const { S, A } = useStore();
-  const list = useMemo(() => adviceList(S), [S]);
-  if (!list.length) return null;
+const ICON: Record<string, IconName> = {
+  'Здоровʼя': 'moon', 'Сон і тіло': 'moon', 'Фінанси': 'money', 'Гроші': 'money', 'Карʼєра': 'company', 'Робота й бізнес': 'company', 'Друзі': 'team', 'Люди': 'team',
+  'Розвиток': 'goals', 'Цілі й розвиток': 'goals', 'Відпочинок': 'bed', 'Увага й час': 'clock', 'Настрій': 'wave',
+};
+
+/** One piece of advice: what, why (with the numbers from your own days) and the one thing to do. The same card on the home and the advice page. */
+export function AdviceItem({ a }: { a: Card }) {
+  const { S, A, go } = useStore();
+  const has = a.task ? S.tasks.some(t => !t.d && t.t === a.task) : false;
   return (
-    <div className="s12 advicegrid">
-      {list.map(a => {
-        const has = a.task ? S.tasks.some(t => !t.d && t.t === a.task) : false;
-        return (
-          <div className={`card advice ${a.tone}`} key={a.title}>
-            <span className="adv-i"><Icon n={a.tone === 'good' ? 'check' : a.area === 'Здоровʼя' ? 'moon' : a.area === 'Фінанси' ? 'money' : a.area === 'Карʼєра' ? 'company' : a.area === 'Друзі' ? 'team' : 'wave'} /></span>
-            <div className="adv-b">
-              <div className="adv-area">{a.area}</div>
-              <h3>{a.title}</h3>
-              <p>{a.reason}</p>
-              {a.facts.length > 0 && <div className="adv-facts">{a.facts.map(f => <span key={f}>{f}</span>)}</div>}
-              <p className="adv-do"><b>Що зробити:</b> {a.action}</p>
-            </div>
-            {a.task && <button className="btn ghost sm" disabled={has} onClick={() => A.addTask(a.task!, 'hi', undefined, TK())}>{has ? 'Уже в задачах' : 'Додати в задачі'}</button>}
-          </div>
-        );
-      })}
+    <div className={`card advice ${a.tone}`}>
+      <span className="adv-i"><Icon n={a.tone === 'good' ? 'check' : ICON[a.area] || 'wave'} /></span>
+      <div className="adv-b">
+        <div className="adv-area">{a.area}</div>
+        <h3>{a.title}</h3>
+        <p>{a.reason}</p>
+        {a.facts.length > 0 && <div className="adv-facts">{a.facts.map(f => <span key={f}>{f}</span>)}</div>}
+        <p className="adv-do"><b>Що зробити:</b> {a.action}</p>
+      </div>
+      {a.task && <button className="btn ghost sm" disabled={has} onClick={() => A.addTask(a.task!, 'hi', undefined, TK())}>{has ? 'Уже в задачах' : 'Додати в задачі'}</button>}
+      {!a.task && a.to && <button className="btn ghost sm" onClick={() => go(a.to!)}>Відкрити <Icon n="arrow" /></button>}
     </div>
   );
+}
+
+/** The tips of the day for the home page: what the logged numbers and the person's own history say, from every area, and one thing to do about each. */
+export function AdviceCard() {
+  const { S } = useStore();
+  const list = useMemo(() => adviceList(S).map((a, i) => ({ ...a, id: 'h' + i }) as Card), [S]);
+  if (!list.length) return null;
+  return <div className="s12 advicegrid">{list.map(a => <AdviceItem key={a.title} a={a} />)}</div>;
 }
 
 /** Everything the algorithm has found so far, with the numbers, or what is still missing for it to find something. */

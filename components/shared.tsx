@@ -5,10 +5,11 @@ import { useStore } from '@/lib/store';
 import { Icon, type IconName } from './Icon';
 import { Face } from './Face';
 import type { State, Tx, UiEvent } from '@/lib/types';
-import { DAY, daysInMonth, hhmm, money, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
+import { DAY, daysInMonth, hhmm, money, pad2, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
 import { dayMood, moveGoal, waterGoal, ENERGY3, energyWord, moodsOn, moodWord } from '@/lib/score';
 import { budgetDKK, monthOf, sumIn, txDKK } from '@/lib/money';
 import { SocialTile } from './SocialTile';
+import { napMinutes, sleepTotal } from '@/lib/sleep';
 
 export const today = () => TK();
 export const hdayOf = (S: State, k = TK()) => S.health[k] || { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0, bed: undefined, wake: undefined };
@@ -71,20 +72,50 @@ function MoodTile() {
   );
 }
 
-/** Bed and wake time of the night that ended on day k; the hours of sleep are counted from them (or typed in). */
+/** Bed and wake time of the night that ended on day k; the hours of sleep are counted from them (or typed in). Daytime sleep (a nap after lunch) is added on top. */
 function SleepTile({ k }: { k: string }) {
   const { S, A } = useStore();
-  const h = hdayOf(S, k);
+  const h = hdayOf(S, k), naps = h.naps || [], nap = napMinutes(h);
+  const napTxt = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} год${m % 60 ? ' ' + (m % 60) + ' хв' : ''}` : `${m} хв`);
   return (
     <div className="tile">
       <div className="lab"><span>Сон</span><span>ціль 8 год</span></div>
-      <div className="tv num">{h.sleep || '—'}<small>{h.sleep ? 'год' : ''}</small></div>
-      <div className="bar"><i style={{ width: pctW(h.sleep, 8) + '%', background: 'var(--sleep)' }} /></div>
+      <div className="tv num">{sleepTotal(h) || '—'}<small>{sleepTotal(h) ? 'год' : ''}</small></div>
+      <div className="bar"><i style={{ width: pctW(sleepTotal(h), 8) + '%', background: 'var(--sleep)' }} /></div>
+      {nap > 0 && <div className="napsum">ніч {h.sleep || 0} год + день {napTxt(nap)}</div>}
       <div className="sleeptimes">
         <label>Заснув<input type="time" value={h.bed || ''} onChange={e => A.setSleepTimes(e.target.value, h.wake || '', k)} aria-label="Коли заснув" /></label>
         <label>Прокинувся<input type="time" value={h.wake || ''} onChange={e => A.setSleepTimes(h.bed || '', e.target.value, k)} aria-label="Коли прокинувся" /></label>
       </div>
-      {!(h.bed && h.wake) && <NumBox key={k + 'sl'} label="Або годин сну" value={h.sleep} step={0.5} max={16} onSave={n => A.setH('sleep', n, k)} />}
+      {!(h.bed && h.wake) && <NumBox key={k + 'sl'} label="Або годин нічного сну" value={h.sleep} step={0.5} max={16} onSave={n => A.setH('sleep', n, k)} />}
+      {naps.length > 0 && (
+        <div className="naplist">
+          {naps.map(n => <span key={n.id} className="napchip"><Icon n="moon" />{n.s}–{n.e}<button aria-label={`Видалити денний сон ${n.s}–${n.e}`} onClick={() => A.delNap(n.id, k)}><Icon n="x" /></button></span>)}
+        </div>
+      )}
+      <NapForm k={k} />
+    </div>
+  );
+}
+
+/** Adds a daytime sleep: from and to, or a quick length from the start time. */
+function NapForm({ k }: { k: string }) {
+  const { A } = useStore();
+  const [open, setOpen] = useState(false);
+  const [s, setS] = useState('13:00'), [e, setE] = useState('13:30');
+  const len = (m: number) => { const t = toMin(s) + m; setE(`${pad2(Math.min(23, Math.floor(t / 60)))}:${pad2(t >= 1440 ? 59 : t % 60)}`); };
+  if (!open) return <button className="napadd" onClick={() => setOpen(true)}><Icon n="plus" />Денний сон</button>;
+  return (
+    <div className="napform">
+      <div className="sleeptimes">
+        <label>Від<input type="time" value={s} onChange={x => setS(x.target.value)} aria-label="Початок денного сну" /></label>
+        <label>До<input type="time" value={e} onChange={x => setE(x.target.value)} aria-label="Кінець денного сну" /></label>
+      </div>
+      <div className="napq">{[20, 30, 60, 90].map(m => <button key={m} type="button" onClick={() => len(m)}>{m >= 60 ? m / 60 + ' год' : m + ' хв'}</button>)}</div>
+      <div className="row" style={{ gap: 6 }}>
+        <button className="btn acc sm" onClick={() => { if (A.addNap(s, e, k)) setOpen(false); }}>Додати</button>
+        <button className="btn ghost sm" onClick={() => setOpen(false)}>Скасувати</button>
+      </div>
     </div>
   );
 }

@@ -1453,3 +1453,59 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .pin-err{min-height:20px;font-size:13px;color:var(--m1)}
 .pin-card .btn{justify-content:center}
 @media (max-width:760px){.remindbar .rb-a{width:100%}.remindbar .rb-a .btn{flex:1;justify-content:center}}
+
+/* daytime sleep and hidden calendar events */
+.cev.nap{background:color-mix(in srgb,var(--sleep) 22%,var(--card));color:var(--ink);border-left-color:var(--sleep)}
+.dv-ev.nap{background:var(--sleep);color:#fff}
+.cal-cell .dots i.nap{background:var(--sleep)}
+.napsum{font-size:11px;color:var(--muted);margin-top:-4px}
+.naplist{display:flex;flex-wrap:wrap;gap:6px}
+.napchip{display:inline-flex;align-items:center;gap:5px;padding:3px 4px 3px 9px;border-radius:99px;background:color-mix(in srgb,var(--sleep) 16%,var(--card));font-size:12px;font-family:var(--f-num)}
+.napchip>svg{width:12px;height:12px;color:var(--sleep)}
+.napchip button{width:20px;height:20px;display:grid;place-items:center;border-radius:50%;color:var(--muted)}
+.napchip button:hover{background:var(--bg)}
+.napchip button svg{width:10px;height:10px}
+.napadd{align-self:flex-start;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--sleep);padding:4px 2px}
+.napadd svg{width:13px;height:13px}
+.napform{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:var(--bg)}
+.napform .sleeptimes input{background:var(--card)}
+.napq{display:flex;flex-wrap:wrap;gap:6px}
+.napq button{font-size:12px;padding:4px 10px;border-radius:99px;background:var(--card);border:1px solid var(--line)}
+.hiddenext{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted);padding:10px 12px;border-radius:12px;background:var(--bg)}
+
+/* day score: every reason written out */
+.score2{display:grid;grid-template-columns:132px minmax(0,1fr);gap:18px;align-items:center;margin:4px 0 16px}
+.score2-t{display:flex;flex-direction:column;gap:10px;min-width:0}
+.sc-cov{margin:0;display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted)}
+.sc-cov i{display:block;height:5px;border-radius:99px;background:var(--ink);opacity:.8;max-width:100%}
+.sc-lost{display:flex;flex-direction:column;gap:2px}
+.sc-lost>b{font-size:12px;margin-bottom:2px}
+.sc-lost button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 8px;text-align:left;padding:7px 10px;border-radius:12px;background:var(--bg)}
+.sc-lost button+button{margin-top:4px}
+.sc-lost span{font-size:13px;font-weight:600}
+.sc-lost em{font-style:normal;font-size:12px;font-weight:600;color:var(--m1)}
+.sc-lost small{grid-column:1/-1;font-size:11.5px;color:var(--muted);line-height:1.35}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.sg2{display:flex;flex-direction:column;gap:7px;padding:12px 14px;border-radius:var(--r-in);background:var(--bg);min-width:0}
+.sg2-h{display:flex;align-items:baseline;gap:8px;font-size:13px}
+.sg2-h span{font-size:11px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg2-h em{margin-left:auto;font-style:normal;font-size:12px;color:var(--muted)}
+.sg2 .bar{background:var(--card)}
+.sp2{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 8px;text-align:left;padding:4px 0}
+.sp2-l{font-size:12.5px;font-weight:500}
+.sp2 em{font-style:normal;font-size:11.5px;color:var(--muted)}
+.sp2 small{grid-column:1/-1;font-size:11.5px;color:var(--muted);line-height:1.4}
+.sp2:hover .sp2-l{text-decoration:underline;text-underline-offset:3px}
+.sc-skip{margin-top:12px;font-size:12px;color:var(--muted)}
+.sc-skip summary{cursor:pointer}
+.sc-skip ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.sc-skip li button{text-align:left;font-size:12px;color:var(--muted)}
+.sc-skip li b{color:var(--ink);font-weight:600;margin-right:6px}
+@media (max-width:560px){.score2{grid-template-columns:1fr;justify-items:center}.score2 .scorebig{width:132px}.score2-t{width:100%}}
+
+/* advice page uses the cards of the home page */
+.pghead{display:flex;align-items:center;gap:12px;margin:6px 0 -4px}
+.pghead .ic{width:22px;height:22px;color:var(--muted);flex:none}
+.pghead h3{margin:0;font-size:17px}
+.pghead p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+.advice .btn.sm{align-self:flex-start}

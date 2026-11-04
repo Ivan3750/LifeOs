@@ -61,8 +61,12 @@ export function Schedule() {
   const nowD = new Date(now), nowMin = nowD.getHours() * 60 + nowD.getMinutes();
   const evClass = (e: UiEvent) => `cev ${e.ext ? 'ext' : e.act !== undefined ? 'act' : e.c}`;
   const evTitle = (e: UiEvent) => `${e.title}${e.allDay ? '' : ` · ${e.s}–${e.e}`}${e.location ? ` · ${e.location}` : ''}${e.ext ? ' (календар)' : ''}`;
-  const editBtn = (e: UiEvent) => !e.ext && e.act === undefined && e.localId !== undefined && <button className="cx" style={{ right: 22 }} aria-label={`Змінити ${e.title}`} title="Змінити" onClick={x => { x.stopPropagation(); setSheet({ kind: 'form', key: 'editEvent', init: { id: String(e.localId), title: e.title, date: e.date, s: e.s, e: e.e, c: e.c } }); }}>✎</button>;
-  const delBtn = (e: UiEvent) => !e.ext && e.act !== 0 && <button className="cx" aria-label={`Видалити ${e.title}`} title="Видалити" onClick={x => { x.stopPropagation(); if (e.act) A.delActivity(e.act); else A.delEvent(e.localId!); }}><Icon n="x" /></button>;
+  const editBtn = (e: UiEvent) => !e.ext && e.act === undefined && e.nap === undefined && e.localId !== undefined && <button className="cx" style={{ right: 22 }} aria-label={`Змінити ${e.title}`} title="Змінити" onClick={x => { x.stopPropagation(); setSheet({ kind: 'form', key: 'editEvent', init: { id: String(e.localId), title: e.title, date: e.date, s: e.s, e: e.e, c: e.c } }); }}>✎</button>;
+  const hideBtn = (e: UiEvent) => e.ext && e.extId && <>
+    {e.repeats && e.series && <button className="cx" style={{ right: 22 }} aria-label={`Сховати всі повтори: ${e.title}`} title="Сховати всі повтори цієї події тут. У календарі вони лишаться" onClick={x => { x.stopPropagation(); A.hideExt(e.series!, true); }}><Icon n="refresh" /></button>}
+    <button className="cx" aria-label={`Сховати тут: ${e.title}`} title="Сховати тут. У самому календарі подія лишиться" onClick={x => { x.stopPropagation(); A.hideExt(e.extId!); }}><Icon n="x" /></button>
+  </>;
+  const delBtn = (e: UiEvent) => !e.ext && e.act !== 0 && <button className="cx" aria-label={`Видалити ${e.title}`} title="Видалити" onClick={x => { x.stopPropagation(); if (e.nap !== undefined) A.delNap(e.nap, e.date); else if (e.act) A.delActivity(e.act); else A.delEvent(e.localId!); }}><Icon n="x" /></button>;
 
   return (
     <section className="view">
@@ -120,7 +124,7 @@ export function Schedule() {
                       return (
                         <div key={e.id} className={evClass(e)} title={evTitle(e)}
                           style={{ top: (s0 / 60 - h0) * HOUR, height: Math.max(20, ((e0 - s0) / 60) * HOUR - 2), left: `calc(${(lane / of) * 100}% + 2px)`, width: `calc(${100 / of}% - 4px)` }}>
-                          <b>{e.title}</b><small className="num">{e.s}–{e.e}{e.location ? ` · ${e.location}` : ''}</small>{editBtn(e)}{delBtn(e)}
+                          <b>{e.title}</b><small className="num">{e.s}–{e.e}{e.location ? ` · ${e.location}` : ''}</small>{editBtn(e)}{delBtn(e)}{hideBtn(e)}
                         </div>
                       );
                     })}
@@ -144,7 +148,7 @@ export function Schedule() {
           <label className="field" htmlFor="evColor">Колір<select id="evColor" value={v.c} onChange={e => setV({ ...v, c: e.target.value })}>{COLORS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
           {err && <p className="muted" style={{ margin: 0, fontSize: 12, color: 'var(--m1)' }}>{err}</p>}
           <button className="btn acc" style={{ alignSelf: 'flex-start' }}>Додати подію</button>
-          <p className="help">Події з підключених календарів показані бузковим. Їх змінюють у самому календарі, тут вони лише для перегляду. Свою подію можна видалити хрестиком.</p>
+          <p className="help">Події з підключених календарів показані бузковим. Їх змінюють у самому календарі, а тут їх можна лише сховати хрестиком: у календарі вони лишаться. Приховане повертається в Налаштуваннях. Свою подію можна видалити хрестиком.</p>
         </form>
       </div>
     </section>

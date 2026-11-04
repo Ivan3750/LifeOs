@@ -1,4 +1,4 @@
-import type { State } from './types';
+import type { HealthDay, State } from './types';
 import { addD, sod, toMin, ymd } from './util';
 
 /** Bedtime as minutes on a line that runs through midnight: 23:30 is 1410, 00:30 is 1470 (anything before noon counts as after midnight). */
@@ -51,3 +51,8 @@ export function sleepStability(S: State, n = 14, now = new Date()) {
     windDown: clock(target - 40),
   };
 }
+
+/** Minutes of daytime sleep (naps) logged for a day. */
+export const napMinutes = (h?: Pick<HealthDay, 'naps'>) => (h?.naps || []).reduce((a, n) => a + Math.max(0, toMin(n.e) - toMin(n.s)), 0);
+/** Hours slept in the 24 hours of a day: the night plus the naps. */
+export const sleepTotal = (h?: Pick<HealthDay, 'sleep' | 'naps'>) => Math.round(((h?.sleep || 0) + napMinutes(h) / 60) * 10) / 10;

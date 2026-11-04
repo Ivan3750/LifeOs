@@ -9,9 +9,12 @@ export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 
     mood and steps are kept only for data saved by older versions (mood is now logged in State.moods). */
 export type HealthDay = {
   water: number; sleep: number; mood: number; steps: number; workout: number; weight: number; bed?: string; wake?: string;
+  /** Daytime sleep (a nap after lunch…): extra to the night. s/e are 'HH:MM' on the same day. */
+  naps?: Nap[];
   demo?: 1;
 };
-export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake'>;
+export type Nap = { id: number; s: string; e: string };
+export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake' | 'naps'>;
 /** A mood check-in at a moment of the day. v: 1–10, energy: 1–5 (0 = not set). */
 export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
 /** Time spent on errands and other non-work things (shop, commute…). start/end are timestamps. */
@@ -99,6 +102,8 @@ export type State = {
   mode: Mode; view: string;
   co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[] };
   icalUrls: string[];
+  /** Events of subscribed calendars that are hidden on this site only (the calendar itself is not touched). Keys are an occurrence id or a whole series id. */
+  hiddenExt?: Record<string, 1>;
   /** What the events mean. evCats: exact (normalised) title → category; evWords: word stem → category → how often it was chosen. The app learns from both. */
   evCats: Record<string, string>; evWords: Record<string, Record<string, number>>;
   social: SocialEntry[];
@@ -115,7 +120,12 @@ export type UiEvent = {
   ext?: boolean; allDay?: boolean; location?: string; localId?: number;
   /** Id of a logged activity (0 for the one still running). */
   act?: number;
+  /** A daytime sleep: the day it belongs to and its id. */
+  nap?: number;
+  /** For events from a subscribed calendar: the key of the whole series, and whether the series repeats within the loaded range. */
+  series?: string; repeats?: boolean; extId?: string;
 };
 
 /** Shape returned by /api/calendar. */
-export type ExtEvent = { id: string; title: string; start: string; end: string; allDay: boolean; location?: string; src: number };
+/** series: the same for every occurrence of a repeating event. */
+export type ExtEvent = { id: string; series?: string; title: string; start: string; end: string; allDay: boolean; location?: string; src: number };

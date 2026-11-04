@@ -2,6 +2,7 @@ import type { ExtEvent, State } from './types';
 import { account, accOf, potSaved, txDKK } from './money';
 import { clientRows } from './clients';
 import { goalProgress } from './goals';
+import { napMinutes } from './sleep';
 import { addD, hhmm, ymd } from './util';
 import { LEAD_STATUS, STAGES } from './util';
 
@@ -39,8 +40,8 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
     S.tasks.filter(t => !t.d || !t.doneAt || inP(day(t.doneAt), p)).map(t => [t.t, t.d ? 'виконано' : 'відкрита', t.p === 'hi' ? 'так' : '', t.due || '', t.doneAt ? day(t.doneAt) : '', S.goals.find(g => g.id === t.goal)?.title || '']));
   add('habits', 'Звички', 'zvychky', ['Дата', 'Звичка'],
     S.habits.flatMap(h => Object.keys(h.days).filter(d => inP(d, p)).map(d => [d, h.name])).sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
-  add('health', 'Здоровʼя', 'zdorovya', ['Дата', 'Заснув', 'Прокинувся', 'Сон, год', 'Вода, склянок', 'Рух, хв', 'Вага, кг'],
-    Object.keys(S.health).filter(d => inP(d, p)).sort().map(d => { const h = S.health[d]; return [d, h.bed || '', h.wake || '', h.sleep || '', h.water || '', h.workout || '', h.weight || '']; }));
+  add('health', 'Здоровʼя', 'zdorovya', ['Дата', 'Заснув', 'Прокинувся', 'Сон, год', 'Денний сон, хв', 'Вода, склянок', 'Рух, хв', 'Вага, кг'],
+    Object.keys(S.health).filter(d => inP(d, p)).sort().map(d => { const h = S.health[d]; return [d, h.bed || '', h.wake || '', h.sleep || '', napMinutes(h) || '', h.water || '', h.workout || '', h.weight || '']; }));
   add('quit', 'Відмова від звичок', 'vidmova', ['Дата', 'Час', 'Звичка', 'Що сталося', 'Причина', 'Допомогло'],
     S.cravings.filter(c => inP(day(c.t), p)).sort((a, b) => a.t - b.t).map(c => [day(c.t), clock(c.t), S.badHabits.find(h => h.id === c.habit)?.name || '', c.outcome === 'resisted' ? 'витримав' : 'зрив', c.trigger, c.tool ? ({ exercise: 'вправи', breath: 'дихання', game: 'гра' } as Record<string, string>)[c.tool] || c.tool : '']));
   add('moods', 'Настрій', 'nastrij', ['Дата', 'Час', 'Настрій 1–10', 'Сили', 'Теги', 'Нотатка'],

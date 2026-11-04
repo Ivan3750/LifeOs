@@ -150,10 +150,13 @@ export function SchedCard() {
         <div className="dv-pop">
           <div style={{ minWidth: 0 }}>
             <b>{sel.title}</b>
-            <small>{sel.allDay ? 'Весь день' : `${sel.s}–${sel.e}`}{sel.location ? ` · ${sel.location}` : ''} · {sel.ext ? 'з календаря' : 'моя подія'}</small>
+            <small>{sel.allDay ? 'Весь день' : `${sel.s}–${sel.e}`}{sel.location ? ` · ${sel.location}` : ''} · {sel.ext ? 'з календаря' : sel.nap !== undefined ? 'денний сон' : 'моя подія'}</small>
           </div>
           {!sel.ext && sel.localId !== undefined && <button className="chip" onClick={() => { setSheet({ kind: 'form', key: 'editEvent', init: { id: String(sel.localId), title: sel.title, date: sel.date, s: sel.s, e: sel.e, c: sel.c } }); setOpen(null); }}>Змінити</button>}
           {!sel.ext && sel.localId !== undefined && <button className="chip" onClick={() => { A.delEvent(sel.localId!); setOpen(null); }}>Видалити</button>}
+          {sel.nap !== undefined && <button className="chip" onClick={() => { A.delNap(sel.nap!, sel.date); setOpen(null); }}>Видалити</button>}
+          {sel.ext && sel.extId && <button className="chip" title="Лише на цьому сайті: у самому календарі подія лишиться" onClick={() => { A.hideExt(sel.extId!); setOpen(null); }}>{sel.repeats ? 'Сховати цю' : 'Сховати тут'}</button>}
+          {sel.ext && sel.series && sel.repeats && <button className="chip" title="Усі повтори цієї події, лише на цьому сайті" onClick={() => { A.hideExt(sel.series!, true); setOpen(null); }}>Сховати всі</button>}
           <button className="rnd" aria-label="Закрити" onClick={() => setOpen(null)}><Icon n="x" /></button>
         </div>
       ) : (
@@ -207,7 +210,7 @@ function FreeTimeCard() {
   const week = lastDays(7).map(d => ({ d, ...scoreOn(d, now).ft }));
   const maxFree = Math.max(60, ...week.map(w => w.free));
   return (
-    <div className="card s6 fillcard">
+    <div className="card s5 fillcard">
       <div className="ch"><Icon n="clock" className="ic" /><div><h3>Вільний час і робота</h3><p>Скільки з годин, вільних від подій і їжі, ти працював</p></div><button className="sel" onClick={() => go('prefs')}>День {hhmm(new Date(t.start))}–{hhmm(new Date(t.fullEnd))}</button></div>
       <div className="bigstat"><span className="v num">{hrs(t.worked)}<small>/</small>{hrs(t.free)}<small>год</small></span><span className={`delta ${pct >= 60 ? 'up' : 'dn'}`}>{pct}%</span></div>
       <div className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
@@ -253,7 +256,8 @@ function DayOffBar({ k }: { k: string }) {
   );
 }
 
-/** Day score 0–100 with what it is made of. Arrows and the bars below switch to earlier days. */
+/** Day score 0–100 with what it is made of. Arrows and the bars below switch to earlier days.
+    Every reason is written out (a tooltip is not visible on a phone), and the card says how much of the day could be judged. */
 function ScoreCard() {
   const { scoreOn, go } = useStore();
   const now = useNow(30_000);
@@ -264,11 +268,13 @@ function ScoreCard() {
   // 7 bars: the picked day and the days around it, never past today
   const endK = ymd(addD(dt, 3)) > today ? today : ymd(addD(dt, 3));
   const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : scoreOn(d, now).total }));
-  const weak = [...sc.parts].sort((a, b) => a.got / a.max - b.got / b.max)[0];
+  const lost = sc.parts.filter(p => p.max - p.got >= 1).sort((a, b) => (b.max - b.got) - (a.max - a.got)).slice(0, 3);
   const to: Record<string, string> = { focus: 'focus', goals: 'goals', sleep: 'health', sleepreg: 'health', water: 'health', move: 'health', habits: 'habits', mood: 'health', money: 'money', social: 'time', tasks: 'tasks', quit: 'quit' };
   const [how, setHow] = useState(false);
+  const pct = Math.round(sc.coverage * 100), partial = sc.total !== null && sc.coverage < 0.45;
+  const tone = (r: number) => (r >= 0.7 ? 'var(--good)' : r >= 0.4 ? 'var(--accent-2)' : 'var(--m1)');
   return (
-    <div className="card s6" id="score-card">
+    <div className="card s7" id="score-card">
       <div className="ch">
         <Icon n="trophy" className="ic" />
         <div><h3>Оцінка дня</h3><p>{isToday ? 'Сьогодні, рахується наживо' : `${WD[dt.getDay()]}, ${dt.getDate()} ${MON[dt.getMonth()]}`}</p></div>
@@ -278,32 +284,43 @@ function ScoreCard() {
         </div>
       </div>
       <DayOffBar k={k} />
-      <div className="score">
+      <div className="score2">
         <div className="scorebig" style={{ ['--sc' as string]: scoreColor(sc.total) }}>
           <b className="num">{sc.total ?? '—'}</b><small>{sc.total === null ? '' : '/100'}</small>
           <span>{scoreWord(sc.total)}</span>
         </div>
-        <div className="scoreparts">
-          {sc.groups.map(g => (
-            <div key={g.key} className="sg">
-              <div className="sgh"><b>{g.label}</b><em className="num">{Math.round(g.got)}/{g.max}</em></div>
-              {sc.parts.filter(p => p.group === g.key).map(p => (
-                <button key={p.key} className="sp" onClick={() => go(to[p.key])} title={p.hint}>
-                  <span>{p.label}</span>
-                  <div className="bar"><i style={{ width: (p.got / p.max) * 100 + '%', background: p.got / p.max >= 0.7 ? 'var(--good)' : p.got / p.max >= 0.4 ? 'var(--accent-2)' : 'var(--m1)' }} /></div>
-                  <em className="num">{Math.round(p.got)}/{p.max}</em>
-                </button>
-              ))}
+        <div className="score2-t">
+          {sc.total !== null && <p className="sc-cov"><i style={{ width: pct + '%' }} /><span>{partial ? `Поки оцінено лише ${pct}% дня` : `Оцінено ${pct}% дня`}</span></p>}
+          {partial && <p className="muted" style={{ fontSize: 12, margin: 0 }}>Це перше враження: запиши ще кілька речей, і оцінка стане точнішою.</p>}
+          {sc.total === null && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Запиши сон, настрій, звичку чи фокус, і я оціню день.</p>}
+          {lost.length > 0 && (
+            <div className="sc-lost">
+              <b>{isToday ? 'Що додасть найбільше балів' : 'Де втрачено найбільше'}</b>
+              {lost.map(p => <button key={p.key} onClick={() => go(to[p.key])}><span>{p.label}</span><em className="num">−{Math.round(p.max - p.got)}</em><small>{p.hint}</small></button>)}
             </div>
-          ))}
-          {sc.skipped.map(p => (
-            <button key={p.key} className="sp off" onClick={() => go(to[p.key])} title={p.why}>
-              <span>{p.label}</span><small>{p.why}</small>
-            </button>
-          ))}
+          )}
         </div>
       </div>
-      {weak && weak.got < weak.max && <p className="muted" style={{ fontSize: 12, margin: '12px 0 0' }}>{isToday ? 'Найбільше балів можна додати' : 'Найбільше балів втрачено'}: <b style={{ color: 'var(--ink)' }}>{weak.label.toLowerCase()}</b> ({weak.hint})</p>}
+      <div className="sgrid">
+        {sc.groups.map(g => (
+          <div key={g.key} className="sg2">
+            <div className="sg2-h"><b>{g.label}</b><span>{g.what}</span><em className="num">{Math.round(g.got)}/{g.max}</em></div>
+            <div className="bar"><i style={{ width: (g.got / g.max) * 100 + '%', background: tone(g.got / g.max) }} /></div>
+            {sc.parts.filter(p => p.group === g.key).map(p => (
+              <button key={p.key} className="sp2" onClick={() => go(to[p.key])}>
+                <span className="sp2-l">{p.label}</span><em className="num">{Math.round(p.got)}/{p.max}</em>
+                <small>{p.hint}</small>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+      {sc.skipped.length > 0 && (
+        <details className="sc-skip">
+          <summary>Не рахується ({sc.skipped.length}): це не зменшує оцінку</summary>
+          <ul>{sc.skipped.map(p => <li key={p.key}><button onClick={() => go(to[p.key])}><b>{p.label}</b>{p.why}</button></li>)}</ul>
+        </details>
+      )}
       <div className="scorehist">
         {hist.map(h => {
           const d = new Date(h.d + 'T00:00'), label = h.v === null ? 'нема даних' : `${h.v}/100`;
@@ -317,19 +334,16 @@ function ScoreCard() {
       <button className="howbtn" aria-expanded={how} onClick={() => setHow(!how)}>{how ? 'Сховати, як рахується' : 'Як рахується оцінка?'}</button>
       {how && (
         <ul className="howlist">
-          <li>Оцінка 0–100 складається з п’яти частин: <b>Робота й цілі</b> (робота 22, цілі 8, задачі 6), <b>Сон і тіло</b> (скільки спав 14, режим сну 8, вода 4, рух 4), <b>Настрій і увага</b> (настрій 8, соцмережі 6), <b>Звички</b> (звички 8, без зривів 6), <b>Гроші</b> (6). Усе, що ти записуєш у застосунку, входить в оцінку, у тому числі за минулі дні.</li>
-          <li><b>Робота.</b> Тижнева ціль ділиться на робочі дні, але не більше 60% вільного часу. Фокус, час, записаний як «Бізнес», і зміни Wolt рахуються як робота. Сьогодні очікується лише та частина дня, що вже минула. У вихідний будь-яка робота лише плюс: 20 хв дають повний бал.</li>
-          <li><b>Задачі.</b> Закриті за день проти тих, що мали термін цього дня й досі відкриті. Дні без задач не оцінюються.</li>
-          <li><b>Цілі.</b> Фокус на задачах, прив’язаних до цілі: повний бал за 20+ хв, якщо є відкрита ціль.</li>
-          <li><b>Сон: скільки.</b> 7–9 годин дають повний бал. <b>Сон: режим.</b> Засинання не пізніше ніж за 30 хв після цільового часу (Налаштування → Здоровʼя) і підйом у межах 45 хв від цільового: так сон рахується стабільним, а не просто довгим. Пізніше, ніж на 2 години за ціль, дає нуль.</li>
-          <li><b>Вода й рух.</b> 8 склянок і 30 хв руху (або твої цілі) дають повні бали.</li>
-          <li><b>Звички.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора.</li>
-          <li><b>Без зривів.</b> Якщо ти відстежуєш шкідливі звички: день без зриву дає повний бал, зрив забирає його (бал ділиться між звичками, які відстежувались того дня).</li>
-          <li><b>Соцмережі.</b> Рахуються, лише коли ти їх записав. Кожна платформа має свій ліміт (за замовчуванням Instagram 30, YouTube 60 хв); 60 хв понад ліміти разом дають нуль. Записи за минулі дні теж враховуються.</li>
-          <li><b>Настрій і гроші.</b> 7/10 і краще дає повний бал. Житло віднімається від місячного бюджету, решта ділиться на денний ліміт.</li>
-          <li>Частина, яку не можна оцінити (вихідний, ще рано, не записано), не дає нуля: її просто немає, а решта перераховується до 100. Дні до початку записів і майбутні дні не оцінюються взагалі.</li>
-          <li><b>Без поблажок на завершений день.</b> Якщо день уже минув і ти вів його записи (сон, настрій, звички або фокус), порожні «вода» та «рух» рахуються як 0, а не пропускаються.</li>
-          <li><b>Не робочий день.</b> Захворів, екстрені справи, відпочинок або поїздка: робота й цілі не очікуються (що зробив, те плюс), звички очікуються частково, хворому сон до 11 год — норма. Такі дні не обривають серію.</li>
+          <li>Усього 100 балів у шести блоках: <b>Робота</b> 30 (фокус 20, задачі 5, цілі 5), <b>Сон</b> 22 (скільки 14, режим 8), <b>Тіло</b> 14 (рух 8, вода 6), <b>Звички</b> 17 (звички 12, без зривів 5), <b>Голова</b> 12 (настрій 8, соцмережі 4), <b>Гроші</b> 5.</li>
+          <li><b>Нічого не штрафується за «не записано».</b> Те, чого ще нема в записах, просто не рахується, а решта перераховується до 100. Тому над числом стоїть, яку частину дня вдалося оцінити: оцінка за 30% дня менш надійна, ніж за 90%.</li>
+          <li><b>Робота.</b> Тижнева ціль ділиться на робочі дні, але не більше 60% вільного часу. Фокус, час «Бізнес» і зміни Wolt рахуються як робота. Сьогодні очікується лише та частина дня, що вже минула. У вихідний будь-яка робота лише плюс: 20 хв дають повний бал.</li>
+          <li><b>Задачі.</b> Закриті за день проти тих, що мали термін цього дня й досі відкриті. <b>Цілі.</b> Фокус на задачах, привʼязаних до цілі: повний бал за 20+ хв.</li>
+          <li><b>Сон.</b> 7–9 годин за добу дають повний бал, і <b>денний сон теж рахується</b>, тож коротку ніч можна частково компенсувати. Режим: засинання не пізніше ніж за 30 хв після цілі й підйом у межах 45 хв від цілі (Налаштування → Здоровʼя).</li>
+          <li><b>Вода й рух.</b> 8 склянок і 30 хв руху (або твої цілі) дають повні бали. Завершений день, який ти вів, рахує порожні «воду» і «рух» як 0.</li>
+          <li><b>Звички.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора. <b>Без зривів:</b> день без зриву шкідливої звички дає повний бал.</li>
+          <li><b>Голова.</b> Настрій 7/10 і краще дає повний бал. Соцмережі рахуються, лише коли записані: 60 хв понад ліміти разом дають нуль.</li>
+          <li><b>Гроші.</b> Житло віднімається від місячного бюджету, решта ділиться на денний ліміт. Подвійний ліміт і більше дає нуль.</li>
+          <li><b>Не робочий день.</b> Захворів, екстрені справи, відпочинок чи поїздка: робота й цілі не очікуються (що зробив, те плюс), звички очікуються частково, хворому сон до 11 год — норма. Такі дні не обривають серію.</li>
         </ul>
       )}
     </div>

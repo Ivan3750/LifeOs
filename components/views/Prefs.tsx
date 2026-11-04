@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { fill, logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
-import { DN, TK } from '@/lib/util';
+import { DN, plural, TK } from '@/lib/util';
 import { dayPlan, sleepRhythm } from '@/lib/score';
 import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
@@ -37,7 +37,7 @@ function TextField({ id, label, value, fallback, onSave }: { id: string; label: 
 }
 
 function CalendarSettings() {
-  const { S, update, cal, refreshCal, toast } = useStore();
+  const { S, A, update, cal, refreshCal, toast } = useStore();
   const [url, setUrl] = useState('');
   const add = (e: FormEvent) => {
     e.preventDefault();
@@ -71,6 +71,12 @@ function CalendarSettings() {
         {!S.icalUrls.length && cal.state !== 'ok' && <p className="muted" style={{ margin: 0, fontSize: 13 }}>Ще жодного календаря. Можна також прописати посилання в файлі <code>.env.local</code> як <code>ICAL_URLS</code>.</p>}
         {!S.icalUrls.length && cal.state === 'ok' && <p className="muted" style={{ margin: 0, fontSize: 13 }}>Календарі підключено через <code>ICAL_URLS</code> у <code>.env.local</code>.</p>}
       </div>
+      {Object.keys(S.hiddenExt || {}).length > 0 && (
+        <div className="hiddenext">
+          <span>Приховано на сайті: {Object.keys(S.hiddenExt || {}).length} {plural(Object.keys(S.hiddenExt || {}).length, 'подія', 'події', 'подій')} (у календарі вони є)</span>
+          <button className="sqb" onClick={() => A.showExt()}>Показати всі</button>
+        </div>
+      )}
       {!!cal.errors?.length && <div className="help" style={{ color: 'var(--m1)' }}>{cal.errors.map(e => <div key={e}>{e}</div>)}</div>}
       <div className="help">
         <b>Google Calendar:</b> calendar.google.com → ⚙ Налаштування → обери свій календар → «Інтеграція календаря» → «Секретна адреса у форматі iCal».<br />

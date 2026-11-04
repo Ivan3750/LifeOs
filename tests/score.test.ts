@@ -72,7 +72,7 @@ describe('dayScore: steady sleep, business and social media', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     s.activities.push({ id: 5, kind: 'Бізнес', title: '', start: new Date(day + 'T10:00').getTime(), end: new Date(day + 'T14:00').getTime() });
     const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(22);
+    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(20);
     expect(r.parts.some(p => p.key === 'biz')).toBe(false);
   });
 
@@ -80,7 +80,7 @@ describe('dayScore: steady sleep, business and social media', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     s.activities.push({ id: 6, kind: 'Wolt', title: 'Зміна', start: new Date(day + 'T12:00').getTime(), end: new Date(day + 'T16:00').getTime() });
     const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(22);
+    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(20);
     expect(r.parts.find(p => p.key === 'focus')?.hint).toContain('Wolt');
   });
 
@@ -88,7 +88,7 @@ describe('dayScore: steady sleep, business and social media', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     expect(dayScore(s, day, [], [], NOW).skipped.some(x => x.key === 'tasks')).toBe(true);
     s.tasks.push({ id: 1, t: 'a', p: 'lo', d: true, doneAt: new Date(day + 'T14:00').getTime() }, { id: 2, t: 'b', p: 'lo', d: false, due: day });
-    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'tasks')?.got).toBe(3);
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'tasks')?.got).toBe(2.5);
   });
 
   it('counts social media added afterwards for a past day', () => {
@@ -103,9 +103,9 @@ describe('dayScore: steady sleep, business and social media', () => {
   it('judges social media against the limit of each platform', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     s.social.push({ id: 1, date: day, platform: 'Instagram', min: 30 }, { id: 2, date: day, platform: 'YouTube', min: 40 });
-    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'social')?.got).toBe(6);
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'social')?.got).toBe(4);
     s.social.push({ id: 3, date: day, platform: 'Instagram', min: 30 });
-    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'social')?.got).toBe(3);
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'social')?.got).toBe(2);
     s.social = [];
     expect(dayScore(s, day, [], [], NOW).skipped.some(x => x.key === 'social')).toBe(true);
   });
@@ -120,6 +120,55 @@ describe('dayScore: steady sleep, business and social media', () => {
     const r = dayScore(s, day, [], s.sessions, NOW);
     expect(r.total).toBe(100);
     expect(r.groups.reduce((a, g) => a + g.max, 0)).toBeLessThanOrEqual(100);
+  });
+
+  it('is worth exactly 100 points when every part applies', () => {
+    const s = blank();
+    s.health[day] = { ...night('23:30', '07:30'), water: 8, workout: 30 };
+    s.habits.push({ id: 1, name: 'h', days: { [day]: 1 } });
+    s.badHabits.push({ id: 7, name: 'q', start: new Date('2026-03-01T10:00').getTime(), best: 0, slips: [] });
+    s.moods.push({ id: 2, t: new Date(day + 'T12:00').getTime(), v: 8, energy: 3, tags: [], note: '' });
+    s.sessions.push({ t: new Date(day + 'T09:00').getTime(), m: 300 });
+    s.social.push({ id: 3, date: day, platform: 'Instagram', min: 10 });
+    s.goals.push({ id: 9, title: 'g', area: 'Карʼєра', target: 10, cur: 1, unit: '', due: '' });
+    s.tasks.push({ id: 1, t: 'a', p: 'lo', d: true, doneAt: new Date(day + 'T14:00').getTime(), goal: 9 });
+    s.sessions.push({ t: new Date(day + 'T15:00').getTime(), m: 60, task: 'a' });
+    s.money.accounts[0].budget = 3000;
+    s.money.tx.push({ id: 5, type: 'out', amt: 10, cat: 'Їжа', note: '', date: day, acc: 'dk' });
+    const r = dayScore(s, day, [], s.sessions, NOW);
+    expect(r.groups.reduce((a, g) => a + g.max, 0)).toBe(100);
+    expect(r.coverage).toBe(1);
+    expect(r.total).toBe(100);
+  });
+
+  it('says how much of the day could be judged, so one logged item is not mistaken for a full day', () => {
+    const s = blank();
+    s.moods.push({ id: 2, t: new Date(day + 'T12:00').getTime(), v: 9, energy: 3, tags: [], note: '' });
+    const r = dayScore(s, day, [], [], NOW);
+    expect(r.coverage).toBeLessThan(0.45);
+    expect(r.groups.map(g => g.key)).toEqual(['work', 'body', 'mind']);   // a finished day counts empty focus, water and movement as 0
+  });
+});
+
+describe('dayScore: daytime sleep', () => {
+  const day = '2026-03-17';
+  const base = { water: 0, mood: 0, steps: 0, workout: 0, weight: 0 };
+
+  it('adds a nap after lunch to a short night', () => {
+    const s = blank(); s.health[day] = { ...base, sleep: 5.5 };
+    const before = dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'sleep')!;
+    s.health[day].naps = [{ id: 1, s: '13:00', e: '14:30' }];
+    const after = dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'sleep')!;
+    expect(before.got).toBeCloseTo(7, 5);   // 5.5 h: (5.5 − 4) / 3 of 14
+    expect(after.got).toBe(14);             // 5.5 + 1.5 = 7 h
+    expect(after.hint).toContain('день 90 хв');
+  });
+
+  it('does not make a long night better, and a nap alone is judged as sleep too', () => {
+    const s = blank(); s.health[day] = { ...base, sleep: 8, naps: [{ id: 1, s: '13:00', e: '13:30' }] };
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'sleep')?.got).toBe(14);
+    s.health[day] = { ...base, sleep: 0, naps: [{ id: 1, s: '13:00', e: '13:30' }] };
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'sleep')?.got).toBeCloseTo(0, 5);
   });
 });
 

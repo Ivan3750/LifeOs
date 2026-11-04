@@ -1,6 +1,6 @@
 import type { State, UiEvent } from './types';
 import { dayMood, energyLevel, moodsOn, waterGoal, moveGoal, isWorkDay } from './score';
-import { clock, sleepStability } from './sleep';
+import { clock, sleepStability, sleepTotal } from './sleep';
 import { socialGoal, socialOn, socialPeriod } from './social';
 import { classify } from './timeuse';
 import { cravingStats, nextMilestone, streakDays, TRIGGERS } from './quit';
@@ -65,12 +65,12 @@ export function coachRows(S: State, eventsOn: (k: string) => UiEvent[], days = 6
   const f = { focus: first(focus), tasks: first(tasks), spend: first(spend), habits: first(habitDays) };
   const rows = keys.map(k => {
     const h = S.health[k], ms = moodsOn(S, k), en = ms.filter(m => m.energy > 0).map(m => energyLevel(m.energy) as number);
-    const evs = eventsOn(k).filter(e => e.act === undefined && !e.allDay);
+    const evs = eventsOn(k).filter(e => e.act === undefined && e.nap === undefined && !e.allDay);
     const evMin = (e: UiEvent) => Math.max(0, toMin(e.e) - toMin(e.s));
     const total = (m: Map<string, number>, from: string) => (k >= from ? m.get(k) || 0 : null);
     const fo = total(focus, f.focus), tk = total(tasks, f.tasks), so = S.social.some(x => x.date === k) ? socialOn(S, k).total : null;
     return {
-      k, sleep: h && h.sleep > 0 ? h.sleep : null, bedTonight: null, mood: dayMood(S, k) || null, energy: en.length ? mean(en) : null,
+      k, sleep: h && sleepTotal(h) > 0 ? sleepTotal(h) : null, bedTonight: null, mood: dayMood(S, k) || null, energy: en.length ? mean(en) : null,
       stress: ms.length ? (ms.some(m => m.tags.some(t => STRESS.includes(t))) ? 1 : 0) : null,
       focus: fo, tasks: tk, taskPace: fo && tk ? fo / tk : null, water: h && h.water > 0 ? h.water : null, workout: h ? h.workout : null,
       habits: S.habits.length && k >= f.habits ? (habitDays.get(k) || 0) / S.habits.length : null,
@@ -116,7 +116,6 @@ const PAIRS: Pair[] = [
   { d: 'water', o: 'focus', lag: 0, h: 1, why: 'Мозок чутливий до нестачі води: концентрація падає раніше за відчуття спраги.', fix: 'Став склянку води поруч із робочим місцем.' },
   { d: 'habits', o: 'mood', lag: 0, h: 1, why: 'Виконані звички дають відчуття контролю й послідовності, а це підтримує настрій.', fix: 'Роби звичку хоча б у мінімальному вигляді, щоб день не «пропав».' },
   { d: 'habits', o: 'focus', lag: 0, h: 1, why: 'Ранкові звички включають режим дня, і далі легше сісти за складне.', fix: 'Став ключові звички на ранок, перед роботою.' },
-  { d: 'focus', o: 'mood', lag: 0, h: 1, why: 'Відчуття, що зробив головне, знімає тривогу й піднімає настрій на решту дня.', fix: 'Почни з одного блоку фокусу вранці, перш ніж відкривати стрічки.' },
   { d: 'tasks', o: 'mood', lag: 0, h: 1, why: 'Закриті задачі прибирають «відкриті петлі» в голові, тому стає спокійніше.', fix: 'Закрий хоча б одну маленьку задачу зранку.' },
   { d: 'goalMin', o: 'mood', lag: 0, h: 1, why: 'Рух до власної цілі повертає відчуття сенсу: це протилежність порівнянню з чужими результатами.', fix: 'Щодня роби хоча б 20 хвилин для цілі.' },
   { d: 'load', o: 'mood', lag: 0, h: -1, why: 'Коли день забитий подіями, немає буфера: поспіх накопичує напругу.', fix: 'Лишай між подіями паузи й не став більше 3–4 довгих подій на день.' },
@@ -352,7 +351,7 @@ export function coach(S: State, eventsOn: (k: string) => UiEvent[], now = new Da
     add({ id: 'peak', area: 'Робота й бізнес', tone: 'good', weight: 35, title: `Твій найпродуктивніший час: ${String(bi).padStart(2, '0')}:00–${String(bi + 2).padStart(2, '0')}:00`,
       facts: [`${Math.round((bv / total) * 100)}% усього фокусу припадає на ці дві години`], why: 'Енергія протягом дня нерівна. Складне, що вимагає думання, найкраще йде в пік, а пошту й дрібниці можна лишити на спад.', action: 'Став на ці години найважливішу задачу й не пускай туди зустрічі.', to: 'focus' });
   }
-  const unknown = Object.keys(S.evCats).length === 0 ? eventsOn(today).filter(e => e.act === undefined && !e.allDay).length + S.events.length : 0;
+  const unknown = Object.keys(S.evCats).length === 0 ? eventsOn(today).filter(e => e.act === undefined && e.nap === undefined && !e.allDay).length + S.events.length : 0;
   if (unknown >= 3) add({ id: 'label-events', area: 'Увага й час', tone: 'info', weight: 30, title: 'Підпиши події, щоб я бачив, куди йде час', facts: [], why: 'Поки я не знаю, що це за події, не можу показати, скільки часу йде на навчання, бізнес чи відпочинок, і порівняти це із сном та настроєм.', action: 'Відкрий «Час» і відповідай на питання: це займе хвилину.', to: 'time' });
 
   tips.sort((a, b) => b.weight - a.weight);

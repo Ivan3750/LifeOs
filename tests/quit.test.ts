@@ -67,9 +67,9 @@ describe('habits to quit in the day score, export and advice', () => {
   it('gives a full mark for a clean day and nothing for a day with a slip', () => {
     const { S } = setup(); S.health[day] = health;
     S.badHabits.push({ id: 1, name: 'A', start: new Date('2026-03-10T10:00').getTime(), best: 0, slips: [] }, { id: 2, name: 'B', start: new Date('2026-03-10T10:00').getTime(), best: 0, slips: [] });
-    expect(dayScore(S, day, [], [], NOW.getTime()).parts.find(p => p.key === 'quit')?.got).toBe(6);
+    expect(dayScore(S, day, [], [], NOW.getTime()).parts.find(p => p.key === 'quit')?.got).toBe(5);
     S.badHabits[0].slips.push(new Date(day + 'T22:00').getTime());
-    expect(dayScore(S, day, [], [], NOW.getTime()).parts.find(p => p.key === 'quit')?.got).toBe(3);
+    expect(dayScore(S, day, [], [], NOW.getTime()).parts.find(p => p.key === 'quit')?.got).toBe(2.5);
     expect(quitOn(S, day).slipped.map(h => h.name)).toEqual(['A']);
   });
 

@@ -1,5 +1,6 @@
 import type { State } from './types';
 import { dayMood, energyLevel, moodsOn, moveGoal, sleepRhythm, waterGoal } from './score';
+import { sleepTotal } from './sleep';
 import { addD, plural, sod, toMin, ymd } from './util';
 
 /* Links between the areas of life, found in the person's own days.
@@ -40,7 +41,7 @@ export function dayRows(S: State, days = 90, now = new Date()): DayRow[] {
     const total = (m: Map<string, number>, from: string) => (k >= from ? m.get(k) || 0 : null);
     return {
       k,
-      sleep: h && h.sleep > 0 ? h.sleep : null,
+      sleep: h && sleepTotal(h) > 0 ? sleepTotal(h) : null,
       bed: h?.bed ? (toMin(h.bed) < 12 * 60 ? toMin(h.bed) + 1440 : toMin(h.bed)) : null,
       mood: dayMood(S, k) || null,
       energy: en.length ? mean(en) : null,
@@ -98,7 +99,7 @@ const OUTCOMES: Partial<Record<Metric, Outcome>> = {
 const PAIRS: [Metric, Metric, 0 | 1][] = [
   ['sleep', 'mood', 0], ['sleep', 'energy', 0], ['sleep', 'focus', 0], ['bed', 'mood', 0], ['bed', 'energy', 0],
   ['water', 'mood', 0], ['water', 'energy', 0], ['workout', 'mood', 1], ['workout', 'energy', 1], ['workout', 'sleep', 1],
-  ['focus', 'sleep', 1], ['focus', 'energy', 1], ['focus', 'mood', 1], ['tasks', 'mood', 0], ['wolt', 'energy', 1], ['wolt', 'focus', 1], ['wolt', 'sleep', 1],
+  ['focus', 'sleep', 1], ['focus', 'energy', 1], ['tasks', 'mood', 0], ['wolt', 'energy', 1], ['wolt', 'focus', 1], ['wolt', 'sleep', 1],
   ['habits', 'mood', 0], ['habits', 'energy', 1], ['spend', 'mood', 1], ['mood', 'spend', 1], ['events', 'mood', 0], ['events', 'energy', 0],
   ['rest', 'mood', 1], ['rest', 'energy', 1], ['stress', 'sleep', 1], ['stress', 'focus', 0], ['mood', 'sleep', 1], ['mood', 'focus', 1],
 ];
@@ -192,7 +193,12 @@ export type Advice = {
   task?: string;
   /** the mood is what is affected (used to explain a low mood) */
   forMood?: boolean;
+  /** what the advice is about (sleep, bed, water…), so the same topic is not advised twice */
+  topic?: string;
 };
+
+/** Drivers that are never offered as the reason for a low mood. */
+const NOT_A_MOOD_CAUSE: Metric[] = ['focus', 'tasks'];
 
 /** The value of a driver that matters for the outcome of today: today's for what is known in the morning, otherwise yesterday's. */
 const relevant = (f: Finding, rows: DayRow[]) => { const dr = DRIVERS[f.driver]!, i = rows.length - 1 - (f.lag === 1 ? 1 : 0); return f.lag === 0 && !dr.morning ? null : rows[i]?.[f.driver] ?? null; };
@@ -215,7 +221,7 @@ export function adviceList(S: State, now = new Date()): Advice[] {
     else reason += ' Недосип знижує настрій, енергію і концентрацію, хоч у твоїх записах ще замало днів для точної закономірності.';
     if (sleepEnergy) facts.push(`енергія ${n1(sleepEnergy.bad.avg)} проти ${n1(sleepEnergy.good.avg)}`);
     if (lowMood) { reason += ` Сьогоднішній настрій ${n1(moodNow!)} із 10: схоже, це відлуння недосипу.`; facts.push(`настрій сьогодні ${n1(moodNow!)}`); }
-    out.push({ tone: 'warn', area: 'Здоровʼя', title: 'Сьогодні вирівняй сон', reason, facts, action: `Лягти спати до ${bed}: так вийде 7,5 години до звичного підйому о ${hm(wake)}.`, cause: `недосип (${n1(s)} год сну)`, task: `Лягти спати до ${bed}`, forMood: true });
+    out.push({ tone: 'warn', area: 'Здоровʼя', title: 'Сьогодні вирівняй сон', reason, facts, action: `Лягти спати до ${bed}: так вийде 7,5 години до звичного підйому о ${hm(wake)}.`, cause: `недосип (${n1(s)} год сну)`, task: `Лягти спати до ${bed}`, forMood: true, topic: 'sleep' });
   }
 
   // every other link whose bad half applies to today (or to yesterday, for next-day effects)
@@ -231,14 +237,16 @@ export function adviceList(S: State, now = new Date()): Advice[] {
     const task = taskFor(f);
     used.add(f.driver);
     out.push({
-      tone: 'warn', area: dr.area, title: adviceTitle(f), forMood: f.outcome === 'mood',
+      tone: 'warn', area: dr.area, title: adviceTitle(f), topic: f.driver,
+      // work output (focus, closed tasks) follows a low mood far more often than it causes one, so it is never named as the reason for it
+      forMood: f.outcome === 'mood' && !NOT_A_MOOD_CAUSE.includes(f.driver),
       reason: `${when}: ${dr.name.toLowerCase()} ${valueText(f.driver, v)}. ${d.text}`,
       facts: [`${dr.name.toLowerCase()}: ${valueText(f.driver, v)}`, `${oc.name} ${oc.fmt(f.bad.avg)} проти ${oc.fmt(f.good.avg)}`, ...(f.preliminary ? ['попередньо, днів мало'] : [])],
       action: d.advice, cause: causeText(f, v), ...(task ? { task } : {}),
     });
   }
   // a good night, when the history shows that sleep matters
-  if (!out.length && today.sleep !== null && today.sleep >= 7 && sleepMood) out.push({ tone: 'good', area: 'Здоровʼя', title: 'Сон у нормі', reason: `Ти спав ${n1(today.sleep)} год. У такі ночі твій настрій у середньому ${n1(sleepMood.good.avg)}, а після короткого сну лише ${n1(sleepMood.bad.avg)}.`, action: 'Так тримати: використай цей запас енергії для найважливішої задачі.', facts: [`сон ${n1(today.sleep)} год`, `настрій ${n1(sleepMood.good.avg)} проти ${n1(sleepMood.bad.avg)}`], cause: '' });
+  if (!out.length && today.sleep !== null && today.sleep >= 7 && sleepMood) out.push({ tone: 'good', area: 'Здоровʼя', title: 'Сон у нормі', reason: `Ти спав ${n1(today.sleep)} год. У такі ночі твій настрій у середньому ${n1(sleepMood.good.avg)}, а після короткого сну лише ${n1(sleepMood.bad.avg)}.`, action: 'Так тримати: використай цей запас енергії для найважливішої задачі.', facts: [`сон ${n1(today.sleep)} год`, `настрій ${n1(sleepMood.good.avg)} проти ${n1(sleepMood.bad.avg)}`], cause: '', topic: 'sleep' });
   return out.slice(0, 3);
 }
 
