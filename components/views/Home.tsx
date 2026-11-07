@@ -6,8 +6,10 @@ import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
 import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { byUrgency, dueLabel, dueState } from '@/lib/tasks';
 import { Icon, type IconName } from '../Icon';
 import { AdviceCard } from '../Advice';
+import { YesterdayCard } from '../Brief';
 import { AffirmationsCard } from '../Affirmations';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
@@ -295,7 +297,7 @@ function ScoreCard() {
           {sc.total === null && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Запиши сон, настрій, звичку чи фокус, і я оціню день.</p>}
           {lost.length > 0 && (
             <div className="sc-lost">
-              <b>{isToday ? 'Що додасть найбільше балів' : 'Де втрачено найбільше'}</b>
+              <b>{isToday ? 'Що додасть найбільше балів' : 'Де можна було більше'}</b>
               {lost.map(p => <button key={p.key} onClick={() => go(to[p.key])}><span>{p.label}</span><em className="num">−{Math.round(p.max - p.got)}</em><small>{p.hint}</small></button>)}
             </div>
           )}
@@ -336,11 +338,11 @@ function ScoreCard() {
         <ul className="howlist">
           <li>Усього 100 балів у шести блоках: <b>Робота</b> 30 (фокус 20, задачі 5, цілі 5), <b>Сон</b> 22 (скільки 14, режим 8), <b>Тіло</b> 14 (рух 8, вода 6), <b>Звички</b> 17 (звички 12, без зривів 5), <b>Голова</b> 12 (настрій 8, соцмережі 4), <b>Гроші</b> 5.</li>
           <li><b>Нічого не штрафується за «не записано».</b> Те, чого ще нема в записах, просто не рахується, а решта перераховується до 100. Тому над числом стоїть, яку частину дня вдалося оцінити: оцінка за 30% дня менш надійна, ніж за 90%.</li>
-          <li><b>Робота.</b> Тижнева ціль ділиться на робочі дні, але не більше 60% вільного часу. Фокус, час «Бізнес» і зміни Wolt рахуються як робота. Сьогодні очікується лише та частина дня, що вже минула. У вихідний будь-яка робота лише плюс: 20 хв дають повний бал.</li>
+          <li><b>Робота.</b> Якщо роботи не записано, а таймером фокусу ти останні два тижні не користувався, цей пункт не рахується. Тижнева ціль ділиться на робочі дні, але не більше 60% вільного часу. Фокус, час «Бізнес» і зміни Wolt рахуються як робота. Сьогодні очікується лише та частина дня, що вже минула. У вихідний будь-яка робота лише плюс: 20 хв дають повний бал.</li>
           <li><b>Задачі.</b> Закриті за день проти тих, що мали термін цього дня й досі відкриті. <b>Цілі.</b> Фокус на задачах, привʼязаних до цілі: повний бал за 20+ хв.</li>
           <li><b>Сон.</b> 7–9 годин за добу дають повний бал, і <b>денний сон теж рахується</b>, тож коротку ніч можна частково компенсувати. Режим: засинання не пізніше ніж за 30 хв після цілі й підйом у межах 45 хв від цілі (Налаштування → Здоровʼя).</li>
-          <li><b>Вода й рух.</b> 8 склянок і 30 хв руху (або твої цілі) дають повні бали. Завершений день, який ти вів, рахує порожні «воду» і «рух» як 0.</li>
-          <li><b>Звички.</b> Сьогодні до обіду рахуються, лише якщо щось уже відмічено; далі очікування росте до вечора. <b>Без зривів:</b> день без зриву шкідливої звички дає повний бал.</li>
+          <li><b>Вода й рух.</b> 8 склянок і 30 хв руху (або твої цілі) дають повні бали. Якщо не записано, це не рахується, а не нуль.</li>
+          <li><b>Звички.</b> Рахуються, лише коли щось відмічено: порожній список не штрафується. Сьогодні очікування росте до вечора. <b>Без зривів:</b> день без зриву шкідливої звички дає повний бал.</li>
           <li><b>Голова.</b> Настрій 7/10 і краще дає повний бал. Соцмережі рахуються, лише коли записані: 60 хв понад ліміти разом дають нуль.</li>
           <li><b>Гроші.</b> Житло віднімається від місячного бюджету, решта ділиться на денний ліміт. Подвійний ліміт і більше дає нуль.</li>
           <li><b>Не робочий день.</b> Захворів, екстрені справи, відпочинок чи поїздка: робота й цілі не очікуються (що зробив, те плюс), звички очікуються частково, хворому сон до 11 год — норма. Такі дні не обривають серію.</li>
@@ -393,8 +395,9 @@ function QuitMini() {
   );
 }
 
-export function Home() {
-  const { S: S0, A, go } = useStore();
+/** Everything that used to crowd the home page: statistics, finance, goals and the day score in detail. Built only when opened. */
+function HomeExtras() {
+  const { S: S0, go } = useStore();
   const now = useNow(30_000);
   // every number below counts the focus run that is still going, the same as the day score does
   const S = { ...S0, sessions: liveSessions(S0, now) };
@@ -405,39 +408,15 @@ export function Home() {
   const goalMin = Math.max(1, S.goal * 60), st = streak(S);
   // tasks: done this week against what is still open
   const taskDone = S.tasks.filter(t => t.d && (t.doneAt ?? 0) >= ws).length, taskOpen = S.tasks.filter(t => !t.d).length;
-  const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
   const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S);
   const gs = [...S.goals].sort((a, c) => goalProgress(c) - goalProgress(a)).slice(0, 4);
   return (
-    <section className="view">
-      <div className="grid">
-        <Hero />
-        <SchedCard />
-
-        <AffirmationsCard />
-
+    <>
         <ScoreCard />
         <FreeTimeCard />
-
-        <AdviceCard />
-
         <WeekSummary />
+        <AffirmationsCard />
 
-        <div className="card s12">
-          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
-          <LifeTiles full={false} />
-        </div>
-
-        <div className="card s4">
-          <div className="ch"><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>{S.habits.length ? `${hDone} з ${S.habits.length} сьогодні` : 'Додай першу звичку'}</p></div><button className="sel" onClick={() => go('habits')}>Усі</button></div>
-          <div className="list">
-            {S.habits.slice(0, 6).map(h => {
-              const on = !!h.days[k];
-              return <div className="item" key={h.id}><button className={`chk ${on ? 'on' : ''}`} aria-pressed={on} aria-label={`Відмітити: ${h.name}`} onClick={() => A.toggleHabit(h.id)}>{on && <Icon n="check" />}</button><span className="t">{h.name}</span><span className="muted num" style={{ fontSize: 12 }}>{habStreak(h.days, S)} дн</span></div>;
-            })}
-            {!S.habits.length && <p className="muted">Звичок поки немає.</p>}
-          </div>
-        </div>
         <div className="card s4">
           <div className="ch"><Icon n="money" className="ic" /><div><h3>Фінанси</h3><p>{MONTHN[new Date().getMonth()]}, витрати обох рахунків у кронах</p></div><button className="sel" onClick={() => go('money')}>Деталі</button></div>
           <div className="bigstat"><span className="v num" style={{ fontSize: 28 }}>{money(out)}</span><span className="muted">з {money(b)}</span></div>
@@ -495,8 +474,80 @@ export function Home() {
           </div>
           <button className="btn" onClick={() => go('focus')}>Продовжити <Icon n="arrow" /></button>
         </div>
+    </>
+  );
+}
+
+/** The few things that matter today: open tasks, the most urgent first, and a one-line way to add another. */
+function TodayTasks() {
+  const { S, A, go } = useStore();
+  const [text, setText] = useState('');
+  const open = S.tasks.filter(t => !t.d).sort(byUrgency);
+  return (
+    <div className="card s6">
+      <div className="ch"><Icon n="tasks" className="ic" /><div><h3>Задачі</h3><p>{open.length ? `${open.length} ${plural(open.length, 'відкрита', 'відкриті', 'відкритих')}, найтерміновіші зверху` : 'Усе зроблено'}</p></div><button className="sel" onClick={() => go('tasks')}>Усі</button></div>
+      <form className="addrow" onSubmit={e => { e.preventDefault(); if (A.addTaskLine(text)) setText(''); }}>
+        <input aria-label="Нова задача" value={text} onChange={e => setText(e.target.value)} placeholder="Нова задача… напр. «Подзвонити завтра !»" autoComplete="off" />
+      </form>
+      <div className="list">
+        {open.slice(0, 5).map(t => (
+          <div className="item" key={t.id}>
+            <button className="chk" role="checkbox" aria-checked={false} aria-label={`Виконано: ${t.t}`} onClick={() => A.toggleTask(t.id)} />
+            <span className="t">{t.t}</span>
+            {t.due && <span className={`muted num${dueState(t.due) === 'overdue' ? ' late' : ''}`} style={{ fontSize: 12 }}>{dueLabel(t.due)}</span>}
+          </div>
+        ))}
+        {open.length > 5 && <button className="chip" style={{ alignSelf: 'flex-start', marginTop: 8 }} onClick={() => go('tasks')}>Ще {open.length - 5}</button>}
+        {!open.length && <p className="muted">Відкритих задач немає.</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Today's habits as a short checklist. */
+function HabitsToday() {
+  const { S, A, go } = useStore();
+  const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
+  return (
+    <div className="card s6">
+      <div className="ch"><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>{S.habits.length ? `${hDone} з ${S.habits.length} сьогодні` : 'Додай першу звичку'}</p></div><button className="sel" onClick={() => go('habits')}>Усі</button></div>
+      <div className="list">
+        {S.habits.slice(0, 6).map(h => {
+          const on = !!h.days[k];
+          return <div className="item" key={h.id}><button className={`chk ${on ? 'on' : ''}`} aria-pressed={on} aria-label={`Відмітити: ${h.name}`} onClick={() => A.toggleHabit(h.id)}>{on && <Icon n="check" />}</button><span className="t">{h.name}</span><span className="muted num" style={{ fontSize: 12 }}>{habStreak(h.days, S)} дн</span></div>;
+        })}
+        {!S.habits.length && <p className="muted">Звичок поки немає.</p>}
+      </div>
+    </div>
+  );
+}
+
+/** The home page in short: the day, what to do about it, tasks, habits and the quick records. Everything else is one tap away. */
+export function Home() {
+  const { go } = useStore();
+  const [more, setMore] = useState(false);
+  return (
+    <section className="view">
+      <div className="grid">
+        <Hero />
+        <SchedCard />
+
+        <YesterdayCard />
+        <AdviceCard />
+
+        <TodayTasks />
+        <HabitsToday />
+
+        <div className="card s12">
+          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
+          <LifeTiles full={false} />
+        </div>
+
+        <button className="moretoggle" aria-expanded={more} onClick={() => setMore(m => !m)}>
+          <Icon n="trend" /><span>Оцінка дня, статистика, фінанси й цілі</span><small>{more ? 'Сховати' : 'Показати'}</small><Icon n="right" className="icn chev" />
+        </button>
+        {more && <HomeExtras />}
       </div>
     </section>
   );
 }
-

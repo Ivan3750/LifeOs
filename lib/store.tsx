@@ -28,9 +28,17 @@ export const VIEWS: [string, string, string][] = [
   ['co', 'Огляд', 'company'], ['leads', 'Ліди', 'leads'], ['clients', 'Клієнти', 'user'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
 ];
 export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'focus', 'time', 'coach', 'tasks', 'habits', 'quit', 'health', 'money', 'wolt', 'goals', 'schedule', 'notes', 'prefs'],
+  me: ['home', 'focus', 'tasks', 'habits', 'health', 'money', 'coach', 'schedule', 'notes', 'wolt', 'prefs'],
   co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
 };
+/** Entries the sidebar keeps folded under «Ще» in personal mode: used rarely, so they do not crowd the daily ones. */
+export const NAV_MORE: string[] = ['schedule', 'notes', 'wolt', 'prefs'];
+/** Personal-mode sections that live inside another one as tabs (tasks and goals, habits and habits to quit, advice and time use).
+    Every view keeps its own key, so links such as go('quit') still work. */
+export const GROUPS: Record<string, string[]> = { tasks: ['tasks', 'goals'], habits: ['habits', 'quit'], coach: ['coach', 'time'] };
+export const TAB_LABEL: Record<string, string> = { tasks: 'Задачі', goals: 'Цілі', habits: 'Звички', quit: 'Шкідливі звички', coach: 'Поради', time: 'Куди йде час' };
+/** The section a view belongs to in the menu: «quit» sits under «habits», and so on. */
+export const parentOf = (v: string) => Object.keys(GROUPS).find(p => GROUPS[p].includes(v)) ?? v;
 export const TABS: Record<Mode, string[]> = { me: ['home', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
 const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
 const ME_ONLY = ['home', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'wolt', 'goals'];

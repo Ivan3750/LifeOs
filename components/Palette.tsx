@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, VIEWS } from '@/lib/store';
 import { GUESS, TK } from '@/lib/util';
+import { searchAll } from '@/lib/search';
+import { claudeReport } from '@/lib/report';
 import { fmtCur } from '@/lib/money';
 import { OFF_KINDS } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
@@ -15,7 +17,7 @@ export function Palette() {
 }
 
 function PaletteDialog() {
-  const { S, setPalette, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, update } = useStore();
+  const { S, setPalette, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, update, toast } = useStore();
   const [q, setQ] = useState('');
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -27,6 +29,7 @@ function PaletteDialog() {
       ...VIEWS.map(([k, l]) => ({ l: 'Відкрити: ' + l, k: 'Перехід', run: () => go(k) })),
       { l: S.timer.running ? 'Поставити таймер на паузу' : 'Запустити таймер фокусу', k: 'Таймер', run: () => { if (S.timer.mode !== 'focus' && !S.timer.running) setTimerMode('focus'); toggleTimer(); } },
       { l: 'Скинути таймер', k: 'Таймер', run: resetTimer },
+      { l: 'Скопіювати звіт для Claude (аналіз у чаті)', k: 'Аналіз', run: () => { const t = claudeReport(S); navigator.clipboard?.writeText(t).then(() => toast('Звіт скопійовано: встав його в чат Claude'), () => toast('Не вдалося скопіювати: відкрий Поради')); } },
       { l: 'Швидко додати…', k: 'N', run: () => setSheet({ kind: 'qa' }) },
       { l: S.mode === 'co' ? 'Перейти в особистий режим' : 'Перейти в режим компанії', k: 'Режим', run: () => setMode(S.mode === 'co' ? 'me' : 'co') },
       { l: 'Нова угода', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'deal' }) },
@@ -53,15 +56,17 @@ function PaletteDialog() {
     let r = ql ? base.filter(c => c.l.toLowerCase().includes(ql)) : base;
     if (t.startsWith('+')) r = [{ l: 'Додати задачу: ' + t.slice(1).trim(), k: 'Enter', run: () => A.addTaskLine(t.slice(1)) }, ...r];
     else if (ql && !r.length) r = [{ l: 'Додати задачу: ' + t, k: 'Enter', run: () => A.addTaskLine(t) }];
-    return r.slice(0, 9);
-  }, [q, S, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, update]);
+    // what the person wrote (tasks, notes, payments, goals…) is searched too, so nothing has to be found by opening every section
+    const found = t.startsWith('+') ? [] : searchAll(S, t).map(h => ({ l: h.l, k: h.k, run: () => go(h.to) }));
+    return [...r.slice(0, ql ? 5 : 9), ...found].slice(0, 11);
+  }, [q, S, go, setMode, setSheet, toggleTimer, resetTimer, setTimerMode, A, update, toast]);
 
   const run = (i: number) => { const c = items[i]; setPalette(false); c?.run(); };
   const s = Math.min(sel, items.length - 1);
   return (
     <div className="ov" onClick={e => { if (e.target === e.currentTarget) setPalette(false); }}>
       <div className="pal" role="dialog" aria-label="Команди">
-        <input ref={input} value={q} placeholder="Команда, «+ задача» або «-45 кава»…" autoComplete="off"
+        <input ref={input} value={q} placeholder="Знайти будь-що, «+ задача» або «-45 кава»…" autoComplete="off"
           onChange={e => { setQ(e.target.value); setSel(0); }}
           onKeyDown={e => {
             if (e.key === 'ArrowDown') { setSel((s + 1) % items.length); e.preventDefault(); }
@@ -69,7 +74,7 @@ function PaletteDialog() {
             else if (e.key === 'Enter') run(s);
           }} />
         <ul role="listbox">
-          {items.map((c, i) => <li key={c.l} role="option" aria-selected={i === s} onClick={() => run(i)}>{c.l}<small>{c.k}</small></li>)}
+          {items.map((c, i) => <li key={c.k + c.l} role="option" aria-selected={i === s} onClick={() => run(i)}>{c.l}<small>{c.k}</small></li>)}
         </ul>
       </div>
     </div>

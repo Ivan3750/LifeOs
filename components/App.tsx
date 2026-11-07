@@ -1,6 +1,6 @@
 'use client';
 
-import { StoreProvider, useStore } from '@/lib/store';
+import { GROUPS, parentOf, StoreProvider, TAB_LABEL, useStore } from '@/lib/store';
 import { Shell } from './Shell';
 import { PinGate } from './PinLock';
 import { Home } from './views/Home';
@@ -25,10 +25,22 @@ const VIEW_COMPONENTS: Record<string, () => React.JSX.Element> = {
   co: CoOverview, leads: Leads, clients: Clients, ads: Ads, deals: Deals, projects: Projects, invoices: Invoices, team: Team,
 };
 
+/** Related sections share one menu entry and switch between each other here: tasks and goals, habits and habits to quit, advice and time use. */
+function SubTabs() {
+  const { S, view, go } = useStore();
+  const group = S.mode === 'co' ? undefined : GROUPS[parentOf(view)];
+  if (!group || !group.includes(view)) return null;
+  return (
+    <div className="subtabs" role="tablist">
+      {group.map(k => <button key={k} role="tab" aria-selected={k === view} onClick={() => go(k)}>{TAB_LABEL[k]}</button>)}
+    </div>
+  );
+}
+
 function Current() {
   const { view } = useStore();
   const V = VIEW_COMPONENTS[view] || Home;
-  return <V key={view} />;
+  return <><SubTabs /><V key={view} /></>;
 }
 
 export default function App({ db }: { db: boolean }) {

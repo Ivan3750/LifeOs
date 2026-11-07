@@ -7,6 +7,7 @@ import { plural } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Empty } from '../shared';
 import { AdviceItem, LinksCard } from '../Advice';
+import { ClaudeReportCard } from '../Brief';
 
 export function CoachPage() {
   const { S, eventsOn } = useStore();
@@ -35,6 +36,8 @@ export function CoachPage() {
         )}
 
         <LinksCard />
+
+        <ClaudeReportCard />
 
         <div className="card s12 cardcol">
           <div className="ch" style={{ margin: 0 }}><Icon n="edit" className="ic" /><div><h3>Що допоможе радити точніше</h3><p>Чим довше й повніше записи, тим впевненіші висновки</p></div></div>

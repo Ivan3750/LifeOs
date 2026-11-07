@@ -146,7 +146,27 @@ describe('dayScore: steady sleep, business and social media', () => {
     s.moods.push({ id: 2, t: new Date(day + 'T12:00').getTime(), v: 9, energy: 3, tags: [], note: '' });
     const r = dayScore(s, day, [], [], NOW);
     expect(r.coverage).toBeLessThan(0.45);
-    expect(r.groups.map(g => g.key)).toEqual(['work', 'body', 'mind']);   // a finished day counts empty focus, water and movement as 0
+    expect(r.groups.map(g => g.key)).toEqual(['mind']);   // not written down is never counted as 0
+    expect(r.total).toBe(100);
+  });
+
+  it('does not punish what was not logged: empty water, movement, habits and focus are left out', () => {
+    const s = blank();
+    s.habits.push({ id: 1, name: 'h', days: {} }, { id: 2, name: 'g', days: {} });
+    s.moods.push({ id: 2, t: new Date(day + 'T12:00').getTime(), v: 7, energy: 3, tags: [], note: '' });
+    const r = dayScore(s, day, [], [], NOW);
+    expect(r.parts.map(p => p.key)).toEqual(['mood']);
+    expect(r.skipped.map(p => p.key)).toEqual(expect.arrayContaining(['focus', 'water', 'move', 'habits']));
+    expect(r.total).toBe(100);
+  });
+
+  it('still counts partly done habits, and an empty workday for someone who uses the focus timer', () => {
+    const s = blank();
+    s.habits.push({ id: 1, name: 'h', days: { [day]: 1 } }, { id: 2, name: 'g', days: {} });
+    s.sessions.push({ t: new Date('2026-03-12T09:00').getTime(), m: 60 });   // the timer was used three days earlier
+    const r = dayScore(s, day, [], s.sessions, NOW);
+    expect(r.parts.find(p => p.key === 'habits')!.got).toBe(6);              // 1 of 2 habits: half of 12
+    expect(r.parts.find(p => p.key === 'focus')!.got).toBe(0);               // the timer is in use, so an empty workday counts
   });
 });
 
