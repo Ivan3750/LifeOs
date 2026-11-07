@@ -9,6 +9,7 @@ import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin
 import { byUrgency, dueLabel, dueState } from '@/lib/tasks';
 import { Icon, type IconName } from '../Icon';
 import { AdviceCard } from '../Advice';
+import { YesterdayCard } from '../Brief';
 import { AffirmationsCard } from '../Affirmations';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
@@ -531,6 +532,7 @@ export function Home() {
         <Hero />
         <SchedCard />
 
+        <YesterdayCard />
         <AdviceCard />
 
         <TodayTasks />
