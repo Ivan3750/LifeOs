@@ -174,7 +174,10 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   const biz = bizMinutesOn(S, k), wolt = activityMinutesOn(S, k, 'Wolt'), done = ft.worked + biz + wolt;
   const what = [`${Math.round(ft.worked)} хв фокусу`, biz >= 1 ? `${Math.round(biz)} хв бізнесу` : '', wolt >= 1 ? `${Math.round(wolt)} хв Wolt` : ''].filter(Boolean).join(' + ');
   // on a day without work what was done still counts, but 20 minutes already is a full mark
+  // no work logged, and no focus session in the 2 weeks before: the timer is simply not used, so it is not held against the day
+  const usesTimer = sessions.some(x => { const d = ymd(new Date(x.t)); return d < k && d >= ymd(new Date(new Date(k + 'T00:00').getTime() - 14 * 864e5)); });
   if (!work && done < 1) skip('focus', 'Фокус і робота', `${quiet}, роботу не очікуємо`);
+  else if (done < 1 && !usesTimer) skip('focus', 'Фокус і робота', 'роботу не записано: не рахується');
   else if (!work) add('focus', 'Фокус і робота', 20, done / 20, `${what} (${quiet}): що зроблено, те плюс, 20 хв уже повний бал`, 'work');
   else if (target < 20 && done < 20) skip('focus', 'Фокус і робота', isToday ? 'ще рано: вільного часу майже не було' : 'вільного часу майже не було');
   else add('focus', 'Фокус і робота', 20, done / Math.max(20, target), `${what} з ${Math.round(Math.max(20, target))} хв${isToday ? ' на цей час' : ''}`, 'work');
@@ -201,24 +204,18 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   if (reg !== null) add('sleepreg', 'Режим сну', 8, reg, `${h?.bed ? `заснув о ${h.bed} (ціль ${S.bedTarget})` : ''}${h?.bed && h?.wake ? ', ' : ''}${h?.wake ? `прокинувся о ${h.wake} (ціль ${S.wakeTarget})` : ''}`, 'sleep');
   else skip('sleepreg', 'Режим сну', 'запиши, коли заснув і прокинувся');
 
-  // Water and movement count once logged (or when the day is over and nothing was logged for a day with other data).
-  // A finished day that was otherwise tracked counts an empty water or movement log as zero:
-  // otherwise leaving out the bad numbers would always be the best move. Today there is still time.
-  const tracked = !isToday && !!(sl || dayMood(S, k) || ft.worked > 0 || S.habits.some(x => x.days[k]));
+  // Water and movement count once logged. Not logged is never a zero: it may just mean it was not written down.
   if (h?.water) add('water', 'Вода', 6, h.water / waterGoal(S), `${h.water} з ${waterGoal(S)} склянок`, 'body');
-  else if (tracked) add('water', 'Вода', 6, 0, 'не записано, рахується як 0', 'body');
   else skip('water', 'Вода', 'не записано');
   if (O && !O.move && !h?.workout) skip('move', 'Рух', O.why);
   else if (h?.workout) add('move', 'Рух', 8, h.workout / moveGoal(S), `${h.workout} з ${moveGoal(S)} хв руху`, 'body');
-  else if (tracked) add('move', 'Рух', 8, 0, 'не записано, рахується як 0', 'body');
   else skip('move', 'Рух', 'не записано');
 
   // Habits: today the expected number grows through the day; before midday they count only once something is done.
   if (S.habits.length) {
     const done = S.habits.filter(x => x.days[k]).length, total = S.habits.length;
     const need = O ? O.habits : 1;
-    if (off?.kind === 'sick' && done === 0) skip('habits', 'Звички', O!.why);
-    else if (isToday && done === 0 && elapsed < 0.5) skip('habits', 'Звички', 'ще є час, рахуються з середини дня');
+    if (done === 0) skip('habits', 'Звички', off?.kind === 'sick' ? O!.why : 'нічого не відмічено: не рахується');
     else add('habits', 'Звички', 12, done / (total * need * Math.max(elapsed, 0.5)), `${done} з ${total}${need < 1 ? ` (${O!.label.toLowerCase()}: досить ${Math.max(1, Math.round(total * need))})` : ''}${isToday && elapsed < 1 ? ', день ще триває' : ''}`);
   }
 
@@ -260,8 +257,8 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   return { total: gMax ? Math.round((gGot / gMax) * 100) : null as number | null, coverage: gMax / 100, parts, groups, skipped, ft, off };
 }
 
-export const scoreWord = (n: number | null) => (n === null ? 'Ще нема що оцінювати' : n >= 85 ? 'Чудовий день' : n >= 70 ? 'Добрий день' : n >= 50 ? 'Непогано' : n >= 30 ? 'Слабко' : 'Дуже погано');
-export const scoreColor = (n: number | null) => (n === null ? 'var(--bar)' : n >= 70 ? 'var(--good)' : n >= 50 ? 'var(--accent-2)' : n >= 30 ? 'var(--accent)' : 'var(--m1)');
+export const scoreWord = (n: number | null) => (n === null ? 'Ще нема що оцінювати' : n >= 85 ? 'Чудовий день' : n >= 70 ? 'Добрий день' : n >= 50 ? 'Нормальний день' : n >= 30 ? 'Спокійний день' : 'Тихий день');
+export const scoreColor = (n: number | null) => (n === null ? 'var(--bar)' : n >= 70 ? 'var(--good)' : n >= 50 ? 'var(--accent-2)' : 'var(--accent)');
 
 /** Keys of the last n days, oldest first. */
 export const lastDays = (n: number) => [...Array(n)].map((_, i) => ymd(addD(sod(new Date()), i - n + 1)));
