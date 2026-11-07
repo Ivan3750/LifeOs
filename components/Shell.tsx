@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV, TABS, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
+import { NAV, NAV_MORE, parentOf, TABS, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
 import { fmt, MON, pad2, WD } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { SheetHost } from './Sheets';
@@ -25,10 +25,23 @@ function NavBtn({ k, step }: { k: string; step?: number }) {
   const [, l, i] = vinfo(k)!;
   const open = S.tasks.filter(t => !t.d).length;
   return (
-    <button onClick={() => go(k)} aria-current={k === view ? 'page' : undefined}>
+    <button onClick={() => go(k)} aria-current={k === parentOf(view) ? 'page' : undefined}>
       {step ? <span className="stepn">{step}</span> : <Icon n={i as IconName} />}<span className="nl">{l}</span>
       {k === 'tasks' && open > 0 && <span className="badge">{open}</span>}
     </button>
+  );
+}
+
+/** Rarely used sections, folded under «Ще». The fold opens by itself when one of them is the current page. */
+function MoreNav() {
+  const { view } = useStore();
+  const [open, setOpen] = useState(false);
+  const shown = open || NAV_MORE.includes(parentOf(view));
+  return (
+    <>
+      <button className="navmore" aria-expanded={shown} onClick={() => setOpen(o => !o)}><Icon n="more" /><span className="nl">Ще</span><Icon n="right" className="icn chev" /></button>
+      {shown && NAV_MORE.map(k => <NavBtn key={k} k={k} />)}
+    </>
   );
 }
 
@@ -135,7 +148,7 @@ export function Shell({ children }: { children: ReactNode }) {
                   <span className="navh">Інструменти</span>
                   {NAV.co.filter(k => k !== 'co' && !CO_FLOW.includes(k)).map(k => <NavBtn key={k} k={k} />)}
                 </>
-              : NAV[m].map(k => <NavBtn key={k} k={k} />)}
+              : <>{NAV.me.filter(k => !NAV_MORE.includes(k)).map(k => <NavBtn key={k} k={k} />)}<MoreNav /></>}
           </nav>
           <MiniTimer />
         </aside>
@@ -147,7 +160,7 @@ export function Shell({ children }: { children: ReactNode }) {
       </div>
       <nav className="tabbar" aria-label="Основні розділи">
         {TABS[m].map(k => <NavBtn key={k} k={k} />)}
-        <button onClick={() => setSheet({ kind: 'more' })} aria-current={TABS[m].includes(view) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
+        <button onClick={() => setSheet({ kind: 'more' })} aria-current={TABS[m].includes(parentOf(view)) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
       </nav>
       <button className="fab" onClick={() => setSheet({ kind: 'qa' })} aria-label="Швидко додати"><Icon n="plus" /></button>
       <SheetHost />

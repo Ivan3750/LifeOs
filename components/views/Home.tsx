@@ -6,6 +6,7 @@ import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
 import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
 import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
+import { byUrgency, dueLabel, dueState } from '@/lib/tasks';
 import { Icon, type IconName } from '../Icon';
 import { AdviceCard } from '../Advice';
 import { AffirmationsCard } from '../Affirmations';
@@ -393,8 +394,9 @@ function QuitMini() {
   );
 }
 
-export function Home() {
-  const { S: S0, A, go } = useStore();
+/** Everything that used to crowd the home page: statistics, finance, goals and the day score in detail. Built only when opened. */
+function HomeExtras() {
+  const { S: S0, go } = useStore();
   const now = useNow(30_000);
   // every number below counts the focus run that is still going, the same as the day score does
   const S = { ...S0, sessions: liveSessions(S0, now) };
@@ -405,39 +407,15 @@ export function Home() {
   const goalMin = Math.max(1, S.goal * 60), st = streak(S);
   // tasks: done this week against what is still open
   const taskDone = S.tasks.filter(t => t.d && (t.doneAt ?? 0) >= ws).length, taskOpen = S.tasks.filter(t => !t.d).length;
-  const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
   const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S);
   const gs = [...S.goals].sort((a, c) => goalProgress(c) - goalProgress(a)).slice(0, 4);
   return (
-    <section className="view">
-      <div className="grid">
-        <Hero />
-        <SchedCard />
-
-        <AffirmationsCard />
-
+    <>
         <ScoreCard />
         <FreeTimeCard />
-
-        <AdviceCard />
-
         <WeekSummary />
+        <AffirmationsCard />
 
-        <div className="card s12">
-          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
-          <LifeTiles full={false} />
-        </div>
-
-        <div className="card s4">
-          <div className="ch"><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>{S.habits.length ? `${hDone} з ${S.habits.length} сьогодні` : 'Додай першу звичку'}</p></div><button className="sel" onClick={() => go('habits')}>Усі</button></div>
-          <div className="list">
-            {S.habits.slice(0, 6).map(h => {
-              const on = !!h.days[k];
-              return <div className="item" key={h.id}><button className={`chk ${on ? 'on' : ''}`} aria-pressed={on} aria-label={`Відмітити: ${h.name}`} onClick={() => A.toggleHabit(h.id)}>{on && <Icon n="check" />}</button><span className="t">{h.name}</span><span className="muted num" style={{ fontSize: 12 }}>{habStreak(h.days, S)} дн</span></div>;
-            })}
-            {!S.habits.length && <p className="muted">Звичок поки немає.</p>}
-          </div>
-        </div>
         <div className="card s4">
           <div className="ch"><Icon n="money" className="ic" /><div><h3>Фінанси</h3><p>{MONTHN[new Date().getMonth()]}, витрати обох рахунків у кронах</p></div><button className="sel" onClick={() => go('money')}>Деталі</button></div>
           <div className="bigstat"><span className="v num" style={{ fontSize: 28 }}>{money(out)}</span><span className="muted">з {money(b)}</span></div>
@@ -495,8 +473,79 @@ export function Home() {
           </div>
           <button className="btn" onClick={() => go('focus')}>Продовжити <Icon n="arrow" /></button>
         </div>
+    </>
+  );
+}
+
+/** The few things that matter today: open tasks, the most urgent first, and a one-line way to add another. */
+function TodayTasks() {
+  const { S, A, go } = useStore();
+  const [text, setText] = useState('');
+  const open = S.tasks.filter(t => !t.d).sort(byUrgency);
+  return (
+    <div className="card s6">
+      <div className="ch"><Icon n="tasks" className="ic" /><div><h3>Задачі</h3><p>{open.length ? `${open.length} ${plural(open.length, 'відкрита', 'відкриті', 'відкритих')}, найтерміновіші зверху` : 'Усе зроблено'}</p></div><button className="sel" onClick={() => go('tasks')}>Усі</button></div>
+      <form className="addrow" onSubmit={e => { e.preventDefault(); if (A.addTaskLine(text)) setText(''); }}>
+        <input aria-label="Нова задача" value={text} onChange={e => setText(e.target.value)} placeholder="Нова задача… напр. «Подзвонити завтра !»" autoComplete="off" />
+      </form>
+      <div className="list">
+        {open.slice(0, 5).map(t => (
+          <div className="item" key={t.id}>
+            <button className="chk" role="checkbox" aria-checked={false} aria-label={`Виконано: ${t.t}`} onClick={() => A.toggleTask(t.id)} />
+            <span className="t">{t.t}</span>
+            {t.due && <span className={`muted num${dueState(t.due) === 'overdue' ? ' late' : ''}`} style={{ fontSize: 12 }}>{dueLabel(t.due)}</span>}
+          </div>
+        ))}
+        {open.length > 5 && <button className="chip" style={{ alignSelf: 'flex-start', marginTop: 8 }} onClick={() => go('tasks')}>Ще {open.length - 5}</button>}
+        {!open.length && <p className="muted">Відкритих задач немає.</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Today's habits as a short checklist. */
+function HabitsToday() {
+  const { S, A, go } = useStore();
+  const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
+  return (
+    <div className="card s6">
+      <div className="ch"><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>{S.habits.length ? `${hDone} з ${S.habits.length} сьогодні` : 'Додай першу звичку'}</p></div><button className="sel" onClick={() => go('habits')}>Усі</button></div>
+      <div className="list">
+        {S.habits.slice(0, 6).map(h => {
+          const on = !!h.days[k];
+          return <div className="item" key={h.id}><button className={`chk ${on ? 'on' : ''}`} aria-pressed={on} aria-label={`Відмітити: ${h.name}`} onClick={() => A.toggleHabit(h.id)}>{on && <Icon n="check" />}</button><span className="t">{h.name}</span><span className="muted num" style={{ fontSize: 12 }}>{habStreak(h.days, S)} дн</span></div>;
+        })}
+        {!S.habits.length && <p className="muted">Звичок поки немає.</p>}
+      </div>
+    </div>
+  );
+}
+
+/** The home page in short: the day, what to do about it, tasks, habits and the quick records. Everything else is one tap away. */
+export function Home() {
+  const { go } = useStore();
+  const [more, setMore] = useState(false);
+  return (
+    <section className="view">
+      <div className="grid">
+        <Hero />
+        <SchedCard />
+
+        <AdviceCard />
+
+        <TodayTasks />
+        <HabitsToday />
+
+        <div className="card s12">
+          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
+          <LifeTiles full={false} />
+        </div>
+
+        <button className="moretoggle" aria-expanded={more} onClick={() => setMore(m => !m)}>
+          <Icon n="trend" /><span>Оцінка дня, статистика, фінанси й цілі</span><small>{more ? 'Сховати' : 'Показати'}</small><Icon n="right" className="icn chev" />
+        </button>
+        {more && <HomeExtras />}
       </div>
     </section>
   );
 }
-
