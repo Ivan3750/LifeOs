@@ -1,5 +1,5 @@
 import { catOf, learn, unlearn } from './timeuse';
-import type { AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
+import type { LifeDay, AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
 import { XFER_CAT, account, fmtCur, pendingRecurring, potSaved, recDate, shiftMk, toDKK } from './money';
 import { addD, AREAS, money, STAGES, TK, toMin, ymd } from './util';
 import { parseTask } from './tasks';
@@ -208,6 +208,17 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     delSocial(id: number) { del(s => { s.social = s.social.filter(x => x.id !== id); }); },
     /** Marks that after this entry you compared your life with someone else's. */
     toggleCompare(id: number) { update(s => { const x = s.social.find(e => e.id === id); if (!x) return; if (x.cmp) delete x.cmp; else x.cmp = 1; delete x.demo; }); },
+    /** The evening check-in. Ratings are 0–10 (0 clears), texts are cut to a sensible length. */
+    setLife(k: string, v: Partial<LifeDay>) {
+      update(s => {
+        const d: LifeDay = (s.life ||= {})[k] || { dev: 0, people: 0, body: 0, god: 0, life: 0, rest: 0, moment: '', why: '', next: '', moments: 0, talks: 0 };
+        for (const key of ['dev', 'people', 'body', 'god', 'life', 'rest'] as const) if (v[key] !== undefined) d[key] = Math.max(0, Math.min(10, Math.round(v[key]!)));
+        if (v.moments !== undefined) d.moments = Math.max(0, Math.min(3, Math.round(v.moments)));
+        if (v.talks !== undefined) d.talks = Math.max(0, Math.min(30, Math.round(v.talks)));
+        for (const key of ['moment', 'why', 'next'] as const) if (v[key] !== undefined) d[key] = v[key]!.slice(0, 280);
+        delete d.demo; s.life![k] = d;
+      });
+    },
     setSocialGoal(platform: string, min: number) { update(s => { s.socialGoals[platform] = Math.max(0, Math.min(600, Math.round(min))); }); },
     /** A habit to quit; the clean streak starts now. */
     addBad(name: string) { name = name.trim(); if (!name) return false; update(s => { s.badHabits.push({ id: s.nextId++, name, start: Date.now(), best: 0, slips: [] }); }); toast('Рахую дні без зривів із цього моменту'); return true; },

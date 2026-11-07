@@ -179,7 +179,7 @@ export function makeState(demo: boolean): State {
     money: { budget: 9000, tx, accounts: DEFAULT_ACCOUNTS.map(a => ({ ...a, budget: a.id === 'ua' && demo ? 3000 : a.budget, opening: demo ? (a.id === 'dk' ? 4200 : 8500) : 0 })), budgetMode: 'fixed', saveRate: 20, catBudgets: {}, recurring: [], pots: [], uahPerDkk: DEFAULT_UAH_PER_DKK, rateAt: 0, rateSrc: 'manual' },
     wheel: demo ? [7, 6, 5, 8, 6, 4, 7, 6] : [5, 5, 5, 5, 5, 5, 5, 5],
     mode: 'me', view: 'home', co, icalUrls: [],
-    evCats: {}, evWords: {}, social, badHabits, cravings, socialGoals: { Instagram: 30, YouTube: 60 }, bedTarget: '23:30', wakeTarget: '07:30',
+    evCats: {}, evWords: {}, social, badHabits, cravings, socialGoals: { Instagram: 30, YouTube: 60 }, bedTarget: '23:30', wakeTarget: '07:30', life: {},
   };
 }
 

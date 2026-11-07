@@ -10,6 +10,7 @@ import { byUrgency, dueLabel, dueState } from '@/lib/tasks';
 import { Icon, type IconName } from '../Icon';
 import { AdviceCard } from '../Advice';
 import { PlanCard } from '../Plan';
+import { LifeCard } from '../Life';
 import { YesterdayCard } from '../Brief';
 import { AffirmationsCard } from '../Affirmations';
 import { FocusArea, Rhythm, Ring } from '../charts';
@@ -535,6 +536,7 @@ export function Home() {
 
         <YesterdayCard />
         <PlanCard />
+        <LifeCard />
         <AdviceCard />
 
         <TodayTasks />

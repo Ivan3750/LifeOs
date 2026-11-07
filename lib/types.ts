@@ -68,6 +68,9 @@ export type SocialEntry = { id: number; date: string; platform: string; min: num
 export type BadHabit = { id: number; name: string; start: number; best: number; slips: number[]; demo?: 1 };
 /** A craving for a bad habit. trigger: what set it off (boredom, stress, social media…), outcome: held on or slipped, tool: what helped (exercise, breathing, game). */
 export type Craving = { id: number; t: number; habit: number; trigger: string; outcome: 'resisted' | 'slipped'; tool?: string; demo?: 1 };
+/** An evening look at the day by six sectors of life, each 1–10 (0 = not rated). moment: the best moment of the day, why: why it was not a 10, next: the one thing that makes tomorrow better.
+    moments: 0 almost none … 3 the day was alive. talks: real conversations with people (friends, new people, girls, family). */
+export type LifeDay = { dev: number; people: number; body: number; god: number; life: number; rest: number; moment: string; why: string; next: string; moments: number; talks: number; demo?: 1 };
 export type Mode = 'me' | 'co';
 export type Theme = 'system' | 'light' | 'dark';
 
@@ -115,6 +118,8 @@ export type State = {
   bedTarget: string; wakeTarget: string;
   /** The last batch received from the automatic collector (Raspberry Pi): when, how many records. */
   ingest?: { at: number; n: number; source: string };
+  /** The evening check-in by sectors of life, keyed by date. */
+  life?: Record<string, LifeDay>;
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */

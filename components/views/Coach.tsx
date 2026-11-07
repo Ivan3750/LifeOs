@@ -8,6 +8,7 @@ import { Icon } from '../Icon';
 import { Empty } from '../shared';
 import { AdviceItem, LinksCard } from '../Advice';
 import { ClaudeReportCard } from '../Brief';
+import { LifeCard } from '../Life';
 import { AutoLine, PlanCard, WeekCard } from '../Plan';
 
 export function CoachPage() {
@@ -21,6 +22,7 @@ export function CoachPage() {
       <div className="vh"><div><h2>Поради</h2><p>Що зробити сьогодні й чому. Я дивлюся на твої записи: сон, настрій, звички, задачі, гроші, події. Усе, що тут написано, випливає з твоїх днів, а не із загальних порад.</p></div></div>
 
       <div className="grid" style={{ marginTop: 18 }}>
+        <LifeCard />
         <PlanCard />
         <WeekCard />
         <div className="s12"><AutoLine /></div>

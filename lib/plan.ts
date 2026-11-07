@@ -1,6 +1,7 @@
 import type { State, Task, UiEvent } from './types';
 import { energyLevel, freeTime, isWorkDay, moodsOn, offOn } from './score';
 import { sleepTotal } from './sleep';
+import { BAD_DAY, recoveryFor } from './life';
 import { classify } from './timeuse';
 import { dayRows, type DayRow } from './correlations';
 import { budgetDKK, monthKey, spentDKK } from './money';
@@ -23,6 +24,8 @@ export type DayPlan = {
   left: Task[];
   peak: { from: number; to: number; known: boolean };
   notes: string[];
+  /** After a bad day (≤ 4/10): no making up for it, only the basics. */
+  recovery: boolean;
 };
 
 const hm = (ms: number) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
@@ -67,12 +70,13 @@ export function planDay(S: State, k: string, events: UiEvent[], now = Date.now()
   const energy = moodsOn(S, k).filter(m => m.energy > 0).map(m => energyLevel(m.energy));
   const lowEnergy = energy.length > 0 && energy[energy.length - 1] === 1;
   const tired = (slept > 0 && slept < 6) || lowEnergy;
-  const mode: DayPlan['mode'] = off ? 'off' : tired ? 'light' : 'full';
-  const modeWhy = off ? `Сьогодні позначено «${off.note || off.kind}»: без навантаження, лише найважливіше`
+  const rec = recoveryFor(S, k);
+  const mode: DayPlan['mode'] = off ? 'off' : tired || rec.on ? 'light' : 'full';
+  const modeWhy = rec.on && !off ? `Вчора було ${String(rec.score).replace('.', ',')}/10: режим відновлення. Без надолужування: сон, одна важлива задача, рух, люди, нормальний вечір` : off ? `Сьогодні позначено «${off.note || off.kind}»: без навантаження, лише найважливіше`
     : slept > 0 && slept < 6 ? `Спав ${String(slept).replace('.', ',')} год: легкий режим, коротші блоки й менше складного`
     : lowEnergy ? 'Енергія низька: легкий режим, коротші блоки'
     : work ? 'Виспаний і з силами: звичайний план' : 'Вихідний: тільки те, що горить';
-  const plan: DayPlan = { k, mode, modeWhy, blocks: [], planned: 0, target: 0, left: [], peak, notes };
+  const plan: DayPlan = { k, mode, modeWhy, blocks: [], planned: 0, target: 0, left: [], peak, notes, recovery: rec.on && !off };
 
   const ft = freeTime(S, k, events, S.sessions, now);
   const isToday = ymd(new Date(now)) === k;
@@ -83,15 +87,17 @@ export function planDay(S: State, k: string, events: UiEvent[], now = Date.now()
   const today = k;
   const soon = ymd(addD(new Date(k + 'T00:00'), 2));
   const open = S.tasks.filter(t => !t.d).sort(byUrgency);
-  const eligible = open.filter(t => (t.due && t.due <= today) || (mode !== 'off' && work && (t.p === 'hi' || (t.due && t.due <= soon))));
+  const eligibleAll = open.filter(t => (t.due && t.due <= today) || (mode !== 'off' && work && (t.p === 'hi' || (t.due && t.due <= soon))));
+  // recovery: one important task, never the whole pile
+  const eligible = rec.on ? eligibleAll.slice(0, 1) : eligibleAll;
   const est = taskEstimate(S), by = focusByTask(S);
   const need = (t: Task) => Math.max(25, est - (by.get(t.t) || 0));
 
   const { want, worked } = wantedToday(S, k, now);
   const dueNow = eligible.filter(t => t.due && t.due <= today);
   // what the day should hold: the goal's share (less when tired), but the things due today are always planned
-  let target = mode === 'off' ? 0 : Math.max(0, (work ? want : 0) * (mode === 'light' ? 0.6 : 1) - worked);
-  target = Math.max(target, Math.min(dueNow.reduce((a, t) => a + need(t), 0), 240));
+  let target = mode === 'off' ? 0 : rec.on ? Math.min(60, eligible.reduce((a, t) => a + need(t), 0)) : Math.max(0, (work ? want : 0) * (mode === 'light' ? 0.6 : 1) - worked);
+  if (!rec.on) target = Math.max(target, Math.min(dueNow.reduce((a, t) => a + need(t), 0), 240));
   plan.target = Math.round(target);
 
   // slots: cut the windows into focus blocks with a 10-minute break between them; the best hours are given out first
@@ -114,7 +120,7 @@ export function planDay(S: State, k: string, events: UiEvent[], now = Date.now()
     const cur = queue.find(q => q.left > 0);
     const mins = Math.round((sl.b - sl.a) / MIN);
     if (!cur) {
-      if (mode === 'off' || !work) break;
+      if (mode === 'off' || !work || rec.on) break;
       taken.push({ a: sl.a, b: sl.b, block: { s: hm(sl.a), e: hm(sl.b), kind: 'focus', title: 'Вільний фокус', why: 'Задачі розплановано: цей час для цілі тижня' } });
       planned += mins; continue;
     }
@@ -156,6 +162,10 @@ export function planDay(S: State, k: string, events: UiEvent[], now = Date.now()
   if (!windows.length && isToday) notes.push('На сьогодні вже нема вільних вікон від 25 хв.');
   else if (planned < target - 10 && mode !== 'off') notes.push(`Не вистачає часу: хочеться ${hmPlain(target)} фокусу, а вільного під план лише на ${hmPlain(planned)}.`);
   if (plan.left.length) notes.push(`Не вмістилося ${plan.left.length}: ${plan.left.slice(0, 3).map(t => '«' + t.t + '»').join(', ')}. Перенеси термін або віддай комусь.`);
+  if (rec.on) {
+    if (rec.next) notes.push(`Вчора ти записав, що зробить день кращим: «${rec.next}». Зроби це.`);
+    notes.push(rec.streak >= 2 ? `Уже ${rec.streak} дні поспіль ≤ ${BAD_DAY}/10. Це сигнал не тиснути, а відпочити й поговорити з кимось живим.` : 'Поганий день нормальний. Головне, щоб він не став трьома: сьогодні нічого не надолужуй.');
+  }
   if (!peak.known) notes.push('Годин твого найкращого фокусу поки не знаю: після 6 фокус-сесій підлаштую план під них.');
   return plan;
 }
