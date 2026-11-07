@@ -1,0 +1,14 @@
+{
+  "site": "https://твій-сайт.example",
+  "token": "той самий INGEST_TOKEN, що на сервері",
+  "name": "pi",
+  "activitywatch": {
+    "enabled": false,
+    "url": "http://192.168.1.50:5600"
+  },
+  "inbox": {
+    "enabled": true,
+    "dir": "/home/pi/lifeos-inbox",
+    "bank": { "date": "Date", "amount": "Amount", "text": "Text", "acc": "dk" }
+  }
+}

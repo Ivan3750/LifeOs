@@ -9,6 +9,7 @@ import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin
 import { byUrgency, dueLabel, dueState } from '@/lib/tasks';
 import { Icon, type IconName } from '../Icon';
 import { AdviceCard } from '../Advice';
+import { PlanCard } from '../Plan';
 import { YesterdayCard } from '../Brief';
 import { AffirmationsCard } from '../Affirmations';
 import { FocusArea, Rhythm, Ring } from '../charts';
@@ -533,6 +534,7 @@ export function Home() {
         <SchedCard />
 
         <YesterdayCard />
+        <PlanCard />
         <AdviceCard />
 
         <TodayTasks />
