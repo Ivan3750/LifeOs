@@ -1,4 +1,5 @@
 /** task: what the focus run was for (the task title), when one was picked. */
+/** ext (here and on Activity, Tx, SocialEntry): id of the record in the automatic collector, so sending it again updates instead of duplicating. */
 export type Session = { t: number; m: number; task?: string; demo?: 1 };
 /** goal: id of the goal this task moves forward. */
 /** due: date to finish by ('YYYY-MM-DD'), doneAt: when it was ticked off. */
@@ -19,7 +20,7 @@ export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake' | 'na
 export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
 /** Time spent on errands and other non-work things (shop, commute…). start/end are timestamps. */
 /** A logged activity. For a Wolt shift: orders (number of deliveries), earned (kr., tips included) and km driven. */
-export type Activity = { id: number; kind: string; title: string; start: number; end: number; orders?: number; earned?: number; km?: number; demo?: 1 };
+export type Activity = { id: number; kind: string; title: string; start: number; end: number; orders?: number; earned?: number; km?: number; ext?: string; demo?: 1 };
 export type Note = { id: number; title: string; text: string; created: number; updated: number; pinned?: boolean; demo?: 1 };
 export type Cur = 'DKK' | 'UAH';
 export type AccId = 'dk' | 'ua';
@@ -29,7 +30,7 @@ export type Account = { id: AccId; name: string; cur: Cur; opening: number; budg
     xfer links the two halves of a transfer between accounts; transfers are not income or spending. */
 /** shift: id of the Wolt shift (activity) this income came from, so deleting the shift removes it too. */
 /** rec: id of the regular payment that created it, pot: id of the savings pot it feeds (a deposit leaves the account but is not spending). */
-export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; shift?: number; rec?: number; pot?: number; demo?: 1 };
+export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; shift?: number; rec?: number; pot?: number; ext?: string; demo?: 1 };
 /** A payment or income that repeats every month on `day` (29–31 means the last day of short months). from: first month it applies to ('YYYY-MM'). */
 export type Recurring = { id: number; name: string; type: 'in' | 'out'; amt: number; cat: string; acc: AccId; day: number; from: string; active: boolean };
 /** A savings pot. What is saved in it is worked out from the deposit records (Tx.pot), in kroner. */
@@ -61,12 +62,15 @@ export type Timer = { mode: 'focus' | 'break'; left: number; running: boolean; e
 /** A daily meal that takes time out of the free hours. s/e are 'HH:MM'. */
 export type Meal = { key: 'breakfast' | 'lunch' | 'dinner'; label: string; s: string; e: string; on: boolean };
 /** Time on a social network or video platform. why: what it was for (learning, fun, news, work); cmp: afterwards you caught yourself comparing your life with other people's. */
-export type SocialEntry = { id: number; date: string; platform: string; min: number; why?: string; cmp?: 1; demo?: 1 };
+export type SocialEntry = { id: number; date: string; platform: string; min: number; why?: string; cmp?: 1; ext?: string; demo?: 1 };
 /** A habit to quit. start: when the current clean streak began; best: the longest streak that was ended by a slip; slips: when it went wrong.
     A slip restarts the streak but the best streak and the total of clean days stay, so progress is never lost. */
 export type BadHabit = { id: number; name: string; start: number; best: number; slips: number[]; demo?: 1 };
 /** A craving for a bad habit. trigger: what set it off (boredom, stress, social media…), outcome: held on or slipped, tool: what helped (exercise, breathing, game). */
 export type Craving = { id: number; t: number; habit: number; trigger: string; outcome: 'resisted' | 'slipped'; tool?: string; demo?: 1 };
+/** An evening look at the day by six sectors of life, each 1–10 (0 = not rated). moment: the best moment of the day, why: why it was not a 10, next: the one thing that makes tomorrow better.
+    moments: 0 almost none … 3 the day was alive. talks: real conversations with people (friends, new people, girls, family). */
+export type LifeDay = { dev: number; people: number; body: number; god: number; life: number; rest: number; moment: string; why: string; next: string; moments: number; talks: number; demo?: 1 };
 export type Mode = 'me' | 'co';
 export type Theme = 'system' | 'light' | 'dark';
 
@@ -112,6 +116,10 @@ export type State = {
   socialGoals: Record<string, number>;
   /** Wanted bedtime and wake-up time: sleep is judged on keeping to them, not only on length. */
   bedTarget: string; wakeTarget: string;
+  /** The last batch received from the automatic collector (Raspberry Pi): when, how many records. */
+  ingest?: { at: number; n: number; source: string };
+  /** The evening check-in by sectors of life, keyed by date. */
+  life?: Record<string, LifeDay>;
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */
