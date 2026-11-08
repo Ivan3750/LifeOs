@@ -7,7 +7,7 @@ const mono = JetBrains_Mono({ variable: '--font-mono', subsets: ['latin', 'cyril
 
 export const metadata: Metadata = {
   title: 'LifeOs',
-  description: 'Особиста жива ОС: фокус, звички, здоровʼя, фінанси, цілі, календар і режим компанії.',
+  description: 'Особиста ОС життя: один екран, що каже, що робити зараз. Фокус, задачі, звички, здоровʼя і цілі.',
   robots: { index: false, follow: false },
   appleWebApp: { capable: true, title: 'LifeOs', statusBarStyle: 'black-translucent' },
   icons: { icon: '/icon.svg' },

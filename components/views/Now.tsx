@@ -211,12 +211,13 @@ export function Home() {
         <ResetCard />
 
         <SchedCard />
+        <HabitsToday />
+
         <div className="card s12">
           <div className="ch"><Icon n="life" className="ic" /><div><h3>Тіло й настрій</h3><p>Один тап на кожне. Решту я порахую</p></div><button className="sel" onClick={() => go('health')}>Докладніше</button></div>
           <LifeTiles full={false} />
         </div>
 
-        <HabitsToday />
         <QuitMini />
 
         <AdviceCard />

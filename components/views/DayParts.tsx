@@ -307,7 +307,7 @@ function WeekSummary() {
   return (
     <div className="card s12">
       <div className="ch"><Icon n="trend" className="ic" /><div><h3>Тиждень у цифрах</h3><p>Останні 7 днів. Дні без записів і не робочі дні не псують середнє</p></div></div>
-      <div className="woltstats">{tiles.map(([l, v, sub]) => <div key={l}><span>{l}</span><b className="num">{v}</b><span style={{ marginTop: 2 }}>{sub}</span></div>)}</div>
+      <div className="wkstats">{tiles.map(([l, v, sub]) => <div key={l}><span>{l}</span><b className="num">{v}</b><span style={{ marginTop: 2 }}>{sub}</span></div>)}</div>
     </div>
   );
 }
@@ -405,7 +405,7 @@ export function HabitsToday() {
   const { S, A, go } = useStore();
   const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
   return (
-    <div className="card s6">
+    <div className="card s6 habtoday">
       <div className="ch"><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>{S.habits.length ? `${hDone} з ${S.habits.length} сьогодні` : 'Додай першу звичку'}</p></div><button className="sel" onClick={() => go('habits')}>Усі</button></div>
       <div className="list">
         {S.habits.slice(0, 6).map(h => {
