@@ -1,9 +1,8 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { ExtEvent, Mode, State, UiEvent } from './types';
+import type { ExtEvent, State, UiEvent } from './types';
 import { makeState } from './seed';
-import { DEFAULT_ACCOUNTS } from './money';
 import { makeActions, goalStep } from './actions';
 import { mergeStates } from './merge';
 import { extOn, seriesSizes } from './extcal';
@@ -18,30 +17,24 @@ const BASE_KEY = 'pulse-os-sync-base';
 /** Browser storage holds about 5 MB; warn well before that. */
 const SIZE_WARN = 3_500_000;
 /** Parts of the state that belong to this device only: where you are, theme, notifications. They are never overwritten by another device. */
-const LOCAL_KEYS = ['view', 'mode', 'theme', 'log', 'unread'] as const;
+const LOCAL_KEYS = ['view', 'theme', 'log', 'unread'] as const;
 const keepLocal = (next: State, cur: State): State => { const o = { ...next } as Record<string, unknown>; for (const k of LOCAL_KEYS) o[k] = cur[k]; return o as State; };
 
 export const VIEWS: [string, string, string][] = [
-  ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['time', 'Час', 'clock'], ['coach', 'Поради', 'life'], ['quit', 'Відмова', 'flame'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
-  ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['wolt', 'Wolt', 'wolt'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
+  ['home', 'Зараз', 'home'], ['focus', 'Фокус', 'focus'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'], ['health', 'Тіло', 'health'],
+  ['schedule', 'Розклад', 'schedule'], ['coach', 'Поради', 'life'], ['time', 'Час', 'clock'], ['quit', 'Відмова', 'flame'], ['goals', 'Цілі', 'goals'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
-  ['co', 'Огляд', 'company'], ['leads', 'Ліди', 'leads'], ['clients', 'Клієнти', 'user'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
 ];
-export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'focus', 'tasks', 'habits', 'health', 'money', 'coach', 'schedule', 'notes', 'wolt', 'prefs'],
-  co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
-};
-/** Entries the sidebar keeps folded under «Ще» in personal mode: used rarely, so they do not crowd the daily ones. */
-export const NAV_MORE: string[] = ['schedule', 'notes', 'wolt', 'prefs'];
-/** Personal-mode sections that live inside another one as tabs (tasks and goals, habits and habits to quit, advice and time use).
+export const NAV: string[] = ['home', 'focus', 'tasks', 'habits', 'health', 'schedule', 'coach', 'notes', 'prefs'];
+/** Entries the sidebar keeps folded under «Ще»: used rarely, so they do not crowd the daily ones. */
+export const NAV_MORE: string[] = ['coach', 'notes', 'prefs'];
+/** Sections that live inside another one as tabs (tasks and goals, habits and habits to quit, advice and time use).
     Every view keeps its own key, so links such as go('quit') still work. */
 export const GROUPS: Record<string, string[]> = { tasks: ['tasks', 'goals'], habits: ['habits', 'quit'], coach: ['coach', 'time'] };
 export const TAB_LABEL: Record<string, string> = { tasks: 'Задачі', goals: 'Цілі', habits: 'Звички', quit: 'Шкідливі звички', coach: 'Поради', time: 'Куди йде час' };
 /** The section a view belongs to in the menu: «quit» sits under «habits», and so on. */
 export const parentOf = (v: string) => Object.keys(GROUPS).find(p => GROUPS[p].includes(v)) ?? v;
-export const TABS: Record<Mode, string[]> = { me: ['home', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
-const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
-const ME_ONLY = ['home', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'wolt', 'goals'];
+export const TABS: string[] = ['home', 'focus', 'tasks', 'habits'];
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
 export type ToastAction = { label: string; run: () => void };
@@ -49,7 +42,7 @@ export type ToastAction = { label: string; run: () => void };
 export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'sos'; habit?: number } | { kind: 'form'; key: string; init?: Record<string, string> } | null;
 export type CalStatus = { state: 'idle' | 'loading' | 'ok' | 'none' | 'error'; at?: number; errors?: string[]; count?: number };
 
-const durOf = (s: State, m: 'focus' | 'break') => (m === 'focus' ? s.focusMin : s.breakMin) * 60;
+const durOf = (s: State, m: 'focus' | 'break') => (s.timer.mode === m && s.timer.dur ? s.timer.dur : (m === 'focus' ? s.focusMin : s.breakMin) * 60);
 const leftOf = (t: State['timer'], at = Date.now()) => (t.running ? Math.max(0, Math.round((t.endAt - at) / 1000)) : t.left);
 
 /** Focus seconds already spent in the current run of the timer. */
@@ -103,10 +96,6 @@ export function fill(s: State): State {
     out.noteList = text ? [{ id: 1, title: 'Мої нотатки', text, created: Date.now(), updated: Date.now() }] : [];
     out.notes = '';
   }
-  // money used to be one account in kroner: its budget moves onto the Danish account
-  if (!Array.isArray(s.money?.accounts)) {
-    out.money.accounts = DEFAULT_ACCOUNTS.map(a => (a.id === 'dk' ? { ...a, budget: s.money?.budget ?? a.budget } : { ...a }));
-  }
   return out;
 }
 
@@ -154,12 +143,9 @@ function replaceState(s: State, next: State) {
 
 function useStoreValue(dbOn: boolean) {
   // The app is rendered on the client only (see ClientApp), so browser storage can be read during init.
-  // opening a link like /#leads also switches to the mode that section belongs to
-  const [S, setS] = useState<State>(() => {
-    const s = load(), h = location.hash.slice(1), mode: Mode = CO_ONLY.includes(h) ? 'co' : ME_ONLY.includes(h) ? 'me' : s.mode;
-    return mode === s.mode ? s : { ...s, mode };
-  });
-  const [view, setView] = useState(() => { const h = location.hash.slice(1); return vinfo(h) ? h : vinfo(S.view) ? S.view : 'home'; });
+  const [S, setS] = useState<State>(() => load());
+  // the app always opens on «Зараз»; only a link such as /#tasks opens another section
+  const [view, setView] = useState(() => { const h = location.hash.slice(1); return vinfo(h) ? h : 'home'; });
   const [toastMsg, setToast] = useState<{ msg: string; id: number; action?: ToastAction } | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [palette, setPalette] = useState(false);
@@ -359,12 +345,10 @@ function useStoreValue(dbOn: boolean) {
     if (!vinfo(v)) v = 'home';
     setView(v);
     setSheet(null);
-    update(s => { s.view = v; if (CO_ONLY.includes(v)) s.mode = 'co'; else if (ME_ONLY.includes(v)) s.mode = 'me'; }, true);
+    update(s => { s.view = v; }, true);
     try { history.replaceState(null, '', v === 'home' ? location.pathname : '#' + v); } catch {}
     window.scrollTo({ top: 0 });
   }, [update]);
-
-  const setMode = useCallback((m: Mode) => go(m === 'co' ? 'co' : 'home'), [go]);
 
   /* ---------- timer ---------- */
   const beep = useCallback(() => {
@@ -389,6 +373,7 @@ function useStoreValue(dbOn: boolean) {
     update(s => {
       const t = s.timer;
       logFocus(s, end);
+      delete t.dur;
       t.mode = t.mode === 'focus' ? 'break' : 'focus';
       t.running = false; t.left = durOf(s, t.mode); t.sid = 0;
     });
@@ -409,6 +394,7 @@ function useStoreValue(dbOn: boolean) {
   /** Ends the current run early: the focus time spent so far stays in the log. */
   const stopRun = (s: State, mode: 'focus' | 'break') => {
     const m = logFocus(s);
+    delete s.timer.dur;
     s.timer.mode = mode; s.timer.running = false; s.timer.left = durOf(s, mode); s.timer.sid = 0;
     return m;
   };
@@ -422,6 +408,26 @@ function useStoreValue(dbOn: boolean) {
     if (cur.timer.mode !== m && logFocus(structuredClone(cur)) >= 1) toast(`Зараховано ${Math.round(focusSpent(cur) / 60)} хв фокусу`);
     update(s => { stopRun(s, m); });
   }, [update, toast]);
+
+  /** Starts a focus run on `task` right now. min: a run of another length than the usual one (a short «just begin» run). */
+  const startFocus = useCallback((task: string, min?: number) => {
+    if (!audio.current) try { audio.current = new AudioContext(); } catch {}
+    update(s => {
+      if (s.timer.mode === 'focus') logFocus(s); // what was already spent on the previous run stays in the log
+      const t = s.timer, sec = Math.round((min ?? s.focusMin) * 60);
+      t.mode = 'focus'; t.task = task; t.sid = 0; t.left = sec; t.running = true; t.endAt = Date.now() + sec * 1000;
+      if (sec === s.focusMin * 60) delete t.dur; else t.dur = sec;
+    });
+  }, [update]);
+  /** A break of `min` minutes, started at once. */
+  const startBreak = useCallback((min?: number) => {
+    update(s => {
+      if (s.timer.mode === 'focus') logFocus(s);
+      const t = s.timer, sec = Math.round((min ?? s.breakMin) * 60);
+      t.mode = 'break'; t.sid = 0; t.left = sec; t.running = true; t.endAt = Date.now() + sec * 1000;
+      if (sec === s.breakMin * 60) delete t.dur; else t.dur = sec;
+    });
+  }, [update]);
 
   /* ---------- calendar (iCal) ---------- */
   const urlsKey = S ? S.icalUrls.join('|') : null;
@@ -492,21 +498,10 @@ function useStoreValue(dbOn: boolean) {
   // eslint-disable-next-line react-hooks/refs
   const A = useMemo(() => makeActions({ update, getS, toast, notify, del }), [update, getS, toast, notify, del]);
 
-  // regular payments come due by themselves: checked on start and whenever the page is shown again
-  // (not before the first contact with the server: another device may already have created them)
-  const syncing = sync.state === 'syncing';
-  useEffect(() => {
-    if (syncing) return;
-    const run = () => { if (document.visibilityState === 'visible') A.applyRecurring(); };
-    const t = setTimeout(run, 600);
-    document.addEventListener('visibilitychange', run);
-    return () => { clearTimeout(t); document.removeEventListener('visibilitychange', run); };
-  }, [A, syncing]);
-
   return {
-    S, update, view, go, setMode, toastMsg, setToast, toast, notify,
+    S, update, view, go, toastMsg, setToast, toast, notify,
     sheet, setSheet, palette, setPalette,
-    toggleTimer, resetTimer, setTimerMode, completeTimer, durOf: (m: 'focus' | 'break') => (S ? durOf(S, m) : 0),
+    toggleTimer, resetTimer, setTimerMode, completeTimer, startFocus, startBreak, durOf: (m: 'focus' | 'break') => (S ? durOf(S, m) : 0),
     ext, cal, refreshCal, eventsOn, scoreOn, A, sync, flush, dbOn,
   };
 }

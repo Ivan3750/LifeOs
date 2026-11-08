@@ -2,80 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { liveSessions, useNow, useStore } from '@/lib/store';
-import { goalFocusOn, goalProgress, goalTasks } from '@/lib/goals';
+import { goalProgress } from '@/lib/goals';
 import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
-import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
-import { byUrgency, dueLabel, dueState } from '@/lib/tasks';
+import { addD, DAY, DN, hhmm, MON, pad2, plural, sod, toMin, TK, WD, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon, type IconName } from '../Icon';
-import { AdviceCard } from '../Advice';
-import { YesterdayCard } from '../Brief';
-import { AffirmationsCard } from '../Affirmations';
 import { FocusArea, Rhythm, Ring } from '../charts';
-import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
 import { bestStreak, streakDays, streakHours } from '@/lib/quit';
-import { CatBars, dayMinutes, habStreak, lanes, LifeTiles, monthTx, streak, sumT, weekMinutes } from '../shared';
-
-const QUOTES: [string, string, string][] = [['Маленькі кроки', 'щодня', 'дають великий результат.'], ['Фокус —', 'це вміння', 'сказати «ні» зайвому.'], ['Краще', 'зроблено,', 'ніж ідеально.'], ['Сьогоднішня', 'робота —', 'завтрашня свобода.']];
-
-function greet(name: string) {
-  const h = new Date().getHours();
-  return (h < 5 ? 'Доброї ночі' : h < 12 ? 'Доброго ранку' : h < 18 ? 'Доброго дня' : 'Доброго вечора') + ', ' + name;
-}
-
-function NextEvent() {
-  const { eventsOn } = useStore();
-  const now = useNow(30_000);
-  const n = new Date(now), m = n.getHours() * 60 + n.getMinutes();
-  const ev = eventsOn(TK()).filter(e => !e.allDay && toMin(e.e) > m)[0];
-  if (!ev) return null;
-  const dm = toMin(ev.s) - m;
-  return (
-    <div className="nextev"><span className="dot" />{dm <= 0 ? 'Зараз' : 'Далі'}: {ev.title} · {ev.s}
-      {dm > 0 && ` (через ${dm >= 60 ? Math.floor(dm / 60) + ' год ' + (dm % 60) + ' хв' : dm + ' хв'})`}
-    </div>
-  );
-}
-
-/** Today at a glance inside the hero: score, focus so far and habits. Each chip opens its section. */
-function HeroStats() {
-  const { S, scoreOn, go } = useStore();
-  const now = useNow(30_000);
-  const k = TK(), live = liveSessions(S, now);
-  const sc = scoreOn(k, now);
-  const focus = sc.ft.worked, hDone = S.habits.filter(h => h.days[k]).length, gMin = goalFocusOn(S, k, live);
-  return (
-    <div className="herostats">
-      <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
-        <span>Оцінка дня</span><b className="num" style={{ color: scoreColor(sc.total) }}>{sc.total ?? '—'}<small>/100</small></b>
-      </button>
-      {sc.off && <button onClick={() => document.getElementById('score-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' })} title={OFF_KINDS[sc.off.kind].hint}><span>День</span><b>{OFF_KINDS[sc.off.kind].label}</b></button>}
-      <button onClick={() => go('focus')}><span>Фокус</span><b className="num">{focus >= 60 ? `${Math.floor(focus / 60)}г ${Math.round(focus % 60)}хв` : `${Math.round(focus)} хв`}</b></button>
-      {S.habits.length > 0 && <button onClick={() => go('habits')}><span>Звички</span><b className="num">{hDone}/{S.habits.length}</b></button>}
-      {goalTasks(S).length > 0 && <button onClick={() => go('focus')} title="Сесія фокусу на крок до цілі"><span>Для цілі</span><b className="num">{gMin >= 20 ? '✓ ' + Math.round(gMin) + ' хв' : gMin ? Math.round(gMin) + ' хв' : 'ще ні'}</b></button>}
-    </div>
-  );
-}
-
-function Hero() {
-  const { S, go } = useStore();
-  const [qi, setQi] = useState(0);
-  useEffect(() => { const t = setInterval(() => setQi(i => (i + 1) % QUOTES.length), 7000); return () => clearInterval(t); }, []);
-  const q = QUOTES[qi];
-  return (
-    <div className="hero s8 hero-wrap">
-      <div className="sun" />
-      <svg className="hills" viewBox="0 0 800 160" preserveAspectRatio="none"><path d="M0 120 L90 80 L170 110 L260 60 L360 105 L430 85 L520 118 L610 70 L700 100 L800 80 L800 160 L0 160Z" fill="#170C07" opacity=".55" /><path d="M0 140 L120 110 L220 135 L330 100 L450 140 L560 115 L680 140 L800 120 L800 160 L0 160Z" fill="#0F0805" /></svg>
-      <div className="eyebrow">{greet(S.name)}{S.demo && <span className="demo">Демо-дані</span>}</div>
-      <h1>Зроби сьогодні вартим</h1>
-      <HeroStats />
-      <NextEvent />
-      <button className="cta" onClick={() => go('focus')}>Почати фокус <Icon n="arrow" /></button>
-      <div className="glass g-cap" aria-hidden="true"><Icon n="cap" /></div>
-      <div className="glass g-quote"><q>{q[0]} <span>{q[1]}</span> {q[2]}</q><div className="prog"><i key={qi} style={{ width: '100%', transition: 'width 7s linear' }} /></div></div>
-    </div>
-  );
-}
+import { dayMinutes, habStreak, lanes, streak, weekMinutes } from '../shared';
 
 const DV_HOUR = 38; // px per hour in the home day view
 
@@ -260,7 +194,7 @@ function DayOffBar({ k }: { k: string }) {
 
 /** Day score 0–100 with what it is made of. Arrows and the bars below switch to earlier days.
     Every reason is written out (a tooltip is not visible on a phone), and the card says how much of the day could be judged. */
-function ScoreCard() {
+export function ScoreCard() {
   const { scoreOn, go } = useStore();
   const now = useNow(30_000);
   const today = TK();
@@ -271,7 +205,7 @@ function ScoreCard() {
   const endK = ymd(addD(dt, 3)) > today ? today : ymd(addD(dt, 3));
   const hist = [...Array(7)].map((_, i) => ymd(addD(new Date(endK + 'T00:00'), i - 6))).map(d => ({ d, v: d === k ? sc.total : scoreOn(d, now).total }));
   const lost = sc.parts.filter(p => p.max - p.got >= 1).sort((a, b) => (b.max - b.got) - (a.max - a.got)).slice(0, 3);
-  const to: Record<string, string> = { focus: 'focus', goals: 'goals', sleep: 'health', sleepreg: 'health', water: 'health', move: 'health', habits: 'habits', mood: 'health', money: 'money', social: 'time', tasks: 'tasks', quit: 'quit' };
+  const to: Record<string, string> = { focus: 'focus', goals: 'goals', sleep: 'health', sleepreg: 'health', water: 'health', move: 'health', habits: 'habits', mood: 'health', social: 'time', tasks: 'tasks', quit: 'quit' };
   const [how, setHow] = useState(false);
   const pct = Math.round(sc.coverage * 100), partial = sc.total !== null && sc.coverage < 0.45;
   const tone = (r: number) => (r >= 0.7 ? 'var(--good)' : r >= 0.4 ? 'var(--accent-2)' : 'var(--m1)');
@@ -336,7 +270,7 @@ function ScoreCard() {
       <button className="howbtn" aria-expanded={how} onClick={() => setHow(!how)}>{how ? 'Сховати, як рахується' : 'Як рахується оцінка?'}</button>
       {how && (
         <ul className="howlist">
-          <li>Усього 100 балів у шести блоках: <b>Робота</b> 30 (фокус 20, задачі 5, цілі 5), <b>Сон</b> 22 (скільки 14, режим 8), <b>Тіло</b> 14 (рух 8, вода 6), <b>Звички</b> 17 (звички 12, без зривів 5), <b>Голова</b> 12 (настрій 8, соцмережі 4), <b>Гроші</b> 5.</li>
+          <li>Усього 100 балів у п’яти блоках: <b>Робота</b> 35 (фокус 22, задачі 7, цілі 6), <b>Сон</b> 22 (скільки 14, режим 8), <b>Тіло</b> 14 (рух 8, вода 6), <b>Звички</b> 17 (звички 12, без зривів 5), <b>Голова</b> 12 (настрій 8, соцмережі 4).</li>
           <li><b>Нічого не штрафується за «не записано».</b> Те, чого ще нема в записах, просто не рахується, а решта перераховується до 100. Тому над числом стоїть, яку частину дня вдалося оцінити: оцінка за 30% дня менш надійна, ніж за 90%.</li>
           <li><b>Робота.</b> Якщо роботи не записано, а таймером фокусу ти останні два тижні не користувався, цей пункт не рахується. Тижнева ціль ділиться на робочі дні, але не більше 60% вільного часу. Фокус, час «Бізнес» і зміни Wolt рахуються як робота. Сьогодні очікується лише та частина дня, що вже минула. У вихідний будь-яка робота лише плюс: 20 хв дають повний бал.</li>
           <li><b>Задачі.</b> Закриті за день проти тих, що мали термін цього дня й досі відкриті. <b>Цілі.</b> Фокус на задачах, привʼязаних до цілі: повний бал за 20+ хв.</li>
@@ -344,7 +278,6 @@ function ScoreCard() {
           <li><b>Вода й рух.</b> 8 склянок і 30 хв руху (або твої цілі) дають повні бали. Якщо не записано, це не рахується, а не нуль.</li>
           <li><b>Звички.</b> Рахуються, лише коли щось відмічено: порожній список не штрафується. Сьогодні очікування росте до вечора. <b>Без зривів:</b> день без зриву шкідливої звички дає повний бал.</li>
           <li><b>Голова.</b> Настрій 7/10 і краще дає повний бал. Соцмережі рахуються, лише коли записані: 60 хв понад ліміти разом дають нуль.</li>
-          <li><b>Гроші.</b> Житло віднімається від місячного бюджету, решта ділиться на денний ліміт. Подвійний ліміт і більше дає нуль.</li>
           <li><b>Не робочий день.</b> Захворів, екстрені справи, відпочинок чи поїздка: робота й цілі не очікуються (що зробив, те плюс), звички очікуються частково, хворому сон до 11 год — норма. Такі дні не обривають серію.</li>
         </ul>
       )}
@@ -380,7 +313,7 @@ function WeekSummary() {
 }
 
 /** Habits to quit on the home page: the streaks and the SOS button. */
-function QuitMini() {
+export function QuitMini() {
   const { S, go, setSheet } = useStore();
   const now = useNow(60_000);
   return (
@@ -396,7 +329,7 @@ function QuitMini() {
 }
 
 /** Everything that used to crowd the home page: statistics, finance, goals and the day score in detail. Built only when opened. */
-function HomeExtras() {
+export function HomeExtras() {
   const { S: S0, go } = useStore();
   const now = useNow(30_000);
   // every number below counts the focus run that is still going, the same as the day score does
@@ -408,24 +341,13 @@ function HomeExtras() {
   const goalMin = Math.max(1, S.goal * 60), st = streak(S);
   // tasks: done this week against what is still open
   const taskDone = S.tasks.filter(t => t.d && (t.doneAt ?? 0) >= ws).length, taskOpen = S.tasks.filter(t => !t.d).length;
-  const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S);
   const gs = [...S.goals].sort((a, c) => goalProgress(c) - goalProgress(a)).slice(0, 4);
   return (
     <>
         <ScoreCard />
         <FreeTimeCard />
         <WeekSummary />
-        <AffirmationsCard />
 
-        <div className="card s4">
-          <div className="ch"><Icon n="money" className="ic" /><div><h3>Фінанси</h3><p>{MONTHN[new Date().getMonth()]}, витрати обох рахунків у кронах</p></div><button className="sel" onClick={() => go('money')}>Деталі</button></div>
-          <div className="bigstat"><span className="v num" style={{ fontSize: 28 }}>{money(out)}</span><span className="muted">з {money(b)}</span></div>
-          <div className="bar" style={{ margin: '10px 0 10px' }}><i style={{ width: pctW(out, b) + '%', background: out > b ? 'var(--m1)' : 'var(--accent)' }} /></div>
-          <div className="accmini">
-            {(['dk', 'ua'] as const).map(id => { const a = account(S, id); return <button key={id} onClick={() => go('money')}><span className={`curtag ${a.cur}`}>{CUR_SIGN[a.cur]}</span><b className="num">{fmtCur(balance(S, id), a.cur)}</b></button>; })}
-          </div>
-          <div className="cats"><CatBars tx={mt} limit={4} /></div>
-        </div>
         <div className="card s4">
           <div className="ch"><Icon n="goals" className="ic" /><div><h3>Цілі</h3><p>Прогрес до великого</p></div><button className="sel" onClick={() => go('goals')}>Усі</button></div>
           {gs.map(g => (
@@ -478,34 +400,8 @@ function HomeExtras() {
   );
 }
 
-/** The few things that matter today: open tasks, the most urgent first, and a one-line way to add another. */
-function TodayTasks() {
-  const { S, A, go } = useStore();
-  const [text, setText] = useState('');
-  const open = S.tasks.filter(t => !t.d).sort(byUrgency);
-  return (
-    <div className="card s6">
-      <div className="ch"><Icon n="tasks" className="ic" /><div><h3>Задачі</h3><p>{open.length ? `${open.length} ${plural(open.length, 'відкрита', 'відкриті', 'відкритих')}, найтерміновіші зверху` : 'Усе зроблено'}</p></div><button className="sel" onClick={() => go('tasks')}>Усі</button></div>
-      <form className="addrow" onSubmit={e => { e.preventDefault(); if (A.addTaskLine(text)) setText(''); }}>
-        <input aria-label="Нова задача" value={text} onChange={e => setText(e.target.value)} placeholder="Нова задача… напр. «Подзвонити завтра !»" autoComplete="off" />
-      </form>
-      <div className="list">
-        {open.slice(0, 5).map(t => (
-          <div className="item" key={t.id}>
-            <button className="chk" role="checkbox" aria-checked={false} aria-label={`Виконано: ${t.t}`} onClick={() => A.toggleTask(t.id)} />
-            <span className="t">{t.t}</span>
-            {t.due && <span className={`muted num${dueState(t.due) === 'overdue' ? ' late' : ''}`} style={{ fontSize: 12 }}>{dueLabel(t.due)}</span>}
-          </div>
-        ))}
-        {open.length > 5 && <button className="chip" style={{ alignSelf: 'flex-start', marginTop: 8 }} onClick={() => go('tasks')}>Ще {open.length - 5}</button>}
-        {!open.length && <p className="muted">Відкритих задач немає.</p>}
-      </div>
-    </div>
-  );
-}
-
 /** Today's habits as a short checklist. */
-function HabitsToday() {
+export function HabitsToday() {
   const { S, A, go } = useStore();
   const k = TK(), hDone = S.habits.filter(h => h.days[k]).length;
   return (
@@ -522,32 +418,3 @@ function HabitsToday() {
   );
 }
 
-/** The home page in short: the day, what to do about it, tasks, habits and the quick records. Everything else is one tap away. */
-export function Home() {
-  const { go } = useStore();
-  const [more, setMore] = useState(false);
-  return (
-    <section className="view">
-      <div className="grid">
-        <Hero />
-        <SchedCard />
-
-        <YesterdayCard />
-        <AdviceCard />
-
-        <TodayTasks />
-        <HabitsToday />
-
-        <div className="card s12">
-          <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші. Одне натискання, і все пораховано</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
-          <LifeTiles full={false} />
-        </div>
-
-        <button className="moretoggle" aria-expanded={more} onClick={() => setMore(m => !m)}>
-          <Icon n="trend" /><span>Оцінка дня, статистика, фінанси й цілі</span><small>{more ? 'Сховати' : 'Показати'}</small><Icon n="right" className="icn chev" />
-        </button>
-        {more && <HomeExtras />}
-      </div>
-    </section>
-  );
-}

@@ -38,27 +38,26 @@ describe('claudeReport', () => {
     const s = blank();
     s.health['2026-03-16'] = { ...H, sleep: 6.5, water: 5 };
     s.noteList.push({ id: 1, title: 'Таємна нотатка', text: 'мій пароль 1234', created: 1, updated: 1 });
-    s.money.tx.push({ id: 5, type: 'out', amt: 120, cat: 'Їжа', note: 'вечеря з Олею', date: '2026-03-16', acc: 'dk' });
+    s.habits.push({ id: 5, name: 'Читання', days: { '2026-03-16': 1 } });
     const r = claudeReport(s, NOW, 30);
     expect(r).toContain('2026-03-16 | 6.5');
-    expect(r).toContain('Їжа: 120');
+    expect(r).toContain('Читання: 1 з 30');
     expect(r).toContain('3 дуже конкретні зміни');
     expect(r).not.toContain('Таємна');
     expect(r).not.toContain('пароль');
-    expect(r).not.toContain('Олею');
   });
 });
 
 import { searchAll } from '@/lib/search';
 
 describe('searchAll', () => {
-  it('finds words in tasks, notes and payments and says where to open them', () => {
+  it('finds words in tasks, notes and events and says where to open them', () => {
     const s = blank();
     s.tasks.push({ id: 1, t: 'Подзвонити клієнту Олексію', p: 'lo', d: false });
     s.noteList.push({ id: 1, title: 'Ідеї', text: 'купити подарунок Олексію', created: 1, updated: 1 });
-    s.money.tx.push({ id: 5, type: 'out', amt: 80, cat: 'Їжа', note: 'кава з Олексієм', date: '2026-03-16', acc: 'dk' });
+    s.events.push({ id: 5, date: '2026-03-16', s: '10:00', e: '11:00', title: 'кава з Олексієм', c: 'c1' });
     const hits = searchAll(s, 'олекс');
-    expect(hits.map(h => h.to).sort()).toEqual(['money', 'notes', 'tasks']);
+    expect(hits.map(h => h.to).sort()).toEqual(['notes', 'schedule', 'tasks']);
     expect(searchAll(s, 'подарунок олексію').map(h => h.to)).toEqual(['notes']);   // every word must be found
     expect(searchAll(s, 'о')).toEqual([]);                                          // one letter is too little to search
     expect(searchAll(s, 'нема такого')).toEqual([]);

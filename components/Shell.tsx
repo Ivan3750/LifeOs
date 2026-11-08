@@ -8,25 +8,13 @@ import { SheetHost } from './Sheets';
 import { Palette } from './Palette';
 import { RemindHost } from './Reminders';
 
-export function ModeSeg() {
-  const { S, setMode } = useStore();
-  return (
-    <div className="modeseg" role="group" aria-label="Режим">
-      <button aria-pressed={S.mode !== 'co'} onClick={() => setMode('me')}>Особисте</button>
-      <button aria-pressed={S.mode === 'co'} onClick={() => setMode('co')}>Компанія</button>
-    </div>
-  );
-}
-
-const CO_FLOW = ['leads', 'clients', 'deals', 'projects', 'invoices'];
-
-function NavBtn({ k, step }: { k: string; step?: number }) {
+function NavBtn({ k }: { k: string }) {
   const { S, view, go } = useStore();
   const [, l, i] = vinfo(k)!;
   const open = S.tasks.filter(t => !t.d).length;
   return (
     <button onClick={() => go(k)} aria-current={k === parentOf(view) ? 'page' : undefined}>
-      {step ? <span className="stepn">{step}</span> : <Icon n={i as IconName} />}<span className="nl">{l}</span>
+      <Icon n={i as IconName} /><span className="nl">{l}</span>
       {k === 'tasks' && open > 0 && <span className="badge">{open}</span>}
     </button>
   );
@@ -87,7 +75,6 @@ function TopBar() {
   return (
     <div className="top">
       <span className="logo mlogo"><Icon n="logo" /></span>
-      <div className="mslot"><ModeSeg /></div>
       <button className="search" onClick={() => setPalette(true)} aria-label="Відкрити пошук і команди">
         <Icon n="search" /><span className="lbl">Пошук чи команда…</span><kbd>Ctrl K</kbd>
       </button>
@@ -106,7 +93,7 @@ function TopBar() {
             {S.log.length ? S.log.slice(0, 8).map(l => {
               const t = new Date(l.t);
               return <div className="item" key={l.t}><span className="sw c1" /><span className="t">{l.msg}</span><span className="muted num" style={{ fontSize: 11 }}>{pad2(t.getHours())}:{pad2(t.getMinutes())}</span></div>;
-            }) : <p className="muted" style={{ padding: 8, margin: 0 }}>Сповіщень поки немає. Тут зʼявляться завершені сесії та виграні угоди.</p>}
+            }) : <p className="muted" style={{ padding: 8, margin: 0 }}>Сповіщень поки немає. Тут зʼявляться завершені сесії та досягнуті цілі.</p>}
           </div>
         )}
       </div>
@@ -119,8 +106,7 @@ function TopBar() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { S, view, toastMsg, setToast, setSheet, setPalette, sheet, palette } = useStore();
-  const m = S.mode === 'co' ? 'co' : 'me';
+  const { view, toastMsg, setToast, setSheet, setPalette, sheet, palette } = useStore();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -138,17 +124,9 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="app">
         <aside className="side">
           <div className="brand"><span className="logo"><Icon n="logo" /></span>LifeOs</div>
-          <ModeSeg />
           <nav className="nav">
-            {m === 'co'
-              ? <>
-                  {NAV.co.slice(0, 1).map(k => <NavBtn key={k} k={k} />)}
-                  <span className="navh">Шлях клієнта</span>
-                  {CO_FLOW.map((k, i) => <NavBtn key={k} k={k} step={i + 1} />)}
-                  <span className="navh">Інструменти</span>
-                  {NAV.co.filter(k => k !== 'co' && !CO_FLOW.includes(k)).map(k => <NavBtn key={k} k={k} />)}
-                </>
-              : <>{NAV.me.filter(k => !NAV_MORE.includes(k)).map(k => <NavBtn key={k} k={k} />)}<MoreNav /></>}
+            {NAV.filter(k => !NAV_MORE.includes(k)).map(k => <NavBtn key={k} k={k} />)}
+            <MoreNav />
           </nav>
           <MiniTimer />
         </aside>
@@ -159,8 +137,8 @@ export function Shell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <nav className="tabbar" aria-label="Основні розділи">
-        {TABS[m].map(k => <NavBtn key={k} k={k} />)}
-        <button onClick={() => setSheet({ kind: 'more' })} aria-current={TABS[m].includes(parentOf(view)) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
+        {TABS.map(k => <NavBtn key={k} k={k} />)}
+        <button onClick={() => setSheet({ kind: 'more' })} aria-current={TABS.includes(parentOf(view)) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
       </nav>
       <button className="fab" onClick={() => setSheet({ kind: 'qa' })} aria-label="Швидко додати"><Icon n="plus" /></button>
       <SheetHost />

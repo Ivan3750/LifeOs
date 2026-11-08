@@ -28,7 +28,8 @@ describe('buildTables', () => {
   const S = makeState(false);
   S.sessions.push({ t: new Date('2026-03-10T10:00:00').getTime(), m: 50, task: 'Звіт' }, { t: new Date('2026-01-01T10:00:00').getTime(), m: 25 });
   S.events.push({ id: 1, date: '2026-03-12', s: '10:00', e: '11:00', title: 'Лекція', c: 'c1' });
-  S.money.tx.push({ id: 2, type: 'out', amt: 90, cat: 'Їжа', note: 'Кава, "велика"', date: '2026-03-11', acc: 'dk' });
+  S.notes = '';
+  S.noteList.push({ id: 2, title: 'Кава, "велика"', text: 'ідея', created: new Date('2026-03-11T10:00').getTime(), updated: new Date('2026-03-11T10:00').getTime() });
   const ext = [
     { id: 'a', title: 'Зустріч у календарі', start: '2026-03-12T09:00:00.000Z', end: '2026-03-12T10:00:00.000Z', allDay: false, src: 0 },
     { id: 'b', title: 'Давня подія', start: '2025-01-01T09:00:00.000Z', end: '2025-01-01T10:00:00.000Z', allDay: false, src: 0 },
@@ -37,7 +38,7 @@ describe('buildTables', () => {
   it('keeps only the records inside the period', () => {
     const t = buildTables(S, ext, { from: '2026-03-01', to: '2026-03-31' }, all);
     expect(t.find(x => x.file === 'fokus')?.rows).toHaveLength(1);
-    expect(t.find(x => x.file === 'finansy')?.rows).toHaveLength(1);
+    expect(t.find(x => x.file === 'notatky')?.rows).toHaveLength(1);
   });
   it('puts own and calendar events into one table, only those in the period', () => {
     const rows = buildTables(S, ext, { from: '2026-03-01', to: '2026-03-31' }, all).find(x => x.file === 'podii')!.rows;
@@ -45,11 +46,11 @@ describe('buildTables', () => {
     expect(rows.map(r => r[3])).not.toContain('Давня подія');
   });
   it('leaves out sections that are switched off', () => {
-    const t = buildTables(S, ext, { from: '2026-03-01', to: '2026-03-31' }, { ...all, money: false, events: false });
-    expect(t.some(x => x.file === 'finansy' || x.file === 'podii')).toBe(false);
+    const t = buildTables(S, ext, { from: '2026-03-01', to: '2026-03-31' }, { ...all, notes: false, events: false });
+    expect(t.some(x => x.file === 'notatky' || x.file === 'podii')).toBe(false);
   });
   it('escapes csv cells and starts with a BOM', () => {
-    const csv = toCsv(buildTables(S, [], { from: '2026-03-01', to: '2026-03-31' }, all).find(x => x.file === 'finansy')!);
+    const csv = toCsv(buildTables(S, [], { from: '2026-03-01', to: '2026-03-31' }, all).find(x => x.file === 'notatky')!);
     expect(csv.startsWith('﻿')).toBe(true);
     expect(csv).toContain('"Кава, ""велика"""');
   });

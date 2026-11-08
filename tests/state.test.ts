@@ -15,20 +15,13 @@ describe('fill', () => {
     expect(s.notes).toBe('');
   });
 
-  it('moves the old single budget onto the Danish account', () => {
-    const old = makeState(false) as unknown as { money: Record<string, unknown> };
-    delete old.money.accounts; old.money.budget = 4321;
-    const s = fill(old as unknown as State);
-    expect(s.money.accounts.find(a => a.id === 'dk')?.budget).toBe(4321);
-  });
-
   it('repairs values of the wrong kind instead of crashing later', () => {
-    const bad = { ...makeState(false), tasks: 'oops', goal: 'many', co: { name: 5 }, health: [] } as unknown as State;
+    const bad = { ...makeState(false), tasks: 'oops', goal: 'many', plan: 5, wins: [], health: [] } as unknown as State;
     const s = fill(bad);
     expect(Array.isArray(s.tasks)).toBe(true);
     expect(typeof s.goal).toBe('number');
-    expect(typeof s.co.name).toBe('string');
-    expect(Array.isArray(s.co.deals)).toBe(true);
+    expect(Array.isArray(s.plan.ids)).toBe(true);
+    expect(Array.isArray(s.wins)).toBe(false);
     expect(Array.isArray(s.health)).toBe(false);
   });
 

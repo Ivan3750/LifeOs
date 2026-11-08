@@ -1,15 +1,12 @@
 import type { ExtEvent, State } from './types';
-import { account, accOf, potSaved, txDKK } from './money';
-import { clientRows } from './clients';
 import { goalProgress } from './goals';
 import { napMinutes } from './sleep';
 import { addD, hhmm, ymd } from './util';
-import { LEAD_STATUS, STAGES } from './util';
 
 export const SECTIONS = [
   ['focus', 'Фокус і сесії'], ['tasks', 'Задачі'], ['habits', 'Звички'], ['health', 'Сон, вода, рух'], ['moods', 'Настрій'],
-  ['acts', 'Справи і зміни Wolt'], ['money', 'Фінанси'], ['events', 'Події: мої і з календарів'], ['goals', 'Цілі і сфери життя'],
-  ['notes', 'Нотатки'], ['quit', 'Відмова від звичок і потяги'], ['company', 'Компанія: ліди, клієнти, угоди, проєкти, рахунки, реклама'],
+  ['acts', 'Справи'], ['events', 'Події: мої і з календарів'], ['goals', 'Цілі і сфери життя'],
+  ['notes', 'Нотатки'], ['quit', 'Відмова від звичок і потяги'],
 ] as const;
 export type SectionKey = (typeof SECTIONS)[number][0];
 
@@ -46,15 +43,8 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
     S.cravings.filter(c => inP(day(c.t), p)).sort((a, b) => a.t - b.t).map(c => [day(c.t), clock(c.t), S.badHabits.find(h => h.id === c.habit)?.name || '', c.outcome === 'resisted' ? 'витримав' : 'зрив', c.trigger, c.tool ? ({ exercise: 'вправи', breath: 'дихання', game: 'гра' } as Record<string, string>)[c.tool] || c.tool : '']));
   add('moods', 'Настрій', 'nastrij', ['Дата', 'Час', 'Настрій 1–10', 'Сили', 'Теги', 'Нотатка'],
     S.moods.filter(m => inP(day(m.t), p)).sort((a, b) => a.t - b.t).map(m => [day(m.t), clock(m.t), m.v, m.energy ? ({ 1: 'мало', 3: 'нормально', 5: 'багато' } as Record<number, string>)[m.energy <= 2 ? 1 : m.energy === 3 ? 3 : 5] : '', m.tags.join('; '), m.note]));
-  add('acts', 'Справи', 'spravy', ['Дата', 'Початок', 'Кінець', 'Хвилин', 'Тип', 'Що', 'Замовлень', 'Заробіток, kr.', 'Км'],
-    S.activities.filter(a => inP(day(a.start), p)).sort((a, b) => a.start - b.start).map(a => [day(a.start), clock(a.start), clock(a.end), dur(a.start, a.end), a.kind, a.title, a.orders ?? '', a.earned ?? '', a.km ?? '']));
-  add('money', 'Фінанси', 'finansy', ['Дата', 'Рахунок', 'Валюта', 'Тип', 'Категорія', 'Сума', 'Сума, kr. за курсом', 'Нотатка'],
-    S.money.tx.filter(t => inP(t.date, p)).sort((a, b) => a.date.localeCompare(b.date)).map(t => {
-      const a = account(S, accOf(t));
-      return [t.date, a.name, a.cur, t.xfer ? 'Переказ' : t.pot ? 'Скарбничка' : t.type === 'in' ? 'Дохід' : 'Витрата', t.cat, t.type === 'in' ? t.amt : -t.amt, Math.round((t.type === 'in' ? 1 : -1) * txDKK(S, t) * 100) / 100, t.note];
-    }));
-  add('money', 'Скарбнички', 'skarbnychky', ['Скарбничка', 'Мета, kr.', 'Відкладено, kr.', 'До дати'], S.money.pots.map(p => [p.name, p.target, Math.round(potSaved(S, p.id) * 100) / 100, p.due]));
-  add('money', 'Регулярні платежі', 'rehuliarni', ['Назва', 'Тип', 'Сума', 'Категорія', 'Числа місяця', 'Активний'], S.money.recurring.map(r => [r.name, r.type === 'in' ? 'Дохід' : 'Платіж', r.amt, r.cat, r.day, r.active ? 'так' : 'ні']));
+  add('acts', 'Справи', 'spravy', ['Дата', 'Початок', 'Кінець', 'Хвилин', 'Тип', 'Що'],
+    S.activities.filter(a => inP(day(a.start), p)).sort((a, b) => a.start - b.start).map(a => [day(a.start), clock(a.start), clock(a.end), dur(a.start, a.end), a.kind, a.title]));
   add('events', 'Події', 'podii', ['Дата', 'Початок', 'Кінець', 'Подія', 'Звідки', 'Місце'], [
     ...S.events.filter(e => inP(e.date, p)).map(e => [e.date, e.s, e.e, e.title, 'мої', '']),
     ...ext.filter(e => inP(e.start.slice(0, 10), p)).map(e => e.allDay
@@ -66,15 +56,6 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
   add('goals', 'Колесо балансу', 'koleso', ['Сфера', 'Оцінка 1–10'], ['Здоровʼя', 'Карʼєра', 'Фінанси', 'Стосунки', 'Друзі', 'Відпочинок', 'Розвиток', 'Дім'].map((a, i) => [a, S.wheel[i] ?? '']));
   add('notes', 'Нотатки', 'notatky', ['Оновлено', 'Назва', 'Текст'],
     S.noteList.filter(n => inP(day(n.updated), p)).map(n => [day(n.updated), n.title, n.text]));
-  add('company', 'Ліди', 'lidy', ['Створено', 'Імʼя', 'Контакт', 'Джерело', 'Статус', 'Очікувана сума', 'Наступний контакт', 'Нотатка'],
-    S.co.leads.filter(l => inP(l.created, p)).map(l => [l.created, l.name, l.contact, l.source, LEAD_STATUS.find(x => x[0] === l.status)?.[1] || l.status, l.value, l.next, l.note]));
-  add('company', 'Клієнти (база)', 'klijenty-baza', ['Клієнт', 'Контакт', 'Джерело', 'З', 'Принесли', 'Чекаємо оплату', 'Відкриті угоди', 'Активні проєкти'],
-    clientRows(S).map(r => [r.name, r.contact, r.source, r.since, r.revenue, r.unpaid, r.deals, r.projects]));
-  add('company', 'Угоди', 'uhody', ['Угода', 'Клієнт', 'Сума', 'Етап'], S.co.deals.map(d => [d.title, d.client, d.amt, STAGES.find(x => x[0] === d.stage)?.[1] || (d.stage === 'lost' ? 'Програно' : d.stage)]));
-  add('company', 'Проєкти', 'proiekty', ['Проєкт', 'Клієнт', 'Бюджет', 'Прогрес, %', 'Дедлайн', 'Статус'], S.co.projects.map(x => [x.name, x.client, x.budget, x.progress, x.due, x.status]));
-  add('company', 'Рахунки', 'rakhunky', ['Номер', 'Клієнт', 'Сума', 'Виставлено', 'Оплатити до', 'Оплачено'],
-    S.co.invoices.filter(i => inP(i.issued, p) || (i.paidAt && inP(i.paidAt, p))).map(i => [i.no, i.client, i.amt, i.issued, i.due, i.paid ? i.paidAt : '']));
-  add('company', 'Реклама', 'reklama', ['Дата', 'Канал', 'Сума, kr.', 'Нотатка'], S.co.ads.filter(a => inP(a.date, p)).sort((a, b) => a.date.localeCompare(b.date)).map(a => [a.date, a.channel, a.amt, a.note]));
   return T;
 }
 

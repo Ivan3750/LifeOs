@@ -6,24 +6,8 @@ export const WD = ['Неділя', 'Понеділок', 'Вівторок', 'С
 
 export const MOODS = ['Погано', 'Так собі', 'Нормально', 'Добре', 'Чудово'];
 export const MOODC = ['var(--m1)', 'var(--m2)', 'var(--m3)', 'var(--m4)', 'var(--m5)'];
-export const CATS = {
-  out: ['Їжа', 'Транспорт', 'Житло', 'Розваги', 'Навчання', 'Здоровʼя', 'Покупки', 'Інше'],
-  in: ['Wolt', 'Зарплата', 'SU / стипендія', 'Фриланс', 'Подарунок', 'Інше'],
-};
 export const AREAS = ['Здоровʼя', 'Карʼєра', 'Фінанси', 'Стосунки', 'Друзі', 'Відпочинок', 'Розвиток', 'Дім'];
-export const LEAD_SOURCES = ['Instagram', 'Facebook', 'Google', 'TikTok', 'LinkedIn', 'Telegram', 'Рекомендація', 'Сайт', 'Холодний пошук', 'Інше'];
-export const AD_CHANNELS = ['Instagram', 'Facebook', 'Google', 'TikTok', 'LinkedIn', 'Telegram', 'Блогер', 'Друк / флаєри', 'Інше'];
-export const LEAD_STATUS = [['new', 'Новий'], ['contacted', 'Написав'], ['replied', 'Відповів'], ['meeting', 'Зустріч'], ['won', 'Клієнт'], ['dead', 'Не цікаво']] as const;
-export const STAGES = [['lead', 'Лід'], ['talk', 'Перемовини'], ['proposal', 'Пропозиція'], ['won', 'Виграно']] as const;
 export const COLORS: [string, string][] = [['c1', 'Помаранчевий'], ['c2', 'Білий'], ['c3', 'Зелений'], ['c4', 'Бузковий']];
-export const GUESS: [RegExp, string][] = [
-  [/кав|обід|їж|сніданок|вечер|продукт|піц|кафе|netto|føtex|rema|lidl/i, 'Їжа'],
-  [/такс|метро|автобус|проїзд|бензин|dsb|rejsekort|tog/i, 'Транспорт'],
-  [/кіно|гра|бар|концерт|клуб/i, 'Розваги'],
-  [/книг|курс|підручник/i, 'Навчання'],
-  [/аптек|лік|apotek/i, 'Здоровʼя'],
-  [/оренд|комунал|інтернет|husleje/i, 'Житло'],
-];
 
 export const pad2 = (n: number) => String(n).padStart(2, '0');
 export const sod = (d: Date | number) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -40,8 +24,6 @@ export const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 export const pctW = (v: number, m: number) => Math.max(0, Math.min(100, m ? (v / m) * 100 : 0)).toFixed(1);
 export const fmt = (s: number) => `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
 
-const dkk = new Intl.NumberFormat('da-DK', { style: 'currency', currency: 'DKK', maximumFractionDigits: 0 });
-export const money = (n: number) => dkk.format(Math.round(n));
 export const fmtN = (n: number) => (+n).toLocaleString('da-DK');
 export const kfmt = (n: number) => (n >= 1e6 ? (n / 1e6).toFixed(1).replace('.0', '') + 'm' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(Math.round(n)));
 export const hmPlain = (m: number) => { m = Math.round(m); const h = Math.floor(m / 60); return h ? `${h} год ${m % 60} хв` : `${m % 60} хв`; };

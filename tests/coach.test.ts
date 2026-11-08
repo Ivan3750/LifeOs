@@ -66,12 +66,10 @@ describe('advice system', () => {
     expect(tip.why.length).toBeGreaterThan(40); expect(tip.action).toContain('лягай');
   });
 
-  it('notices overdue tasks and leads and unpaid invoices from other parts of the app', () => {
+  it('notices overdue tasks', () => {
     const S = makeState(false); S.meals = [];
     S.tasks.push({ id: 1, t: 'Старе', p: 'lo', d: false, due: '2026-03-01' });
-    S.co.leads.push({ id: 2, name: 'Клієнт', contact: '', source: '', status: 'new', value: 0, next: '2026-03-20', note: '', created: '2026-03-01' });
-    S.co.invoices.push({ id: 3, no: '1', client: 'X', amt: 100, issued: '2026-03-01', due: '2026-03-10', paid: false, paidAt: '' });
     const ids = coach(S, () => [], NOW).tips.map(t => t.id);
-    expect(ids).toEqual(expect.arrayContaining(['overdue', 'leads', 'invoices']));
+    expect(ids).toEqual(expect.arrayContaining(['overdue']));
   });
 });
