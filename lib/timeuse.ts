@@ -4,16 +4,16 @@ import { sleepTotal } from './sleep';
 
 /** Where an event's time goes. Colours are fixed so a category looks the same everywhere. */
 export const EV_CATS: { key: string; label: string; color: string }[] = [
-  { key: 'work', label: 'Робота', color: '#5B5BFA' },
-  { key: 'biz', label: 'Бізнес', color: '#0EA5E9' },
-  { key: 'study', label: 'Навчання', color: '#A855F7' },
+  { key: 'work', label: 'Робота', color: '#FF5B1F' },
+  { key: 'biz', label: 'Бізнес', color: '#C2410C' },
+  { key: 'study', label: 'Навчання', color: '#6A4CE0' },
   { key: 'sport', label: 'Спорт і здоровʼя', color: '#3FB383' },
   { key: 'food', label: 'Їжа', color: '#F2B544' },
   { key: 'people', label: 'Спілкування', color: '#E0568C' },
   { key: 'rest', label: 'Відпочинок і розваги', color: '#3B9BF0' },
-  { key: 'road', label: 'Дорога', color: '#8A8EA5' },
+  { key: 'road', label: 'Дорога', color: '#8C8781' },
   { key: 'chores', label: 'Побут і справи', color: '#B58B5E' },
-  { key: 'other', label: 'Інше', color: '#B9BDCB' },
+  { key: 'other', label: 'Інше', color: '#B9B3AC' },
 ];
 export const catOf = (key: string) => EV_CATS.find(c => c.key === key) || EV_CATS[EV_CATS.length - 1];
 
@@ -123,7 +123,7 @@ export function timeLedger(S: State, days: string[], eventsOn: (k: string) => Ui
     put('rem', Math.max(0, win - used));
   }
   const rows: LedgerRow[] = [];
-  const meta: Record<string, [string, string]> = { sleep: ['Сон', '#8B7CF6'], focus: ['Фокус', '#5B5BFA'], act: ['Справи (дорога, магазин…)', '#2B2D3C'], social: ['Соцмережі', '#E5484D'], rem: ['Без обліку', '#D5D8E4'] };
+  const meta: Record<string, [string, string]> = { sleep: ['Сон', '#8B7CF6'], focus: ['Фокус', '#FF5B1F'], act: ['Справи (дорога, магазин…)', '#2B2723'], social: ['Соцмережі', '#E5484D'], rem: ['Без обліку', '#D8D3CC'] };
   for (const [key, min] of Object.entries(acc)) {
     if (key.startsWith('ev:')) { const c = catOf(key.slice(3)); rows.push({ key, label: c.label, color: c.color, min }); }
     else rows.push({ key, label: meta[key][0], color: meta[key][1], min });
