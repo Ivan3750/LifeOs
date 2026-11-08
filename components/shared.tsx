@@ -4,19 +4,14 @@ import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { Icon, type IconName } from './Icon';
 import { Face } from './Face';
-import type { State, Tx, UiEvent } from '@/lib/types';
-import { DAY, daysInMonth, hhmm, money, pad2, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
+import type { State, UiEvent } from '@/lib/types';
+import { DAY, hhmm, pad2, pctW, sod, sum, TK, toMin, wStart, ymd, addD } from '@/lib/util';
 import { dayMood, moveGoal, waterGoal, ENERGY3, energyWord, moodsOn, moodWord } from '@/lib/score';
-import { budgetDKK, monthOf, sumIn, txDKK } from '@/lib/money';
 import { SocialTile } from './SocialTile';
 import { napMinutes, sleepTotal } from '@/lib/sleep';
 
 export const today = () => TK();
 export const hdayOf = (S: State, k = TK()) => S.health[k] || { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0, bed: undefined, wake: undefined };
-/** This month's income and spending on both accounts, without transfers between them. */
-export const monthTx = (S: State) => monthOf(S, TK().slice(0, 7));
-/** Sum in kroner; hryvnia records are converted at the current rate. */
-export const sumT = (S: State, a: Tx[], type: 'in' | 'out') => sumIn(S, a, type);
 export const sumA = (a: { amt: number }[]) => a.reduce((x, i) => x + (+i.amt || 0), 0);
 export const dayMinutes = (S: State, d: Date) => { const a = sod(d).getTime(), b = addD(sod(d), 1).getTime(); return S.sessions.filter(s => s.t >= a && s.t < b).reduce((x, s) => x + s.m, 0); };
 export const weekMinutes = (S: State, off = 0) => {
@@ -179,9 +174,7 @@ function WeightTile({ k }: { k: string }) {
 
 /** Tiles for one day (today unless k is given). Mood check-ins are only for the present moment. */
 export function LifeTiles({ full, k = TK() }: { full: boolean; k?: string }) {
-  const { S, go } = useStore();
   const isToday = k === TK();
-  const spent = sumT(S, monthTx(S).filter(x => x.date === TK()), 'out'), lim = budgetDKK(S) / daysInMonth();
   return (
     <div className="life">
       <SleepTile k={k} />
@@ -189,27 +182,9 @@ export function LifeTiles({ full, k = TK() }: { full: boolean; k?: string }) {
       <WaterTile k={k} />
       <MoveTile k={k} />
       {!full && <SocialTile />}
-      {full ? (
-        <WeightTile key={k} k={k} />
-      ) : (
-        <div className="tile">
-          <div className="lab"><span>Витрати</span><span>ліміт {money(lim)}</span></div>
-          <div className="tv num">{money(spent)}</div>
-          <div className="bar"><i style={{ width: pctW(spent, lim) + '%', background: spent > lim ? 'var(--m1)' : 'var(--accent)' }} /></div>
-          <div className="step"><button onClick={() => go('money')}>+ Записати</button></div>
-        </div>
-      )}
+      {full && <WeightTile key={k} k={k} />}
     </div>
   );
-}
-
-export function CatBars({ tx, limit }: { tx: Tx[]; limit: number }) {
-  const { S } = useStore();
-  const by: Record<string, number> = {};
-  tx.filter(t => t.type === 'out' && !t.xfer).forEach(t => { by[t.cat] = (by[t.cat] || 0) + txDKK(S, t); });
-  const arr = Object.entries(by).sort((a, b) => b[1] - a[1]).slice(0, limit), max = arr.length ? arr[0][1] : 1;
-  if (!arr.length) return <p className="muted" style={{ margin: 0 }}>Витрат цього місяця ще немає.</p>;
-  return <>{arr.map(([c, v]) => <div className="catrow" key={c}><span>{c}</span><div className="bar"><i style={{ width: pctW(v, max) + '%' }} /></div><span className="num" style={{ textAlign: 'right' }}>{money(v)}</span></div>)}</>;
 }
 
 /** Two-click delete: the first click arms the button, the second one deletes. */

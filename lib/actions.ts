@@ -1,10 +1,8 @@
 import { catOf, learn, unlearn } from './timeuse';
-import type { AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
-import { XFER_CAT, account, fmtCur, pendingRecurring, potSaved, recDate, shiftMk, toDKK } from './money';
-import { addD, AREAS, money, STAGES, TK, toMin, ymd } from './util';
+import type { DayOff, Goal, HealthField, Meal, OffKind, State } from './types';
+import { AREAS, TK, toMin } from './util';
 import { parseTask } from './tasks';
 import { moodCause } from './correlations';
-import { norm } from './clients';
 
 export const goalStep = (target: number) => (target >= 200 ? Math.round(target / 20) : target >= 40 ? 5 : 1);
 
@@ -27,6 +25,20 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     setH(f: HealthField, v: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },
     addH(f: HealthField, d: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(((h[f] || 0) + d) * 10) / 10)); delete h.demo; }); },
     addTask,
+    /** Saves the main things of today. */
+    setPlan(ids: number[], k = TK()) { update(s => { s.plan = { date: k, ids: ids.slice(0, 5) }; }); },
+    /** Takes one task out of today's plan and puts the next most pressing one in its place (if there is one). */
+    swapPlan(id: number, replacement?: number) {
+      update(s => {
+        const k = TK(), ids = s.plan.date === k ? [...s.plan.ids] : [];
+        const i = ids.indexOf(id);
+        if (i < 0) return;
+        if (replacement) ids[i] = replacement; else ids.splice(i, 1);
+        s.plan = { date: k, ids };
+      });
+    },
+    /** One line about what went well on day k (empty removes it). */
+    setWin(text: string, k = TK()) { update(s => { const t = text.trim(); if (t) s.wins[k] = t; else delete s.wins[k]; }); },
     /** Adds a task from one line of text: «!» makes it important, a trailing «завтра» or «25.11» sets the date. */
     addTaskLine(line: string, goal?: number) { const q = parseTask(line); if (!q.t) return false; addTask(q.t, q.p, goal, q.due); return true; },
     setTaskGoal(id: number, goal?: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; if (goal) t.goal = goal; else delete t.goal; }); },
@@ -46,70 +58,6 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     /** Removes every finished task in one go (can be undone). */
     clearDoneTasks() { del(s => { s.tasks = s.tasks.filter(x => !x.d); }, 'Виконані задачі видалено'); },
     delTask(id: number) { del(s => { s.tasks = s.tasks.filter(x => x.id !== id); }); },
-    addTx(type: 'in' | 'out', amt: number, cat: string, note: string, date: string, acc: AccId = 'dk') {
-      if (!(amt > 0)) return;
-      update(s => { s.money.tx.push({ id: s.nextId++, type, amt, cat, note: (note || '').trim(), date, acc }); });
-      toast((type === 'out' ? 'Витрату' : 'Дохід') + ' записано: ' + fmtCur(amt, account(getS(), acc).cur));
-    },
-    /** Changes a record; for one half of a transfer only the note and date follow to the other half. */
-    updateTx(id: number, v: Partial<Pick<Tx, 'type' | 'amt' | 'cat' | 'note' | 'date' | 'acc'>>) {
-      update(s => {
-        const t = s.money.tx.find(x => x.id === id); if (!t) return;
-        Object.assign(t, v, v.note !== undefined ? { note: v.note.trim() } : {}); delete t.demo;
-        if (t.xfer) s.money.tx.filter(x => x.xfer === t.xfer && x.id !== id).forEach(o => { o.date = t.date; o.note = t.note; });
-      });
-      toast('Запис оновлено');
-    },
-    /** Moves money between own accounts: one record out of `from`, one into `to` (received may differ after conversion). */
-    addTransfer(from: AccId, to: AccId, amt: number, received: number, date: string, note: string) {
-      if (!(amt > 0) || !(received > 0) || from === to) return;
-      update(s => {
-        const x = s.nextId++;
-        s.money.tx.push({ id: s.nextId++, type: 'out', amt, cat: XFER_CAT, note: note.trim(), date, acc: from, xfer: x });
-        s.money.tx.push({ id: s.nextId++, type: 'in', amt: received, cat: XFER_CAT, note: note.trim(), date, acc: to, xfer: x });
-      });
-      toast(`Переказ: ${fmtCur(amt, account(getS(), from).cur)} → ${fmtCur(received, account(getS(), to).cur)}`);
-    },
-    /** Creates the records of regular payments that have come due (one per month, only once). Returns how many were added. */
-    applyRecurring() {
-      // two devices can create the same month's record before they sync: keep the oldest one only
-      const seen = new Set<string>(), extra = new Set<number>();
-      for (const t of [...getS().money.tx].sort((a, b) => a.id - b.id)) if (t.rec) { const k = t.rec + '|' + t.date.slice(0, 7); if (seen.has(k)) extra.add(t.id); else seen.add(k); }
-      if (extra.size) update(s => { s.money.tx = s.money.tx.filter(t => !extra.has(t.id)); });
-      const due = pendingRecurring(getS()); if (!due.length) return 0;
-      update(s => { for (const { r, date } of due) s.money.tx.push({ id: s.nextId++, type: r.type, amt: r.amt, cat: r.cat, note: r.name, date, acc: r.acc, rec: r.id }); });
-      toast(`Додано регулярних записів: ${due.length}`);
-      return due.length;
-    },
-    addRecurring(v: Omit<Recurring, 'id' | 'from' | 'active'> & { from?: string }) {
-      if (!v.name.trim() || !(v.amt > 0)) return false;
-      const day = Math.min(31, Math.max(1, Math.round(v.day) || 1)), mk = TK().slice(0, 7);
-      // a payment whose day has already passed this month starts next month, so nothing is added twice for a record that was already typed in by hand
-      const from = v.from || (recDate({ day } as Recurring, mk) <= TK() ? shiftMk(mk, 1) : mk);
-      update(s => { s.money.recurring.push({ id: s.nextId++, ...v, name: v.name.trim(), from, active: true, day }); });
-      toast(`Регулярний платіж додано${from > mk ? ': перший запис у наступному місяці' : ''}`); return true;
-    },
-    toggleRecurring(id: number) { update(s => { const r = s.money.recurring.find(x => x.id === id); if (r) r.active = !r.active; }); },
-    delRecurring(id: number) { del(s => { s.money.recurring = s.money.recurring.filter(x => x.id !== id); }, 'Регулярний платіж видалено'); },
-    addPot(v: { name: string; target: number; due: string }) { if (!v.name.trim() || !(v.target > 0)) return false; update(s => { s.money.pots.push({ id: s.nextId++, name: v.name.trim(), target: v.target, due: v.due }); }); toast('Скарбничку створено'); return true; },
-    /** Moves money into a pot (or back out when amt is negative). The account balance changes, spending statistics do not. */
-    potMove(id: number, amt: number, acc: AccId = 'dk') {
-      const pot = getS().money.pots.find(p => p.id === id); if (!pot || !amt) return;
-      // cannot take out more than is in the pot (in kroner)
-      if (amt < 0 && -toDKK(getS(), amt, account(getS(), acc).cur) > potSaved(getS(), id) + 0.005) { toast('У скарбничці стільки нема'); return; }
-      update(s => { s.money.tx.push({ id: s.nextId++, type: amt > 0 ? 'out' : 'in', amt: Math.abs(amt), cat: 'Заощадження', note: pot.name, date: TK(), acc, pot: id }); });
-      toast(amt > 0 ? `Відкладено ${fmtCur(amt, account(getS(), acc).cur)}: ${pot.name}` : `Знято зі скарбнички: ${pot.name}`);
-    },
-    delPot(id: number) { del(s => { s.money.pots = s.money.pots.filter(p => p.id !== id); s.money.tx = s.money.tx.filter(t => t.pot !== id); }, 'Скарбничку видалено, гроші повернулись на рахунок'); },
-    setCatBudget(cat: string, n: number) { update(s => { if (n > 0) s.money.catBudgets[cat] = Math.round(n); else delete s.money.catBudgets[cat]; }); },
-    setBudgetMode(mode: 'fixed' | 'income') { update(s => { s.money.budgetMode = mode; }); },
-    setSaveRate(n: number) { update(s => { s.money.saveRate = Math.max(0, Math.min(90, Math.round(n))); }); },
-    setAccount(id: AccId, v: Partial<Pick<Account, 'name' | 'opening' | 'budget'>>) { update(s => { const a = s.money.accounts.find(x => x.id === id); if (a) Object.assign(a, v); }); },
-    setRate(uahPerDkk: number, src: 'nbu' | 'manual') { if (!(uahPerDkk > 0)) return; update(s => { s.money.uahPerDkk = uahPerDkk; s.money.rateAt = Date.now(); s.money.rateSrc = src; }); },
-    /** Deleting one half of a transfer removes both halves. */
-    delTx(id: number) {
-      update(s => { const t = s.money.tx.find(x => x.id === id); s.money.tx = s.money.tx.filter(x => x.id !== id && !(t?.xfer && x.xfer === t.xfer)); });
-    },
     addEvent(v: { title: string; date: string; s: string; e: string; c: string }) {
       if (toMin(v.e) <= toMin(v.s)) { toast('Кінець має бути пізніше за початок'); return false; }
       update(s => { s.events.push({ id: s.nextId++, ...v }); }); toast('Подію додано'); return true;
@@ -151,34 +99,6 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     dropEmptyNote(id: number) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id || x.title.trim() || x.text.trim()); }); },
     pinNote(id: number) { update(s => { const n = s.noteList.find(x => x.id === id); if (n) n.pinned = !n.pinned; }); },
     delNote(id: number, quiet = false) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id); }); if (!quiet) toast('Нотатку видалено'); },
-    /** Ends the running Wolt shift with what it brought: the money becomes an income record on the Danish account. */
-    finishShift(v: { earned: number; orders: number; km: number }) {
-      const a = getS().act; if (!a) return;
-      const end = Date.now(), m = Math.round((end - a.start) / 6e4);
-      update(s => {
-        if (m >= 1) {
-          const id = s.nextId++;
-          s.activities.push({ id, ...a, end, ...(v.orders > 0 ? { orders: v.orders } : {}), ...(v.earned > 0 ? { earned: v.earned } : {}), ...(v.km > 0 ? { km: v.km } : {}) });
-          if (v.earned > 0) s.money.tx.push({ id: s.nextId++, type: 'in', amt: v.earned, cat: 'Wolt', note: `Зміна ${Math.floor(m / 60)} год ${m % 60} хв${v.orders ? `, ${v.orders} замовл.` : ''}`, date: ymd(new Date(end)), acc: 'dk', shift: id });
-        }
-        s.act = null;
-      });
-      toast(m >= 1 ? `Зміну записано: ${Math.floor(m / 60)} год ${m % 60} хв${v.earned ? ' · ' + fmtCur(v.earned, 'DKK') : ''}` : 'Менше хвилини, не записано');
-    },
-    /** A shift that was not timed: when it was and what it brought. */
-    addShift(v: { start: number; end: number; earned: number; orders: number; km: number }) {
-      if (v.end <= v.start) { toast('Кінець має бути пізніше за початок'); return false; }
-      update(s => {
-        const id = s.nextId++;
-        s.activities.push({ id, kind: 'Wolt', title: 'Зміна', start: v.start, end: v.end, ...(v.orders > 0 ? { orders: v.orders } : {}), ...(v.earned > 0 ? { earned: v.earned } : {}), ...(v.km > 0 ? { km: v.km } : {}) });
-        s.activities.sort((a, b) => a.start - b.start);
-        if (v.earned > 0) s.money.tx.push({ id: s.nextId++, type: 'in', amt: v.earned, cat: 'Wolt', note: `Зміна${v.orders ? `, ${v.orders} замовл.` : ''}`, date: ymd(new Date(v.end)), acc: 'dk', shift: id });
-      });
-      toast('Зміну додано'); return true;
-    },
-    /** Deletes a shift together with the income it recorded. */
-    delShift(id: number) { del(s => { s.activities = s.activities.filter(x => x.id !== id); s.money.tx = s.money.tx.filter(x => x.shift !== id); }, 'Зміну видалено'); },
-    setWoltGoal(n: number) { update(s => { s.woltGoal = Math.max(0, Math.round(n)); }); },
     startAct(kind: string, title: string) { update(s => { s.act = { kind, title: title.trim(), start: Date.now() }; }); },
     /** Saves the running activity; runs shorter than a minute are dropped. */
     stopAct() {
@@ -284,95 +204,6 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       if (g.cur < g.target && cur >= g.target) notify('Ціль досягнуто: ' + g.title);
     },
     delGoal(id: number) { del(s => { s.goals = s.goals.filter(x => x.id !== id); s.tasks.forEach(t => { if (t.goal === id) delete t.goal; }); }); },
-    addDeal(v: { title: string; client: string; amt: number; stage: string }) { update(s => { s.co.deals.push({ id: s.nextId++, title: v.title, client: v.client, amt: v.amt || 0, stage: (v.stage || 'lead') as 'lead' }); }); toast('Угоду додано'); },
-    /** Moves a deal one stage. Winning it starts the rest of the chain by itself: a project to do the work and an invoice to get paid (only once per deal). */
-    moveDeal(id: number, dir: number) {
-      const d = getS().co.deals.find(x => x.id === id); if (!d) return;
-      const hadProject = getS().co.projects.some(p => p.deal === d.id), billed = getS().co.invoices.some(i => i.deal === d.id);
-      const i = STAGES.findIndex(st => st[0] === d.stage), n = Math.max(0, Math.min(3, i + dir));
-      if (n === i) return;
-      const won = STAGES[n][0] === 'won';
-      update(s => {
-        const x = s.co.deals.find(y => y.id === id)!; x.stage = STAGES[n][0]; delete x.demo;
-        if (!won) return;
-        let proj = s.co.projects.find(p => p.deal === x.id);
-        if (!proj) { proj = { id: s.nextId++, name: x.title, client: x.client, due: ymd(addD(new Date(), 30)), progress: 0, status: 'active', budget: x.amt, deal: x.id }; s.co.projects.push(proj); }
-        if (!s.co.invoices.some(i => i.deal === x.id)) { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: x.client || x.title, amt: x.amt, issued: TK(), due: ymd(addD(new Date(), 14)), paid: false, paidAt: '', deal: x.id, project: proj.id }); }
-      });
-      if (won) notify(`Угоду виграно: ${d.title}.${hadProject && billed ? '' : ` Створено ${hadProject ? '' : 'проєкт'}${!hadProject && !billed ? ' і ' : ''}${billed ? '' : 'рахунок'}.`}`);
-    },
-    /** Bills a project that has no invoice yet, for its budget. */
-    invoiceProject(id: number) {
-      const p = getS().co.projects.find(x => x.id === id); if (!p || getS().co.invoices.some(i => i.project === id)) return;
-      update(s => { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: p.client || p.name, amt: p.budget, issued: TK(), due: ymd(addD(new Date(), 14)), paid: false, paidAt: '', project: id, ...(p.deal ? { deal: p.deal } : {}) }); });
-      toast('Рахунок створено');
-    },
-    updateDeal(id: number, v: Partial<Pick<Deal, 'title' | 'client' | 'amt' | 'stage'>>) { update(s => { const x = s.co.deals.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Угоду оновлено'); },
-    delDeal(id: number) { del(s => { s.co.deals = s.co.deals.filter(x => x.id !== id); }); },
-    restoreDeal(id: number) { update(s => { const x = s.co.deals.find(y => y.id === id); if (x) x.stage = 'lead'; }); toast('Угоду повернуто в «Лід»'); },
-    loseDeal(id: number) { update(s => { const x = s.co.deals.find(y => y.id === id); if (x) x.stage = 'lost'; }); toast('Угоду позначено як програну'); },
-    addProject(v: { name: string; client: string; budget: number; due: string }) { update(s => { s.co.projects.push({ id: s.nextId++, ...v, budget: v.budget || 0, progress: 0, status: 'active' }); }); toast('Проєкт додано'); },
-    setProgress(id: number, p: number) {
-        const pr = getS().co.projects.find(x => x.id === id); if (!pr) return;
-      update(s => { const x = s.co.projects.find(y => y.id === id)!; x.progress = p; delete x.demo; if (p >= 100) x.status = 'done'; else if (x.status === 'done') x.status = 'active'; });
-      if (p >= 100 && pr.status !== 'done') notify('Проєкт завершено: ' + pr.name);
-    },
-    updateProject(id: number, v: Partial<Pick<Project, 'name' | 'client' | 'budget' | 'due'>>) { update(s => { const x = s.co.projects.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Проєкт оновлено'); },
-    cycleProject(id: number) { update(s => { const x = s.co.projects.find(y => y.id === id); if (!x) return; x.status = ({ active: 'paused', paused: 'done', done: 'active' } as const)[x.status]; if (x.status === 'done') x.progress = 100; }); },
-    delProject(id: number) { del(s => { s.co.projects = s.co.projects.filter(x => x.id !== id); }); },
-    addInvoice(v: { client: string; amt: number; due: string }) {
-      update(s => { s.co.invSeq++; s.co.invoices.push({ id: s.nextId++, no: 'INV-' + String(s.co.invSeq).padStart(3, '0'), client: v.client, amt: v.amt || 0, issued: TK(), due: v.due || ymd(addD(new Date(), 14)), paid: false, paidAt: '' }); });
-      toast('Рахунок створено');
-    },
-    updateInvoice(id: number, v: Partial<Pick<Invoice, 'client' | 'amt' | 'due'>>) { update(s => { const x = s.co.invoices.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Рахунок оновлено'); },
-    togglePaid(id: number) {
-        const i = getS().co.invoices.find(x => x.id === id); if (!i) return;
-      update(s => { const x = s.co.invoices.find(y => y.id === id)!; x.paid = !x.paid; x.paidAt = x.paid ? TK() : ''; });
-      if (!i.paid) toast(`Оплату ${money(i.amt)} зараховано`);
-    },
-    delInvoice(id: number) { del(s => { s.co.invoices = s.co.invoices.filter(x => x.id !== id); }); },
-    addLead(v: { name: string; contact: string; source: string; value: number; next: string; note: string; status?: LeadStatus }) {
-      update(s => { s.co.leads.push({ id: s.nextId++, name: v.name.trim(), contact: v.contact.trim(), source: v.source, status: v.status || 'new', value: v.value || 0, next: v.next, note: v.note.trim(), created: TK() }); });
-      toast('Потенційного клієнта додано');
-    },
-    updateLead(id: number, v: Partial<Pick<Lead, 'name' | 'contact' | 'source' | 'value' | 'next' | 'note' | 'status'>>) {
-      update(s => { const x = s.co.leads.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } });
-    },
-    /** Moves a lead along the chain; a lead that is closed no longer needs a next contact. */
-    setLeadStatus(id: number, status: LeadStatus) {
-      update(s => { const x = s.co.leads.find(y => y.id === id); if (!x) return; x.status = status; delete x.demo; if (status === 'won' || status === 'dead') x.next = ''; });
-    },
-    /** The lead has become a client: a client card is made (or an existing one with the same name is reused) and the lead is closed as won. */
-    leadToClient(id: number) {
-      const l = getS().co.leads.find(x => x.id === id); if (!l) return;
-      update(s => {
-        const x = s.co.leads.find(y => y.id === id)!; x.status = 'won'; x.next = ''; delete x.demo;
-        if (!s.co.clients.some(c => norm(c.name) === norm(x.name))) s.co.clients.push({ id: s.nextId++, name: x.name, contact: x.contact, source: x.source, since: TK(), note: x.note, lead: x.id });
-      });
-      notify(`${l.name}: тепер клієнт`);
-    },
-    /** Turns a lead into a deal in the pipeline; the lead also becomes a client. */
-    leadToDeal(id: number) {
-      const l = getS().co.leads.find(x => x.id === id); if (!l) return;
-      update(s => {
-        const x = s.co.leads.find(y => y.id === id)!; x.status = 'won'; x.next = ''; delete x.demo;
-        if (!s.co.clients.some(c => norm(c.name) === norm(x.name))) s.co.clients.push({ id: s.nextId++, name: x.name, contact: x.contact, source: x.source, since: TK(), note: x.note, lead: x.id });
-        s.co.deals.push({ id: s.nextId++, title: 'Угода: ' + x.name, client: x.name, amt: x.value, stage: 'lead' });
-      });
-      notify(`${l.name}: створено угоду, клієнта додано`);
-    },
-    addClient(v: { name: string; contact: string; source: string; note: string }) {
-      if (!v.name.trim()) return false;
-      if (getS().co.clients.some(c => norm(c.name) === norm(v.name))) { toast('Такий клієнт уже є'); return false; }
-      update(s => { s.co.clients.push({ id: s.nextId++, name: v.name.trim(), contact: v.contact.trim(), source: v.source, since: TK(), note: v.note.trim() }); });
-      toast('Клієнта додано'); return true;
-    },
-    updateClient(id: number, v: Partial<Pick<Client, 'name' | 'contact' | 'source' | 'note'>>) { update(s => { const x = s.co.clients.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Клієнта оновлено'); },
-    delClient(id: number) { del(s => { s.co.clients = s.co.clients.filter(x => x.id !== id); }); },
-    delLead(id: number) { del(s => { s.co.leads = s.co.leads.filter(x => x.id !== id); }); },
-    addAd(v: { date: string; channel: string; amt: number; note: string }) { if (!(v.amt > 0)) return false; update(s => { s.co.ads.push({ id: s.nextId++, ...v, note: v.note.trim() }); }); toast('Витрату на рекламу записано'); return true; },
-    updateAd(id: number, v: Partial<Pick<AdSpend, 'date' | 'channel' | 'amt' | 'note'>>) { update(s => { const x = s.co.ads.find(y => y.id === id); if (x) { Object.assign(x, v); delete x.demo; } }); toast('Запис оновлено'); },
-    delAd(id: number) { del(s => { s.co.ads = s.co.ads.filter(x => x.id !== id); }); },
     /** Marks a day as sick, emergency, rest or trip (null clears it); the day score is judged more gently on it. */
     setDayOff(k: string, kind: OffKind | null, note?: string) {
       update(s => {
@@ -382,10 +213,6 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       });
       toast(kind ? 'День позначено: оцінка буде м’якшою' : 'Позначку дня знято');
     },
-    addMember(v: { name: string; role: string }) { update(s => { s.co.team.push({ id: s.nextId++, ...v, load: 50 }); }); toast('Учасника додано'); },
-    updateMember(id: number, v: Partial<Pick<Member, 'name' | 'role'>>) { update(s => { const m = s.co.team.find(x => x.id === id); if (m) { Object.assign(m, v); delete m.demo; } }); toast('Учасника оновлено'); },
-    setLoad(id: number, l: number) { update(s => { const m = s.co.team.find(x => x.id === id); if (m) m.load = l; }); },
-    delMember(id: number) { del(s => { s.co.team = s.co.team.filter(x => x.id !== id); }); },
   };
 }
 

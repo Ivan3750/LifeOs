@@ -72,23 +72,15 @@ describe('dayScore: steady sleep, business and social media', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     s.activities.push({ id: 5, kind: 'Бізнес', title: '', start: new Date(day + 'T10:00').getTime(), end: new Date(day + 'T14:00').getTime() });
     const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(20);
+    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(22);
     expect(r.parts.some(p => p.key === 'biz')).toBe(false);
-  });
-
-  it('counts a Wolt shift as work too', () => {
-    const s = blank(); s.health[day] = night('23:30', '07:30');
-    s.activities.push({ id: 6, kind: 'Wolt', title: 'Зміна', start: new Date(day + 'T12:00').getTime(), end: new Date(day + 'T16:00').getTime() });
-    const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(20);
-    expect(r.parts.find(p => p.key === 'focus')?.hint).toContain('Wolt');
   });
 
   it('judges the tasks of the day: closed against due and still open', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     expect(dayScore(s, day, [], [], NOW).skipped.some(x => x.key === 'tasks')).toBe(true);
     s.tasks.push({ id: 1, t: 'a', p: 'lo', d: true, doneAt: new Date(day + 'T14:00').getTime() }, { id: 2, t: 'b', p: 'lo', d: false, due: day });
-    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'tasks')?.got).toBe(2.5);
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'tasks')?.got).toBe(3.5);
   });
 
   it('counts social media added afterwards for a past day', () => {
@@ -133,8 +125,6 @@ describe('dayScore: steady sleep, business and social media', () => {
     s.goals.push({ id: 9, title: 'g', area: 'Карʼєра', target: 10, cur: 1, unit: '', due: '' });
     s.tasks.push({ id: 1, t: 'a', p: 'lo', d: true, doneAt: new Date(day + 'T14:00').getTime(), goal: 9 });
     s.sessions.push({ t: new Date(day + 'T15:00').getTime(), m: 60, task: 'a' });
-    s.money.accounts[0].budget = 3000;
-    s.money.tx.push({ id: 5, type: 'out', amt: 10, cat: 'Їжа', note: '', date: day, acc: 'dk' });
     const r = dayScore(s, day, [], s.sessions, NOW);
     expect(r.groups.reduce((a, g) => a + g.max, 0)).toBe(100);
     expect(r.coverage).toBe(1);

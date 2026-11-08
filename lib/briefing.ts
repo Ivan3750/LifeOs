@@ -20,7 +20,6 @@ const SPEC: Partial<Record<Metric, { label: string; fmt: (v: number) => string; 
   tasks: { label: 'Закрито задач', fmt: v => String(Math.round(v)), better: 1, gap: 2, to: 'tasks' },
   workout: { label: 'Рух', fmt: v => `${Math.round(v)} хв`, better: 1, gap: 12, to: 'health', skip0: true },
   water: { label: 'Вода', fmt: v => `${Math.round(v)} скл.`, better: 1, gap: 2, to: 'health', skip0: true },
-  spend: { label: 'Витрати', fmt: v => `${Math.round(v)} kr.`, better: -1, gap: 0.3, to: 'money' },
 };
 
 const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
@@ -38,8 +37,7 @@ export function dayBrief(S: State, now = new Date(), k = ymd(addD(sod(now), -1))
     const past = before.map((r: DayRow) => r[key]).filter((x): x is number => x !== null && !(sp.skip0 && x === 0));
     if (past.length < 3) continue;
     const avg = mean(past), diff = v - avg;
-    // spending is compared in percent of the usual, the rest in their own units
-    const far = key === 'spend' ? Math.abs(diff) > Math.max(20, avg * sp.gap) : Math.abs(diff) >= sp.gap;
+    const far = Math.abs(diff) >= sp.gap;
     lines.push({ key, label: sp.label, value: sp.fmt(v), usual: sp.fmt(avg), to: sp.to, tone: !far ? 'info' : diff * sp.better > 0 ? 'good' : 'warn' });
   }
   const order = { warn: 0, good: 1, info: 2 };

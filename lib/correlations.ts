@@ -4,12 +4,12 @@ import { sleepTotal } from './sleep';
 import { addD, plural, sod, toMin, ymd } from './util';
 
 /* Links between the areas of life, found in the person's own days.
-   Every day becomes a row of numbers (sleep, water, movement, focus, habits, spending, events, rest, Wolt, stress, mood, energy).
+   Every day becomes a row of numbers (sleep, water, movement, focus, habits, events, rest, stress, mood, energy).
    A curated list of «this → that» pairs is checked: the days are split into low and high for the driver (fixed norms for the body,
    the person's own thirds for everything else) and the outcome is compared. A link is reported only when both groups have enough days,
    the difference is large compared to the usual spread, and it holds as a trend too. */
 
-export type Metric = 'sleep' | 'bed' | 'mood' | 'energy' | 'water' | 'workout' | 'focus' | 'habits' | 'spend' | 'tasks' | 'wolt' | 'events' | 'rest' | 'stress';
+export type Metric = 'sleep' | 'bed' | 'mood' | 'energy' | 'water' | 'workout' | 'focus' | 'habits' | 'tasks' | 'events' | 'rest' | 'stress';
 /** One day as numbers (null: nothing to say about that day). */
 export type DayRow = { k: string } & Record<Metric, number | null>;
 
@@ -22,20 +22,18 @@ const hhmm = (min: number) => (min >= 60 ? `${n1(min / 60)} год` : `${Math.ro
 const STRESS = ['Стрес', 'Тривога', 'Злість'];
 
 /** The last `days` days up to today. A bedtime after midnight counts as 24:30, 25:00… so that 23:30 and 00:30 sit next to each other.
-    Totals of a day (focus, spending, tasks…) are null before the first record of that kind, so days before tracking started do not count as zero. */
+    Totals of a day (focus, tasks…) are null before the first record of that kind, so days before tracking started do not count as zero. */
 export function dayRows(S: State, days = 90, now = new Date()): DayRow[] {
   const keys = [...Array(days)].map((_, i) => ymd(addD(sod(now), i - days + 1)));
   const day = (t: number) => ymd(new Date(t));
   const by = <T,>(list: T[], at: (x: T) => string, val: (x: T) => number) => { const m = new Map<string, number>(); for (const x of list) m.set(at(x), (m.get(at(x)) || 0) + val(x)); return m; };
   const focus = by(S.sessions, s => day(s.t), s => s.m);
-  const spend = by(S.money.tx.filter(t => t.type === 'out' && !t.xfer && !t.pot), t => t.date, t => (t.acc === 'ua' ? t.amt / (S.money.uahPerDkk || 1) : t.amt));
   const tasks = by(S.tasks.filter(t => t.d && t.doneAt), t => day(t.doneAt!), () => 1);
-  const wolt = by(S.activities.filter(a => a.kind === 'Wolt'), a => day(a.start), a => (a.end - a.start) / 36e5);
   const rest = by(S.activities.filter(a => a.kind === 'Відпочинок' || a.kind === 'Спорт'), a => day(a.start), a => (a.end - a.start) / 6e4);
   const events = by(S.events, e => e.date, () => 1);
   const habitDays = by(S.habits.flatMap(h => Object.keys(h.days)), d => d, () => 1);
   const first = (m: Map<string, number>) => [...m.keys()].sort()[0] ?? '9999';
-  const f = { focus: first(focus), spend: first(spend), tasks: first(tasks), wolt: first(wolt), rest: first(rest), events: first(events), habits: first(habitDays) };
+  const f = { focus: first(focus), tasks: first(tasks), rest: first(rest), events: first(events), habits: first(habitDays) };
   return keys.map(k => {
     const h = S.health[k], ms = moodsOn(S, k), en = ms.filter(m => m.energy > 0).map(m => energyLevel(m.energy) as number);
     const total = (m: Map<string, number>, from: string) => (k >= from ? m.get(k) || 0 : null);
@@ -47,7 +45,7 @@ export function dayRows(S: State, days = 90, now = new Date()): DayRow[] {
       energy: en.length ? mean(en) : null,
       water: h && h.water > 0 ? h.water : null,
       workout: h ? h.workout : null,
-      focus: total(focus, f.focus), spend: total(spend, f.spend), tasks: total(tasks, f.tasks), wolt: total(wolt, f.wolt), rest: total(rest, f.rest), events: total(events, f.events),
+      focus: total(focus, f.focus), tasks: total(tasks, f.tasks), rest: total(rest, f.rest), events: total(events, f.events),
       habits: S.habits.length && k >= f.habits ? (habitDays.get(k) || 0) / S.habits.length : null,
       stress: ms.length ? (ms.some(m => m.tags.some(t => STRESS.includes(t))) ? 1 : 0) : null,
     } as DayRow;
@@ -76,9 +74,7 @@ const DRIVERS: Partial<Record<Metric, Driver>> = {
   workout: { name: 'Рух', area: 'Здоровʼя', onlyBad: 'low', norm: S => ({ lowMax: 0, highMin: Math.min(20, moveGoal(S) * 0.7) }), low: () => 'у тебе день без жодного руху', high: t => `ти рухаєшся понад ${Math.round(t)} хв`, more: 'Додай хоча б 20 хвилин ходьби чи зарядки.', less: 'Дай тілу відновитись після великих навантажень.' },
   focus: { name: 'Фокус', area: 'Карʼєра', low: t => `фокусу менше ${hhmm(t)}`, high: t => `фокус триває понад ${hhmm(t)}`, more: 'Тримай щодня мінімум фокусу: це піднімає тонус.', less: 'Не перевантажуй день: роби перерви й ділі фокус на кілька сесій.' },
   tasks: { name: 'Закриті задачі', area: 'Карʼєра', low: t => `закриваєш менше ${Math.max(1, Math.ceil(t))} ${plural(Math.ceil(t) || 1, 'задачі', 'задач', 'задач')} за день`, high: t => `закриваєш понад ${Math.floor(t)} ${plural(Math.floor(t), 'задачу', 'задачі', 'задач')} за день`, more: 'Закривай хоча б кілька дрібних задач щодня.', less: 'Не бери на день забагато задач: лишай запас.' },
-  wolt: { name: 'Wolt', area: 'Карʼєра', onlyBad: 'high', low: () => 'ти без змін Wolt', high: t => `ти їздиш на Wolt понад ${n1(t)} год`, more: 'Не віддавай усі дні доставці: лишай час на себе.', less: 'Став зміни Wolt так, щоб лишався час на сон і відпочинок.' },
   habits: { name: 'Звички', area: 'Розвиток', onlyBad: 'low', low: t => `виконуєш менше ${Math.round(t * 100)}% звичок`, high: t => `виконуєш понад ${Math.round(t * 100)}% звичок`, more: 'Виконуй звички, хай навіть у спрощеному вигляді.', less: 'Не женись за всіма звичками одразу.' },
-  spend: { name: 'Витрати', area: 'Фінанси', onlyBad: 'high', low: t => `витрачаєш менше ${Math.round(t)} kr. за день`, high: t => `витрачаєш понад ${Math.round(t)} kr. за день`, more: 'Не економ до стресу: став собі розумний бюджет.', less: 'Постав ліміт на день і лишай запас до кінця місяця.' },
   events: { name: 'Події в розкладі', area: 'Друзі', low: () => 'у розкладі немає подій', high: t => `у розкладі понад ${Math.floor(t)} ${plural(Math.floor(t), 'подія', 'події', 'подій')}`, more: 'Плануй живі зустрічі: вони піднімають настрій.', less: 'Лишай у розкладі вільні вікна між подіями.' },
   rest: { name: 'Відпочинок і спорт', area: 'Відпочинок', onlyBad: 'low', low: () => 'у тебе немає відпочинку чи спорту', high: t => `відпочинок і спорт тривають понад ${hhmm(t)}`, more: 'Заплануй відпочинок у розкладі як справу.', less: 'Не заміщуй відпочинком усе: тримай баланс.' },
   stress: { name: 'Стрес', area: 'Настрій', onlyBad: 'high', low: () => 'у записах немає стресу', high: () => 'у записах є стрес, тривога чи злість', more: '', less: 'Знайди, що саме викликає стрес, запиши це в нотатку й зроби коротку прогулянку.' },
@@ -92,15 +88,14 @@ const OUTCOMES: Partial<Record<Metric, Outcome>> = {
   focus: { name: 'фокус', area: 'Карʼєра', min: 20, better: 1, fmt: v => hhmm(v), next: 'наступного дня' },
   habits: { name: 'виконання звичок', area: 'Розвиток', min: 0.15, better: 1, fmt: v => `${Math.round(v * 100)}%`, next: 'наступного дня' },
   sleep: { name: 'сон', area: 'Здоровʼя', min: 0.5, better: 1, fmt: v => `${n1(v)} год`, next: 'тієї ночі' },
-  spend: { name: 'витрати', area: 'Фінанси', min: 12, better: -1, fmt: v => `${Math.round(v)} kr.`, next: 'наступного дня' },
 };
 
 /** The pairs that make sense to check: driver, outcome, and whether the driver of the previous day is used. */
 const PAIRS: [Metric, Metric, 0 | 1][] = [
   ['sleep', 'mood', 0], ['sleep', 'energy', 0], ['sleep', 'focus', 0], ['bed', 'mood', 0], ['bed', 'energy', 0],
   ['water', 'mood', 0], ['water', 'energy', 0], ['workout', 'mood', 1], ['workout', 'energy', 1], ['workout', 'sleep', 1],
-  ['focus', 'sleep', 1], ['focus', 'energy', 1], ['tasks', 'mood', 0], ['wolt', 'energy', 1], ['wolt', 'focus', 1], ['wolt', 'sleep', 1],
-  ['habits', 'mood', 0], ['habits', 'energy', 1], ['spend', 'mood', 1], ['mood', 'spend', 1], ['events', 'mood', 0], ['events', 'energy', 0],
+  ['focus', 'sleep', 1], ['focus', 'energy', 1], ['tasks', 'mood', 0],
+  ['habits', 'mood', 0], ['habits', 'energy', 1], ['events', 'mood', 0], ['events', 'energy', 0],
   ['rest', 'mood', 1], ['rest', 'energy', 1], ['stress', 'sleep', 1], ['stress', 'focus', 0], ['mood', 'sleep', 1], ['mood', 'focus', 1],
 ];
 
@@ -262,16 +257,16 @@ export function moodCause(S: State, now = new Date()): Advice | null {
 function valueText(m: Metric, v: number) {
   switch (m) {
     case 'sleep': return `${n1(v)} год`; case 'bed': return hm(v); case 'water': return `${Math.round(v)} склянок`; case 'workout': return v ? `${Math.round(v)} хв` : 'без руху';
-    case 'focus': case 'rest': return hhmm(v); case 'tasks': return `${Math.round(v)}`; case 'wolt': return `${n1(v)} год`; case 'habits': return `${Math.round(v * 100)}%`;
-    case 'spend': return `${Math.round(v)} kr.`; case 'events': return `${Math.round(v)}`; case 'stress': return v ? 'був' : 'не було'; default: return n1(v);
+    case 'focus': case 'rest': return hhmm(v); case 'tasks': return `${Math.round(v)}`; case 'habits': return `${Math.round(v * 100)}%`;
+    case 'events': return `${Math.round(v)}`; case 'stress': return v ? 'був' : 'не було'; default: return n1(v);
   }
 }
 const adviceTitle = (f: Finding) => ({
-  water: 'Випий води', workout: 'Додай трохи руху', bed: 'Лягай раніше', focus: f.badSide === 'high' ? 'Не перевантажуй себе' : 'Знайди час на фокус', tasks: f.badSide === 'high' ? 'Не бери забагато задач' : 'Закрий кілька задач', wolt: 'Бережи себе від перевтоми',
-  habits: 'Повернись до звичок', spend: 'Притримай витрати', events: f.badSide === 'high' ? 'Дай собі паузу від подій' : 'Побачся з кимось', rest: 'Заплануй відпочинок', stress: 'Зніми напругу', mood: 'Підтримай себе', sleep: 'Подбай про сон',
+  water: 'Випий води', workout: 'Додай трохи руху', bed: 'Лягай раніше', focus: f.badSide === 'high' ? 'Не перевантажуй себе' : 'Знайди час на фокус', tasks: f.badSide === 'high' ? 'Не бери забагато задач' : 'Закрий кілька задач',
+  habits: 'Повернись до звичок', events: f.badSide === 'high' ? 'Дай собі паузу від подій' : 'Побачся з кимось', rest: 'Заплануй відпочинок', stress: 'Зніми напругу', mood: 'Підтримай себе', sleep: 'Подбай про сон',
 } as Record<Metric, string>)[f.driver];
 const causeText = (f: Finding, v: number) => ({
-  water: 'мало води', workout: 'вчора без руху', bed: 'пізній відбій', focus: f.badSide === 'high' ? `багато фокусу вчора (${valueText('focus', v)})` : 'мало фокусу', tasks: 'мало закритих задач', wolt: `довга зміна Wolt (${n1(v)} год)`,
-  habits: 'пропущені звички', spend: `великі витрати вчора (${Math.round(v)} kr.)`, events: f.badSide === 'high' ? 'забагато подій' : 'мало спілкування', rest: 'не було відпочинку', stress: 'вчорашній стрес', mood: 'вчорашній настрій', sleep: 'мало сну',
+  water: 'мало води', workout: 'вчора без руху', bed: 'пізній відбій', focus: f.badSide === 'high' ? `багато фокусу вчора (${valueText('focus', v)})` : 'мало фокусу', tasks: 'мало закритих задач',
+  habits: 'пропущені звички', events: f.badSide === 'high' ? 'забагато подій' : 'мало спілкування', rest: 'не було відпочинку', stress: 'вчорашній стрес', mood: 'вчорашній настрій', sleep: 'мало сну',
 } as Record<Metric, string>)[f.driver];
 const taskFor = (f: Finding) => ({ water: 'Випити склянку води', workout: 'Пройтися 20 хвилин', habits: 'Виконати одну звичку', rest: 'Запланувати відпочинок', events: f.badSide === 'low' ? 'Написати другові' : undefined } as Partial<Record<Metric, string | undefined>>)[f.driver];

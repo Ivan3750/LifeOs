@@ -8,7 +8,7 @@ import type { State } from '@/lib/types';
 const NOW = new Date('2026-03-18T15:00:00');
 const key = (back: number, at = NOW) => ymd(addD(at, -back));
 
-type Spec = Partial<{ sleep: number; bed: string; water: number; workout: number; mood: number; energy: number; focus: number; spend: number; habit: boolean; events: number; wolt: number; rest: number; stress: boolean }>;
+type Spec = Partial<{ sleep: number; bed: string; water: number; workout: number; mood: number; energy: number; focus: number; habit: boolean; events: number; rest: number; stress: boolean }>;
 
 /** A made-up history: spec(i) describes the day that was i days ago (1 = yesterday). Everything not mentioned stays the same every day. */
 function world(spec: (i: number) => Spec, days = 30, at = NOW): State {
@@ -20,10 +20,8 @@ function world(spec: (i: number) => Spec, days = 30, at = NOW): State {
     S.health[k] = { water: s.water ?? 6, sleep: s.sleep ?? 7.6, mood: 0, steps: 0, workout: s.workout ?? 25, weight: 0, ...(s.bed ? { bed: s.bed, wake: '07:00' } : {}) };
     S.moods.push({ id: 100 + i, t: t0 + 12 * 36e5, v: s.mood ?? 7, energy: s.energy ?? 3, tags: s.stress ? ['Стрес'] : [], note: '' });
     if (s.focus !== undefined) S.sessions.push({ t: t0 + 10 * 36e5, m: s.focus });
-    if (s.spend !== undefined) S.money.tx.push({ id: 5000 + i, type: 'out', amt: s.spend, cat: 'Їжа', note: '', date: k, acc: 'dk' });
     if (s.habit) S.habits[0].days[k] = 1;
     for (let e = 0; e < (s.events ?? 0); e++) S.events.push({ id: 7000 + i * 10 + e, date: k, s: '10:00', e: '11:00', title: 'Подія', c: 'c1' });
-    if (s.wolt) S.activities.push({ id: 8000 + i, kind: 'Wolt', title: '', start: t0 + 10 * 36e5, end: t0 + (10 + s.wolt) * 36e5 });
     if (s.rest) S.activities.push({ id: 9000 + i, kind: 'Відпочинок', title: '', start: t0 + 18 * 36e5, end: t0 + 18 * 36e5 + s.rest * 6e4 });
   }
   return S;
@@ -53,20 +51,6 @@ describe('every area of life can be linked', () => {
     const S = world(i => ({ focus: third(i) ? 330 : 90, energy: after(i) ? 1 : 3 }));
     expect(find(S, 'focus-energy')).toMatchObject({ badSide: 'high', lag: 1 });
     expect(describe_text(S, 'focus-energy')).toContain('Після дня, коли фокус триває понад');
-  });
-  it('work: a long Wolt day → worse focus the next day', () => {
-    const S = world(i => ({ wolt: third(i) ? 8 : 0, focus: after(i) ? 30 : 120 }));
-    expect(find(S, 'wolt-focus')).toMatchObject({ badSide: 'high', lag: 1 });
-  });
-  it('money: a day of big spending → lower mood the next day', () => {
-    const f = find(world(i => ({ spend: third(i) ? 400 : 40, mood: after(i) ? 4 : 8 })), 'spend-mood')!;
-    expect(f).toMatchObject({ badSide: 'high', lag: 1 });
-    expect(f.bad.avg).toBeCloseTo(4);
-  });
-  it('money: a low mood is followed by more spending (the outcome is a «lower is better» one)', () => {
-    const f = find(world(i => ({ mood: third(i) ? 3 : 8, spend: after(i) ? 300 : 40 })), 'mood-spend')!;
-    expect(f).toMatchObject({ badSide: 'low', lag: 1 });
-    expect(f.bad.avg).toBeCloseTo(300);
   });
   it('habits: doing the habits goes with a better mood', () => {
     expect(find(world(i => ({ habit: !third(i), mood: third(i) ? 5 : 8 })), 'habits-mood')).toMatchObject({ badSide: 'low', lag: 0 });
@@ -121,7 +105,7 @@ describe('what the algorithm leaves alone', () => {
   });
   it('invents nothing from random days', () => {
     const r = rng(11), pick = (a: number, b: number) => a + Math.round(r() * (b - a));
-    const S = world(() => ({ sleep: pick(50, 90) / 10, water: pick(1, 9), workout: pick(0, 40), mood: pick(3, 9), energy: pick(1, 3), focus: pick(0, 300), spend: pick(0, 400), habit: r() > 0.5, events: pick(0, 3), wolt: pick(0, 6), rest: pick(0, 90), stress: r() > 0.7 }), 60);
+    const S = world(() => ({ sleep: pick(50, 90) / 10, water: pick(1, 9), workout: pick(0, 40), mood: pick(3, 9), energy: pick(1, 3), focus: pick(0, 300), habit: r() > 0.5, events: pick(0, 3), rest: pick(0, 90), stress: r() > 0.7 }), 60);
     expect(findings(S, NOW).length).toBeLessThanOrEqual(1);
   });
   it('does not use today, which is not finished', () => {
@@ -158,17 +142,6 @@ describe('advice for today, from any area', () => {
     expect(a.action).toContain('23:30');
     expect(a.task).toMatch(/^Лягти спати до/);
   });
-  it('after a day of big spending: a tip from Finance', () => {
-    const S = world(i => ({ spend: third(i) ? 400 : 40, mood: after(i) ? 4 : 8 }));
-    S.money.tx.push({ id: 9999, type: 'out', amt: 420, cat: 'Покупки', note: '', date: key(1), acc: 'dk' });
-    const list = adviceList(S, NOW);
-    const a = list.find(x => x.area === 'Фінанси')!;
-    expect(a).toBeDefined();
-    expect(a.reason).toContain('Вчора');
-    expect(a.reason).toContain('460 kr.');
-    expect(a.action).toContain('ліміт');
-    expect(a.forMood).toBe(true);
-  });
   it('after an overloaded day: a tip from Work', () => {
     const S = world(i => ({ focus: third(i) ? 330 : 90, energy: after(i) ? 1 : 3 }));
     S.sessions.push({ t: new Date(key(1) + 'T09:00').getTime(), m: 300 });
@@ -177,9 +150,8 @@ describe('advice for today, from any area', () => {
     expect(a.action).toContain('перерви');
   });
   it('gives advice from several areas at once, never more than three', () => {
-    const S = world(i => ({ sleep: third(i) ? 5.2 : 7.6, spend: third(i) ? 400 : 40, focus: third(i) ? 330 : 90, wolt: third(i) ? 7 : 0, mood: third(i) || after(i) ? 4 : 8, energy: after(i) ? 1 : 3 }));
+    const S = world(i => ({ sleep: third(i) ? 5.2 : 7.6, focus: third(i) ? 330 : 90, mood: third(i) || after(i) ? 4 : 8, energy: after(i) ? 1 : 3 }));
     S.health[key(0)] = { water: 6, sleep: 5, mood: 0, steps: 0, workout: 20, weight: 0 };
-    S.money.tx.push({ id: 9999, type: 'out', amt: 420, cat: 'Покупки', note: '', date: key(1), acc: 'dk' });
     S.sessions.push({ t: new Date(key(1) + 'T09:00').getTime(), m: 340 });
     const list = adviceList(S, NOW);
     expect(list.length).toBeGreaterThan(1);
@@ -217,9 +189,9 @@ describe('explaining a low mood when it is logged', () => {
     expect(notes.join(' ')).toContain('причина: недосип');
   });
   it('names something other than sleep when sleep was fine', () => {
-    const real = new Date(), S = world(i => ({ spend: third(i) ? 400 : 40, mood: after(i) ? 4 : 8 }), 30, real);
-    S.money.tx.push({ id: 9999, type: 'out', amt: 450, cat: 'Покупки', note: '', date: key(1, real), acc: 'dk' });
+    const real = new Date(), S = world(i => ({ workout: third(i) ? 0 : 30, mood: after(i) ? 4 : 8 }), 30, real);
+    S.health[key(1, real)] = { water: 6, sleep: 7.6, mood: 0, steps: 0, workout: 0, weight: 0 };
     const cause = moodCause(S, real)!;
-    expect(cause.cause).toContain('великі витрати вчора');
+    expect(cause.cause).toContain('без руху');
   });
 });
