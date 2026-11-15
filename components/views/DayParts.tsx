@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { liveSessions, useNow, useStore } from '@/lib/store';
+import { habitsShown, liveSessions, useNow, useStore } from '@/lib/store';
 import { goalProgress } from '@/lib/goals';
 import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
@@ -231,8 +231,8 @@ export function ScoreCard() {
           {sc.total === null && <p className="muted" style={{ fontSize: 13, margin: 0 }}>Запиши сон, настрій, звичку чи фокус, і я оціню день.</p>}
           {lost.length > 0 && (
             <div className="sc-lost">
-              <b>{isToday ? 'Що додасть найбільше балів' : 'Де можна було більше'}</b>
-              {lost.map(p => <button key={p.key} onClick={() => go(to[p.key])}><span>{p.label}</span><em className="num">−{Math.round(p.max - p.got)}</em><small>{p.hint}</small></button>)}
+              <b>{isToday ? 'Якщо захочеш додати' : 'Що було б плюсом'}</b>
+              {lost.map(p => <button key={p.key} onClick={() => go(to[p.key])}><span>{p.label}</span><em className="num">+{Math.round(p.max - p.got)}</em><small>{p.hint}</small></button>)}
             </div>
           )}
         </div>
@@ -359,7 +359,7 @@ export function HomeExtras() {
           {!gs.length && <p className="muted">Постав першу ціль у розділі «Цілі».</p>}
         </div>
 
-        <QuitMini />
+        {habitsShown(S0) && <QuitMini />}
 
         <div className="card s4">
           <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div><span className="sel">Цей тиждень</span></div>
@@ -388,8 +388,8 @@ export function HomeExtras() {
         <div className="card s12 streak">
           <Icon n="trophy" className="ic" />
           <div>
-            <h3>{st ? `Ти тримаєш серію ${st} ${plural(st, 'день', 'дні', 'днів')} поспіль!` : 'Почни нову серію сьогодні'}</h3>
-            <p>{st ? 'Не зупиняйся: стабільність дає результат.' : 'Одна сесія фокусу, і перший вогник засвітиться.'}</p>
+            <h3>{st ? `Фокус ${st} ${plural(st, 'день', 'дні', 'днів')} поспіль` : 'Фокус цього тижня'}</h3>
+            <p>{st ? 'Рівний ритм працює краще за ривки. Пропуск дня нічого не ламає.' : 'Одна сесія фокусу, і перший вогник засвітиться.'}</p>
           </div>
           <div className="flames">
             {DN.map((d, i) => { const on = dayMinutes(S, addD(wStart(), i)) > 0; return <div key={d} className={`flame ${on ? 'on' : ''} ${i === ti ? 'today' : ''}`}><i><Icon n="flame" /></i><span>{d}</span></div>; })}

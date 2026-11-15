@@ -37,7 +37,7 @@ export const habStreak = (days: Record<string, 1>, S?: State) => {
 export const loadC = (l: number) => (l >= 100 ? 'var(--m1)' : l >= 80 ? 'var(--accent)' : 'var(--good)');
 export const avg = (a: number[]) => (a.length ? sum(a) / a.length : 0);
 
-const QUICK_MOODS: [number, string][] = [[2, 'Погано'], [4, 'Так собі'], [6, 'Нормально'], [8, 'Добре'], [10, 'Чудово']];
+export const QUICK_MOODS: [number, string][] = [[2, 'Погано'], [4, 'Так собі'], [6, 'Нормально'], [8, 'Добре'], [10, 'Чудово']];
 
 /** Quick mood check-in: one tap saves the mood at the current time. Details are added on the Health page. */
 function MoodTile() {

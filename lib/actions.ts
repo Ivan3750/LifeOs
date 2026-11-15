@@ -25,6 +25,17 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     setH(f: HealthField, v: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },
     addH(f: HealthField, d: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(((h[f] || 0) + d) * 10) / 10)); delete h.demo; }); },
     addTask,
+    /** Ends the first-run questions. Every answer is optional; what was given becomes a sensible default. */
+    finishOnboarding(v: { wake?: string; bed?: string; focus?: string; ical?: string } = {}) {
+      const focus = (v.focus || '').trim(), ical = (v.ical || '').trim().replace(/^webcal:/i, 'https:');
+      update(s => {
+        if (v.wake) { s.wakeTarget = v.wake; s.dayStart = v.wake; }
+        if (v.bed) { s.bedTarget = v.bed; s.dayEnd = v.bed; }
+        if (focus) s.tasks.unshift({ id: s.nextId++, t: focus, p: 'hi', d: false });
+        if (/^https:\/\//i.test(ical) && !s.icalUrls.includes(ical)) s.icalUrls.push(ical);
+        s.onboarded = true;
+      });
+    },
     /** Saves the main things of today. */
     setPlan(ids: number[], k = TK()) { update(s => { s.plan = { date: k, ids: ids.slice(0, 5) }; }); },
     /** Takes one task out of today's plan and puts the next most pressing one in its place (if there is one). */

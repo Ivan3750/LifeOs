@@ -1,16 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useNow, useStore } from '@/lib/store';
-import { scoreColor, scoreWord } from '@/lib/score';
+import { habitsShown, useNow, useStore } from '@/lib/store';
+import { moodsOn, scoreColor, scoreWord, sleepGuess } from '@/lib/score';
 import { dueLabel, dueState } from '@/lib/tasks';
 import { greeting, nextCandidate, nowState, phaseOf, PLAN_SIZE, RESETS, todayPlan } from '@/lib/now';
 import { fmt, MON, plural, TK, WD } from '@/lib/util';
 import { Icon } from '../Icon';
 import { AdviceCard } from '../Advice';
 import { YesterdayCard } from '../Brief';
-import { LifeTiles } from '../shared';
-import { HabitsToday, HomeExtras, QuitMini, SchedCard } from './DayParts';
+import { LifeTiles, QUICK_MOODS } from '../shared';
+import { Face } from '../Face';
+import { HabitsToday, HomeExtras, SchedCard } from './DayParts';
 
 /** The one thing to do now: what is running, what is going on in the calendar, or the next task with a button to start it. */
 function NowCard() {
@@ -172,6 +173,7 @@ function ReviewCard() {
   const sc = scoreOn(k, now);
   const win = S.wins[k] || '';
   const [text, setText] = useState(win);
+  const h = S.health[k], needMood = moodsOn(S, k).length === 0, needSleep = !(h?.bed || h?.wake || h?.sleep), guess = sleepGuess(S, k);
   return (
     <div className="card s12 reviewcard">
       <div className="ch"><Icon n="moon" className="ic" /><div><h3>Підсумок дня</h3><p>30 секунд. Решту я порахував сам</p></div></div>
@@ -181,12 +183,31 @@ function ReviewCard() {
           <span>{scoreWord(sc.total)}</span>
         </div>
         <div className="rv-form">
+          {(needMood || needSleep) && (
+            <div className="rv-quick">
+              {needMood && (
+                <div className="rv-q">
+                  <span>Який був день?</span>
+                  <div className="moods">{QUICK_MOODS.map(([v, m]) => <button key={v} title={m} aria-label={`Настрій: ${m}`} onClick={() => A.addMood({ t: Date.now(), v, energy: 0, tags: [], note: '' })}><Face v={v} size={30} /></button>)}</div>
+                </div>
+              )}
+              {needSleep && (
+                <div className="rv-q">
+                  <span>Спав ≈ {String(guess.hours).replace('.', ',')} год ({guess.bed}–{guess.wake})?</span>
+                  <div className="row" style={{ gap: 6 }}>
+                    <button className="btn acc sm" onClick={() => A.setSleepTimes(guess.bed, guess.wake, k)}><Icon n="check" />Так</button>
+                    <button className="btn ghost sm" onClick={() => go('health')}>Інакше</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <label className="field" htmlFor="winText">Що вдалось сьогодні?
             <textarea id="winText" rows={2} value={text} placeholder="Одне речення. Навіть дрібниця" onChange={e => setText(e.target.value)} onBlur={() => A.setWin(text, k)} />
           </label>
           <div className="row">
             <button className="btn" onClick={() => { A.setWin(text, k); go('tasks'); }}><Icon n="flag" />Спланувати завтра</button>
-            <button className="btn ghost" onClick={() => go('health')}>Записати сон і настрій</button>
+            <button className="btn ghost" onClick={() => go('health')}>Докладніше про тіло</button>
           </div>
         </div>
       </div>
@@ -194,9 +215,36 @@ function ReviewCard() {
   );
 }
 
+/** First launch only: three optional questions, so nothing has to be set up by hand afterwards. */
+function OnboardCard() {
+  const { S, A } = useStore();
+  const [wake, setWake] = useState(S.wakeTarget), [bed, setBed] = useState(S.bedTarget), [focus, setFocus] = useState(''), [ical, setIcal] = useState('');
+  return (
+    <div className="card s12 onboard">
+      <div className="ch"><Icon n="flag" className="ic" /><div><h3>Три швидкі питання</h3><p>Усе необовʼязково. Решту налаштую сам, а змінити можна в будь-який момент</p></div></div>
+      <form className="cardcol" onSubmit={e => { e.preventDefault(); A.finishOnboarding({ wake, bed, focus, ical }); }}>
+        <div className="fgrid">
+          <label className="field" htmlFor="obWake">Прокидаюсь о<input id="obWake" type="time" value={wake} onChange={e => setWake(e.target.value)} /></label>
+          <label className="field" htmlFor="obBed">Лягаю спати о<input id="obBed" type="time" value={bed} onChange={e => setBed(e.target.value)} /></label>
+        </div>
+        <label className="field" htmlFor="obFocus">Що найважливіше цього місяця?
+          <input id="obFocus" value={focus} onChange={e => setFocus(e.target.value)} placeholder="Одна справа. Стане першою задачею" autoComplete="off" />
+        </label>
+        <label className="field" htmlFor="obCal">Посилання на календар (iCal), якщо є
+          <input id="obCal" type="url" value={ical} onChange={e => setIcal(e.target.value)} placeholder="https://… .ics" autoComplete="off" />
+        </label>
+        <div className="row">
+          <button className="btn acc">Готово</button>
+          <button type="button" className="btn ghost" onClick={() => A.finishOnboarding()}>Пропустити</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /** The home page: one screen that tells what to do now. Everything else is a tap away. */
 export function Home() {
-  const { go } = useStore();
+  const { S, go } = useStore();
   const now = useNow(60_000), phase = phaseOf(new Date(now));
   const [more, setMore] = useState(false);
   const evening = phase === 'evening' || phase === 'night';
@@ -205,28 +253,30 @@ export function Home() {
       <div className="grid">
         <NowCard />
 
+        {S.onboarded === false && <OnboardCard />}
+
         {evening && <ReviewCard />}
 
         <PlanCard />
         <ResetCard />
 
         <SchedCard />
-        <HabitsToday />
-
-        <div className="card s12">
-          <div className="ch"><Icon n="life" className="ic" /><div><h3>Тіло й настрій</h3><p>Один тап на кожне. Решту я порахую</p></div><button className="sel" onClick={() => go('health')}>Докладніше</button></div>
-          <LifeTiles full={false} />
-        </div>
-
-        <QuitMini />
-
-        <AdviceCard />
-        <YesterdayCard />
 
         <button className="moretoggle" aria-expanded={more} onClick={() => setMore(m => !m)}>
-          <Icon n="trend" /><span>Оцінка дня, статистика й цілі</span><small>{more ? 'Сховати' : 'Показати'}</small><Icon n="right" className="icn chev" />
+          <Icon n="trend" /><span>Тіло, поради, оцінка дня й цілі</span><small>{more ? 'Сховати' : 'Показати'}</small><Icon n="right" className="icn chev" />
         </button>
-        {more && <HomeExtras />}
+        {more && (
+          <>
+            <div className="card s12">
+              <div className="ch"><Icon n="life" className="ic" /><div><h3>Тіло й настрій</h3><p>Один тап на кожне. Решту я порахую</p></div><button className="sel" onClick={() => go('health')}>Докладніше</button></div>
+              <LifeTiles full={false} />
+            </div>
+            {habitsShown(S) && <HabitsToday />}
+            <AdviceCard />
+            <YesterdayCard />
+            <HomeExtras />
+          </>
+        )}
       </div>
     </section>
   );

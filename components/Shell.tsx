@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV, NAV_MORE, parentOf, TABS, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
+import { NAV_MORE, navOf, parentOf, tabsOf, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
 import { fmt, MON, pad2, WD } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { SheetHost } from './Sheets';
@@ -106,7 +106,8 @@ function TopBar() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { view, toastMsg, setToast, setSheet, setPalette, sheet, palette } = useStore();
+  const { S, view, toastMsg, setToast, setSheet, setPalette, sheet, palette } = useStore();
+  const tabs = tabsOf(S);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -125,7 +126,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <aside className="side">
           <div className="brand"><span className="logo"><Icon n="logo" /></span>LifeOs</div>
           <nav className="nav">
-            {NAV.filter(k => !NAV_MORE.includes(k)).map(k => <NavBtn key={k} k={k} />)}
+            {navOf(S).filter(k => !NAV_MORE.includes(k)).map(k => <NavBtn key={k} k={k} />)}
             <MoreNav />
           </nav>
           <MiniTimer />
@@ -137,8 +138,8 @@ export function Shell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <nav className="tabbar" aria-label="Основні розділи">
-        {TABS.map(k => <NavBtn key={k} k={k} />)}
-        <button onClick={() => setSheet({ kind: 'more' })} aria-current={TABS.includes(parentOf(view)) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
+        {tabs.map(k => <NavBtn key={k} k={k} />)}
+        <button onClick={() => setSheet({ kind: 'more' })} aria-current={tabs.includes(parentOf(view)) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
       </nav>
       <button className="fab" onClick={() => setSheet({ kind: 'qa' })} aria-label="Швидко додати"><Icon n="plus" /></button>
       <SheetHost />
