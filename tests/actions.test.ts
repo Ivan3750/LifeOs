@@ -38,3 +38,41 @@ describe('tasks', () => {
     expect(S.tasks[0].doneAt).toBeGreaterThan(0);
   });
 });
+
+describe('first-run questions', () => {
+  it('turns the answers into defaults, a first task and a calendar', () => {
+    const { S, A } = setup();
+    S.onboarded = false;
+    A.finishOnboarding({ wake: '06:45', bed: '23:00', focus: 'Здати звіт', ical: 'webcal://example.com/a.ics' });
+    expect(S).toMatchObject({ onboarded: true, wakeTarget: '06:45', dayStart: '06:45', bedTarget: '23:00', dayEnd: '23:00' });
+    expect(S.tasks[0]).toMatchObject({ t: 'Здати звіт', p: 'hi', d: false });
+    expect(S.icalUrls).toEqual(['https://example.com/a.ics']);
+  });
+
+  it('skipping changes nothing but ends the questions', () => {
+    const { S, A } = setup();
+    S.onboarded = false;
+    const before = { wake: S.wakeTarget, bed: S.bedTarget };
+    A.finishOnboarding();
+    expect(S.onboarded).toBe(true);
+    expect({ wake: S.wakeTarget, bed: S.bedTarget }).toEqual(before);
+    expect(S.tasks).toHaveLength(0);
+    expect(S.icalUrls).toHaveLength(0);
+  });
+
+  it('ignores a calendar link that is not https', () => {
+    const { S, A } = setup();
+    A.finishOnboarding({ ical: 'http://example.com/a.ics' });
+    expect(S.icalUrls).toHaveLength(0);
+  });
+});
+
+describe('menu without habits', () => {
+  it('hides habits until they are switched on, and keeps four tabs', async () => {
+    const { navOf, tabsOf } = await import('@/lib/store');
+    expect(navOf({})).not.toContain('habits');
+    expect(navOf({ habitsOn: true })).toContain('habits');
+    expect(tabsOf({})).toEqual(['home', 'focus', 'tasks', 'health']);
+    expect(tabsOf({ habitsOn: true })).toEqual(['home', 'focus', 'tasks', 'habits']);
+  });
+});

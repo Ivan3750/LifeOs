@@ -232,6 +232,14 @@ export function Prefs() {
           </div>
         </div>
 
+        <div className="card s6 cardcol">
+          <div className="ch" style={{ margin: 0 }}><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>Щоденні відмітки. Дані не видаляються, коли розділ сховано</p></div></div>
+          <div className="seg">
+            <button aria-pressed={!S.habitsOn} onClick={() => update(s => { s.habitsOn = false; })}>Сховати</button>
+            <button aria-pressed={!!S.habitsOn} onClick={() => update(s => { s.habitsOn = true; })}>Показувати</button>
+          </div>
+        </div>
+
         <div className="s6"><ReminderSettings /></div>
         <div className="s6"><PinSettings /></div>
 
@@ -273,10 +281,12 @@ export function Prefs() {
             <button className="btn ghost" onClick={() => fileRef.current?.click()}>Відновити з копії</button>
             <input ref={fileRef} type="file" accept="application/json,.json" hidden aria-label="Файл резервної копії" onChange={restore} />
           </div>
-          <div className="prefdemo">
-            <p className="help" style={{ margin: '0 0 10px' }}>{S.demo ? 'Зараз у застосунку показані демонстраційні дані. Прибери їх, коли будеш готовий вести власні.' : 'Демонстраційних даних немає.'}</p>
-            <button className="btn ghost" disabled={!S.demo} onClick={() => { update(stripDemo); toast('Демо-дані прибрано'); }}>Прибрати демо-дані</button>
-          </div>
+          {S.demo && (
+            <div className="prefdemo">
+              <p className="help" style={{ margin: '0 0 10px' }}>Зараз у застосунку показані демонстраційні дані. Прибери їх, коли будеш готовий вести власні.</p>
+              <button className="btn ghost" onClick={() => { update(stripDemo); toast('Демо-дані прибрано'); }}>Прибрати демо-дані</button>
+            </div>
+          )}
         </div>
 
         <div className="s6"><AccountSettings /></div>

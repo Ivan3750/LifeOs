@@ -80,6 +80,10 @@ export type State = {
   socialGoals: Record<string, number>;
   /** Wanted bedtime and wake-up time: sleep is judged on keeping to them, not only on length. */
   bedTarget: string; wakeTarget: string;
+  /** Show the habits and habits-to-quit sections (off by default: they take daily effort). */
+  habitsOn?: boolean;
+  /** false only on a fresh start, until the three first-run questions are answered or skipped. Missing on older data, so those users never see them. */
+  onboarded?: boolean;
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */

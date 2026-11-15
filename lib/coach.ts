@@ -290,9 +290,9 @@ export function coach(S: State, eventsOn: (k: string) => UiEvent[], now = new Da
 
   /* ---- work, tasks, goals ---- */
   const late = S.tasks.filter(x => !x.d && x.due && x.due < today);
-  if (late.length) add({ id: 'overdue', area: 'Робота й бізнес', tone: 'warn', weight: 80, title: `${late.length} ${plural(late.length, 'прострочена задача', 'прострочені задачі', 'прострочених задач')}`,
-    facts: late.slice(0, 3).map(x => x.t), why: 'Прострочене тисне на голову й забирає увагу від нового: навіть коли ти про нього не думаєш, мозок тримає його «відкритим».',
-    action: 'Для кожної вирішити: зробити сьогодні, перенести на конкретну дату або видалити. Почни з найменшої.', to: 'tasks' });
+  if (late.length) add({ id: 'overdue', area: 'Робота й бізнес', tone: 'info', weight: 80, title: `${late.length} ${plural(late.length, 'задача', 'задачі', 'задач')} з минулих днів`,
+    facts: late.slice(0, 3).map(x => x.t), why: 'Відкриті справи тихо забирають увагу, навіть коли ти про них не думаєш.',
+    action: 'Для кожної вибери: зробити сьогодні, перенести або прибрати. Почни з найменшої.', to: 'tasks' });
   const wkGoal = S.goal * 60, wkStart = sod(addD(now, -((now.getDay() + 6) % 7))).getTime();
   const wkDone = S.sessions.filter(s => s.t >= wkStart).reduce((a, s) => a + s.m, 0), dayIdx = (now.getDay() + 6) % 7, workLeft = [...Array(7)].filter((_, i) => i >= dayIdx && isWorkDay(S, ymd(addD(sod(now), i - dayIdx)))).length;
   if (wkGoal > 0 && workLeft > 0 && dayIdx >= 1) {
@@ -308,8 +308,8 @@ export function coach(S: State, eventsOn: (k: string) => UiEvent[], now = new Da
   if (idle.length && !soon.length) add({ id: 'goal-idle', area: 'Цілі й розвиток', tone: 'info', weight: 50, title: `Ціль «${idle[0].title}» цього тижня без фокусу`,
     facts: [], why: 'Цілі зростають із повторюваних невеликих кроків. Один блок на тиждень майже не змінює траєкторію.', action: 'Привʼяжи до цілі задачу й запусти 25 хв фокусу.', to: 'goals' });
   const risk = S.habits.map(h => ({ h, n: (() => { let n = 0; for (let i = 1; i < 60 && h.days[ymd(addD(now, -i))]; i++) n++; return n; })() })).filter(x => x.n >= 3 && !x.h.days[today]);
-  if (risk.length && hour >= 16) add({ id: 'streak', area: 'Цілі й розвиток', tone: 'info', weight: 58, title: `Не обірви серію «${risk[0].h.name}» (${risk[0].n} дн)`,
-    facts: [], why: 'Серія збільшує шанс повторити: кожен новий день легший за попередній, поки ти її не перервеш.', action: 'Навіть мінімальна версія (2 хвилини) зберігає серію.', to: 'habits' });
+  if (risk.length && hour >= 16) add({ id: 'streak', area: 'Цілі й розвиток', tone: 'info', weight: 58, title: `«${risk[0].h.name}» сьогодні ще не відмічено (${risk[0].n} дн поспіль)`,
+    facts: [], why: 'Серія збільшує шанс повторити: кожен новий день легший за попередній, поки ти її не перервеш.', action: 'Навіть мінімальна версія на 2 хвилини зараховується.', to: 'habits' });
 
   /* ---- body today ---- */
   const hw = S.health[today];

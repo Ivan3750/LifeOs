@@ -35,6 +35,10 @@ export const TAB_LABEL: Record<string, string> = { tasks: 'Задачі', goals:
 /** The section a view belongs to in the menu: «quit» sits under «habits», and so on. */
 export const parentOf = (v: string) => Object.keys(GROUPS).find(p => GROUPS[p].includes(v)) ?? v;
 export const TABS: string[] = ['home', 'focus', 'tasks', 'habits'];
+/** Menu entries for this user: habits are hidden until switched on in the settings. */
+export const navOf = (S: Pick<State, 'habitsOn'>) => NAV.filter(k => k !== 'habits' || S.habitsOn);
+/** The mobile tab bar: «Тіло» takes the place of «Звички» while habits are off. */
+export const tabsOf = (S: Pick<State, 'habitsOn'>) => TABS.map(k => (k === 'habits' && !S.habitsOn ? 'health' : k));
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
 export type ToastAction = { label: string; run: () => void };
@@ -108,7 +112,8 @@ function load(): State {
     // unreadable local copy: keep it aside for recovery and take the server copy instead of pushing a blank one over it
     try { if (raw) { localStorage.setItem(KEY + '-broken', raw); localStorage.setItem(SYNC_KEY, JSON.stringify({ version: -1, dirty: false })); } } catch {}
   }
-  return makeState(true);
+  // a fresh start is empty and asks three questions instead of showing example data
+  return { ...makeState(false), onboarded: false };
 }
 
 /* ---------- server sync bookkeeping ---------- */

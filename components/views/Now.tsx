@@ -10,7 +10,7 @@ import { Icon } from '../Icon';
 import { AdviceCard } from '../Advice';
 import { YesterdayCard } from '../Brief';
 import { LifeTiles } from '../shared';
-import { HabitsToday, HomeExtras, QuitMini, SchedCard } from './DayParts';
+import { HabitsToday, HomeExtras, SchedCard } from './DayParts';
 
 /** The one thing to do now: what is running, what is going on in the calendar, or the next task with a button to start it. */
 function NowCard() {
@@ -194,9 +194,36 @@ function ReviewCard() {
   );
 }
 
+/** First launch only: three optional questions, so nothing has to be set up by hand afterwards. */
+function OnboardCard() {
+  const { S, A } = useStore();
+  const [wake, setWake] = useState(S.wakeTarget), [bed, setBed] = useState(S.bedTarget), [focus, setFocus] = useState(''), [ical, setIcal] = useState('');
+  return (
+    <div className="card s12 onboard">
+      <div className="ch"><Icon n="flag" className="ic" /><div><h3>Три швидкі питання</h3><p>Усе необовʼязково. Решту налаштую сам, а змінити можна в будь-який момент</p></div></div>
+      <form className="cardcol" onSubmit={e => { e.preventDefault(); A.finishOnboarding({ wake, bed, focus, ical }); }}>
+        <div className="fgrid">
+          <label className="field" htmlFor="obWake">Прокидаюсь о<input id="obWake" type="time" value={wake} onChange={e => setWake(e.target.value)} /></label>
+          <label className="field" htmlFor="obBed">Лягаю спати о<input id="obBed" type="time" value={bed} onChange={e => setBed(e.target.value)} /></label>
+        </div>
+        <label className="field" htmlFor="obFocus">Що найважливіше цього місяця?
+          <input id="obFocus" value={focus} onChange={e => setFocus(e.target.value)} placeholder="Одна справа. Стане першою задачею" autoComplete="off" />
+        </label>
+        <label className="field" htmlFor="obCal">Посилання на календар (iCal), якщо є
+          <input id="obCal" type="url" value={ical} onChange={e => setIcal(e.target.value)} placeholder="https://… .ics" autoComplete="off" />
+        </label>
+        <div className="row">
+          <button className="btn acc">Готово</button>
+          <button type="button" className="btn ghost" onClick={() => A.finishOnboarding()}>Пропустити</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /** The home page: one screen that tells what to do now. Everything else is a tap away. */
 export function Home() {
-  const { go } = useStore();
+  const { S, go } = useStore();
   const now = useNow(60_000), phase = phaseOf(new Date(now));
   const [more, setMore] = useState(false);
   const evening = phase === 'evening' || phase === 'night';
@@ -205,28 +232,30 @@ export function Home() {
       <div className="grid">
         <NowCard />
 
+        {S.onboarded === false && <OnboardCard />}
+
         {evening && <ReviewCard />}
 
         <PlanCard />
         <ResetCard />
 
         <SchedCard />
-        <HabitsToday />
-
-        <div className="card s12">
-          <div className="ch"><Icon n="life" className="ic" /><div><h3>Тіло й настрій</h3><p>Один тап на кожне. Решту я порахую</p></div><button className="sel" onClick={() => go('health')}>Докладніше</button></div>
-          <LifeTiles full={false} />
-        </div>
-
-        <QuitMini />
-
-        <AdviceCard />
-        <YesterdayCard />
 
         <button className="moretoggle" aria-expanded={more} onClick={() => setMore(m => !m)}>
-          <Icon n="trend" /><span>Оцінка дня, статистика й цілі</span><small>{more ? 'Сховати' : 'Показати'}</small><Icon n="right" className="icn chev" />
+          <Icon n="trend" /><span>Тіло, поради, оцінка дня й цілі</span><small>{more ? 'Сховати' : 'Показати'}</small><Icon n="right" className="icn chev" />
         </button>
-        {more && <HomeExtras />}
+        {more && (
+          <>
+            <div className="card s12">
+              <div className="ch"><Icon n="life" className="ic" /><div><h3>Тіло й настрій</h3><p>Один тап на кожне. Решту я порахую</p></div><button className="sel" onClick={() => go('health')}>Докладніше</button></div>
+              <LifeTiles full={false} />
+            </div>
+            {S.habitsOn && <HabitsToday />}
+            <AdviceCard />
+            <YesterdayCard />
+            <HomeExtras />
+          </>
+        )}
       </div>
     </section>
   );

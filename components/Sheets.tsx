@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type FormEvent } from 'react';
-import { NAV, useStore, vinfo, type Store } from '@/lib/store';
+import { navOf, useStore, vinfo, type Store } from '@/lib/store';
 import { parseTask } from '@/lib/tasks';
 import { PLATFORMS } from '@/lib/social';
 import { COLORS, TK } from '@/lib/util';
@@ -92,7 +92,7 @@ export function SheetHost() {
     body = (
       <>
         <div className="qa-grid">
-          {NAV.map(k => { const [, l, i] = vinfo(k)!; return <button key={k} onClick={() => go(k)}><Icon n={i as IconName} className="ic" />{l}</button>; })}
+          {navOf(st.S).map(k => { const [, l, i] = vinfo(k)!; return <button key={k} onClick={() => go(k)}><Icon n={i as IconName} className="ic" />{l}</button>; })}
         </div>
       </>
     );
