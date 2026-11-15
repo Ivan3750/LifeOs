@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { liveSessions, useNow, useStore } from '@/lib/store';
+import { habitsShown, liveSessions, useNow, useStore } from '@/lib/store';
 import { goalProgress } from '@/lib/goals';
 import { dayPlan, freeTime, lastDays, OFF_KINDS, offOn, scoreColor, scoreWord } from '@/lib/score';
 import type { OffKind } from '@/lib/types';
@@ -359,7 +359,7 @@ export function HomeExtras() {
           {!gs.length && <p className="muted">Постав першу ціль у розділі «Цілі».</p>}
         </div>
 
-        {S0.habitsOn && <QuitMini />}
+        {habitsShown(S0) && <QuitMini />}
 
         <div className="card s4">
           <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div><span className="sel">Цей тиждень</span></div>

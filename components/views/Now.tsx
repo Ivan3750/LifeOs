@@ -1,15 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { useNow, useStore } from '@/lib/store';
-import { scoreColor, scoreWord } from '@/lib/score';
+import { habitsShown, useNow, useStore } from '@/lib/store';
+import { moodsOn, scoreColor, scoreWord, sleepGuess } from '@/lib/score';
 import { dueLabel, dueState } from '@/lib/tasks';
 import { greeting, nextCandidate, nowState, phaseOf, PLAN_SIZE, RESETS, todayPlan } from '@/lib/now';
 import { fmt, MON, plural, TK, WD } from '@/lib/util';
 import { Icon } from '../Icon';
 import { AdviceCard } from '../Advice';
 import { YesterdayCard } from '../Brief';
-import { LifeTiles } from '../shared';
+import { LifeTiles, QUICK_MOODS } from '../shared';
+import { Face } from '../Face';
 import { HabitsToday, HomeExtras, SchedCard } from './DayParts';
 
 /** The one thing to do now: what is running, what is going on in the calendar, or the next task with a button to start it. */
@@ -172,6 +173,7 @@ function ReviewCard() {
   const sc = scoreOn(k, now);
   const win = S.wins[k] || '';
   const [text, setText] = useState(win);
+  const h = S.health[k], needMood = moodsOn(S, k).length === 0, needSleep = !(h?.bed || h?.wake || h?.sleep), guess = sleepGuess(S, k);
   return (
     <div className="card s12 reviewcard">
       <div className="ch"><Icon n="moon" className="ic" /><div><h3>Підсумок дня</h3><p>30 секунд. Решту я порахував сам</p></div></div>
@@ -181,12 +183,31 @@ function ReviewCard() {
           <span>{scoreWord(sc.total)}</span>
         </div>
         <div className="rv-form">
+          {(needMood || needSleep) && (
+            <div className="rv-quick">
+              {needMood && (
+                <div className="rv-q">
+                  <span>Який був день?</span>
+                  <div className="moods">{QUICK_MOODS.map(([v, m]) => <button key={v} title={m} aria-label={`Настрій: ${m}`} onClick={() => A.addMood({ t: Date.now(), v, energy: 0, tags: [], note: '' })}><Face v={v} size={30} /></button>)}</div>
+                </div>
+              )}
+              {needSleep && (
+                <div className="rv-q">
+                  <span>Спав ≈ {String(guess.hours).replace('.', ',')} год ({guess.bed}–{guess.wake})?</span>
+                  <div className="row" style={{ gap: 6 }}>
+                    <button className="btn acc sm" onClick={() => A.setSleepTimes(guess.bed, guess.wake, k)}><Icon n="check" />Так</button>
+                    <button className="btn ghost sm" onClick={() => go('health')}>Інакше</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <label className="field" htmlFor="winText">Що вдалось сьогодні?
             <textarea id="winText" rows={2} value={text} placeholder="Одне речення. Навіть дрібниця" onChange={e => setText(e.target.value)} onBlur={() => A.setWin(text, k)} />
           </label>
           <div className="row">
             <button className="btn" onClick={() => { A.setWin(text, k); go('tasks'); }}><Icon n="flag" />Спланувати завтра</button>
-            <button className="btn ghost" onClick={() => go('health')}>Записати сон і настрій</button>
+            <button className="btn ghost" onClick={() => go('health')}>Докладніше про тіло</button>
           </div>
         </div>
       </div>
@@ -250,7 +271,7 @@ export function Home() {
               <div className="ch"><Icon n="life" className="ic" /><div><h3>Тіло й настрій</h3><p>Один тап на кожне. Решту я порахую</p></div><button className="sel" onClick={() => go('health')}>Докладніше</button></div>
               <LifeTiles full={false} />
             </div>
-            {S.habitsOn && <HabitsToday />}
+            {habitsShown(S) && <HabitsToday />}
             <AdviceCard />
             <YesterdayCard />
             <HomeExtras />

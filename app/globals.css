@@ -1582,5 +1582,8 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .rv-score span{font-size:12px;color:var(--muted)}
 .rv-form{display:flex;flex-direction:column;gap:14px;min-width:0}
 .rv-form textarea{resize:vertical}
+.rv-quick{display:flex;flex-direction:column;gap:12px}
+.rv-q{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.rv-q>span{font-size:13px;font-weight:600}
 @media (max-width:640px){.review{grid-template-columns:1fr;justify-items:center}.rv-form{width:100%}.nowcard{min-height:0}}
 @media (min-width:1181px){.view .grid>.sched-wrap{grid-column:span 5!important}.view .grid>.habtoday{grid-column:span 7;align-self:stretch}}

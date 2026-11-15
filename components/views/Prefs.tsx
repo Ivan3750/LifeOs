@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import { fill, logFocus, useStore } from '@/lib/store';
+import { fill, habitsShown, logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
 import { DN, plural, TK } from '@/lib/util';
 import { dayPlan, sleepRhythm } from '@/lib/score';
@@ -235,8 +235,8 @@ export function Prefs() {
         <div className="card s6 cardcol">
           <div className="ch" style={{ margin: 0 }}><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>Щоденні відмітки. Дані не видаляються, коли розділ сховано</p></div></div>
           <div className="seg">
-            <button aria-pressed={!S.habitsOn} onClick={() => update(s => { s.habitsOn = false; })}>Сховати</button>
-            <button aria-pressed={!!S.habitsOn} onClick={() => update(s => { s.habitsOn = true; })}>Показувати</button>
+            <button aria-pressed={!habitsShown(S)} onClick={() => update(s => { s.habitsOn = false; })}>Сховати</button>
+            <button aria-pressed={habitsShown(S)} onClick={() => update(s => { s.habitsOn = true; })}>Показувати</button>
           </div>
         </div>
 

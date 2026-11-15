@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayScore, freeTime, isWorkDay, sleepRhythm } from '@/lib/score';
+import { dayScore, freeTime, isWorkDay, sleepGuess, sleepRhythm } from '@/lib/score';
 import { makeState } from '@/lib/seed';
 import { addD, ymd } from '@/lib/util';
 import type { State } from '@/lib/types';
@@ -205,5 +205,36 @@ describe('days and rhythm', () => {
     const r = sleepRhythm(s, K);
     expect(r.wake).toBe(7 * 60);
     expect(r.bed).toBe(24 * 60);
+  });
+});
+
+describe('effortless days', () => {
+  it('a day with only a closed task and a focus session is still judged, and nothing unlogged counts as zero', () => {
+    const s = blank();
+    s.tasks.push({ id: 1, t: 'Звіт', p: 'hi', d: true, doneAt: new Date(K + 'T10:00').getTime() });
+    const sessions = [{ t: new Date(K + 'T09:00').getTime(), m: 40 }];
+    s.sessions = sessions;
+    const r = dayScore(s, K, [], sessions, NOW);
+    expect(r.total).not.toBeNull();
+    expect(r.total as number).toBeGreaterThan(60);
+    for (const key of ['sleep', 'sleepreg', 'water', 'move', 'mood', 'social']) expect(r.parts.some(p => p.key === key)).toBe(false);
+  });
+});
+
+describe('tasks alone', () => {
+  it('a day with only a closed task is judged too', () => {
+    const s = blank();
+    s.tasks.push({ id: 1, t: 'Звіт', p: 'lo', d: true, doneAt: new Date(K + 'T10:00').getTime() });
+    expect(dayScore(s, K, [], [], NOW).total).not.toBeNull();
+  });
+});
+
+describe('sleepGuess', () => {
+  it('falls back to the wanted times, then follows the typical nights', () => {
+    const s = blank();
+    s.bedTarget = '23:00'; s.wakeTarget = '07:00';
+    expect(sleepGuess(s, K)).toMatchObject({ bed: '23:00', wake: '07:00', hours: 8, typical: false });
+    for (let i = 1; i <= 4; i++) s.health[ymd(addD(new Date(K + 'T00:00'), -i))] = { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0, bed: '00:30', wake: '08:00' };
+    expect(sleepGuess(s, K)).toMatchObject({ bed: '00:30', wake: '08:00', hours: 7.5, typical: true });
   });
 });

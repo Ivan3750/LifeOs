@@ -46,6 +46,14 @@ export function sleepRhythm(S: State, k = ymd(new Date())) {
   return { wake, bed, nights: days.filter(d => d!.wake || d!.bed).length };
 }
 
+/** A guess for the night that ended on day k, to confirm with one tap: the typical bed and wake time of the last nights, or the wanted ones. */
+export function sleepGuess(S: State, k = ymd(new Date())) {
+  const r = sleepRhythm(S, k);
+  const wake = r.wake ?? toMin(S.wakeTarget || '07:30');
+  const bed = r.bed ?? (toMin(S.bedTarget || '23:30') < 720 ? toMin(S.bedTarget || '23:30') + 1440 : toMin(S.bedTarget || '23:30'));
+  return { bed: hm(bed), wake: hm(wake), hours: Math.round(((wake + 1440 - bed) / 60) * 10) / 10, typical: r.wake != null && r.bed != null };
+}
+
 /** The planned day: when it starts and ends, and the meals in it.
     With dayFromSleep the start is today's logged wake time (or the typical one), the end is the
     typical bedtime (cut at midnight), and breakfast moves to half an hour after waking. */
@@ -131,7 +139,7 @@ export const offOn = (S: State, k: string) => S.offDays?.[k];
 /** First day with any record at all. Earlier days have nothing to judge. */
 export function firstDay(S: State) {
   const c: string[] = [...Object.keys(S.health), ...S.habits.flatMap(h => Object.keys(h.days))];
-  for (const t of [...S.sessions.map(x => x.t), ...S.moods.map(x => x.t), ...S.activities.map(x => x.start)]) c.push(ymd(new Date(t)));
+  for (const t of [...S.sessions.map(x => x.t), ...S.moods.map(x => x.t), ...S.activities.map(x => x.start), ...S.tasks.flatMap(x => (x.doneAt ? [x.doneAt] : []))]) c.push(ymd(new Date(t)));
   return c.length ? c.reduce((a, b) => (b < a ? b : a)) : null;
 }
 

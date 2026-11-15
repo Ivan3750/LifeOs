@@ -68,11 +68,15 @@ describe('first-run questions', () => {
 });
 
 describe('menu without habits', () => {
-  it('hides habits until they are switched on, and keeps four tabs', async () => {
-    const { navOf, tabsOf } = await import('@/lib/store');
-    expect(navOf({})).not.toContain('habits');
-    expect(navOf({ habitsOn: true })).toContain('habits');
-    expect(tabsOf({})).toEqual(['home', 'focus', 'tasks', 'health']);
-    expect(tabsOf({ habitsOn: true })).toEqual(['home', 'focus', 'tasks', 'habits']);
+  it('hides habits for a fresh start, shows them when there is habit data, and obeys the switch', async () => {
+    const { navOf, tabsOf, habitsShown } = await import('@/lib/store');
+    const empty = makeState(false);
+    expect(navOf(empty)).not.toContain('habits');
+    expect(tabsOf(empty)).toEqual(['home', 'focus', 'tasks', 'health']);
+    const used = { ...empty, habits: [{ id: 1, name: 'Читати', days: {} }] };
+    expect(habitsShown(used)).toBe(true);
+    expect(tabsOf(used)).toEqual(['home', 'focus', 'tasks', 'habits']);
+    expect(habitsShown({ ...used, habitsOn: false })).toBe(false);
+    expect(habitsShown({ ...empty, habitsOn: true })).toBe(true);
   });
 });
