@@ -3,7 +3,8 @@ export type Session = { t: number; m: number; task?: string; demo?: 1 };
 /** goal: id of the goal this task moves forward. */
 /** due: date to finish by ('YYYY-MM-DD'), doneAt: when it was ticked off. */
 export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; due?: string; doneAt?: number; demo?: 1 };
-export type LocalEvent = { id: number; date: string; s: string; e: string; title: string; c: string; demo?: 1 };
+/** need: id of the need this event was planned for (a slot made by the week planner); ok: it was done, and the need got its mark. */
+export type LocalEvent = { id: number; date: string; s: string; e: string; title: string; c: string; need?: number; ok?: 1; demo?: 1 };
 export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 1 };
 /** One day, keyed by the date you woke up. bed/wake are 'HH:MM'; sleep hours are derived from them when both are set.
     mood and steps are kept only for data saved by older versions (mood is now logged in State.moods). */
@@ -70,6 +71,32 @@ export type Craving = { id: number; t: number; habit: number; trigger: string; o
 export type Mode = 'me' | 'co';
 export type Theme = 'system' | 'light' | 'dark';
 
+/** A need: something that goes hungry when it is missed (sport, people, something new, faith, rest…). weekly: how many times a week it should be met.
+    min, from, to, days: how long one slot is and when in the day it suits (the week planner uses them).
+    cat, kw, workout, machine: what is counted automatically (calendar events of that kind or with those words in the title, workouts logged in «Тіло», logged work on an income goal). */
+export type Need = {
+  id: number; key?: string; name: string; weekly: number; on: boolean;
+  min: number; from: string; to: string; days: 'any' | 'weekend' | 'weekdays';
+  cat?: string; kw?: string[]; workout?: boolean; machine?: boolean;
+};
+/** One time a need was met. src: how it was marked; ref: the touch, place or event it came from. */
+export type NeedLog = { id: number; need: number; date: string; t: number; src?: 'manual' | 'daily' | 'plan' | 'people' | 'place'; ref?: number };
+/** The daily minimum: movement and one new thing are ticked here (the person is a touch in the people list). */
+export type DailyMark = { move?: 1; nov?: 1 };
+/** Someone in your life. every: how often (days) you want to be in touch; next: what comes next, nextDate: when (if known). */
+export type Person = { id: number; name: string; kind: 'friend' | 'family' | 'partner' | 'work'; every: number; next?: string; nextDate?: string };
+/** A message or a meeting with a person. */
+export type Touch = { id: number; person: number; date: string; kind: 'msg' | 'meet' };
+/** A club or community. was: last time you were there, going: the day you go next. */
+export type Place = { id: number; name: string; what: string; url?: string; was?: string; going?: string };
+/** One day of work on a money goal: leads found, clients won, money received. */
+export type MachineLog = { id: number; date: string; leads: number; clients: number; money: number };
+/** A goal that is a sum of money (a car…): it is broken down into clients and leads per week.
+    price: what one client brings, conv: share of leads that become clients (%), saved: what is already there. */
+export type Machine = { id: number; title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string; log: MachineLog[] };
+/** The Sunday review of one week. ratings: need id → 1–5; focus: needs that get the first slots next week; accepted: suggestions taken. */
+export type Review = { ratings: Record<string, number>; focus: number[]; accepted: string[]; done?: number };
+
 export type State = {
   v: 1;
   name: string; goal: number; focusMin: number; breakMin: number;
@@ -112,6 +139,9 @@ export type State = {
   socialGoals: Record<string, number>;
   /** Wanted bedtime and wake-up time: sleep is judged on keeping to them, not only on length. */
   bedTarget: string; wakeTarget: string;
+  /** Needs and everything around them. needLog: each time a need was met; daily: the daily minimum by date; reviews: Sunday reviews by the Monday of the week. */
+  needs: Need[]; needLog: NeedLog[]; daily: Record<string, DailyMark>; reviews: Record<string, Review>;
+  people: Person[]; touches: Touch[]; places: Place[]; machines: Machine[];
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */

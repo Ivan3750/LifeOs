@@ -9,6 +9,7 @@ import { addD, DAY, DN, hhmm, MON, MONTHN, money, pad2, pctW, plural, sod, toMin
 import { Icon, type IconName } from '../Icon';
 import { AdviceCard } from '../Advice';
 import { AffirmationsCard } from '../Affirmations';
+import { DailyCard, NeedsCard, WeekReviewPrompt } from '../needs';
 import { FocusArea, Rhythm, Ring } from '../charts';
 import { account, balance, budgetDKK, CUR_SIGN, fmtCur } from '@/lib/money';
 import { bestStreak, streakDays, streakHours } from '@/lib/quit';
@@ -413,6 +414,10 @@ export function Home() {
       <div className="grid">
         <Hero />
         <SchedCard />
+
+        <WeekReviewPrompt />
+        <DailyCard cls="s7" />
+        <NeedsCard cls="s5" />
 
         <AffirmationsCard />
 

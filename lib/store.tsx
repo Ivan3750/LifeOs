@@ -26,14 +26,20 @@ export const VIEWS: [string, string, string][] = [
   ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['wolt', 'Wolt', 'wolt'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
   ['co', 'Огляд', 'company'], ['leads', 'Ліди', 'leads'], ['clients', 'Клієнти', 'user'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
+  ['needs', 'Потреби', 'needs'], ['plan', 'План тижня', 'schedule'], ['people', 'Люди', 'team'], ['machine', 'Ціль → дії', 'trend'], ['review', 'Огляд тижня', 'check'],
 ];
 export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'focus', 'time', 'coach', 'tasks', 'habits', 'quit', 'health', 'money', 'wolt', 'goals', 'schedule', 'notes', 'prefs'],
+  me: ['home', 'needs', 'focus', 'time', 'coach', 'tasks', 'habits', 'quit', 'health', 'money', 'wolt', 'goals', 'schedule', 'notes', 'prefs'],
   co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
 };
-export const TABS: Record<Mode, string[]> = { me: ['home', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
+export const TABS: Record<Mode, string[]> = { me: ['home', 'needs', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
 const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
-const ME_ONLY = ['home', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'wolt', 'goals'];
+const ME_ONLY = ['home', 'needs', 'plan', 'people', 'machine', 'review', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'wolt', 'goals'];
+/** Sections that live inside another one as tabs: the needs and everything around them. Every view keeps its own key, so go('plan') still works. */
+export const GROUPS: Record<string, string[]> = { needs: ['needs', 'plan', 'people', 'machine', 'review'] };
+export const TAB_LABEL: Record<string, string> = { needs: 'Потреби', plan: 'План тижня', people: 'Люди', machine: 'Ціль → дії', review: 'Огляд' };
+/** The section a view belongs to in the menu: «plan» sits under «needs», and so on. */
+export const parentOf = (v: string) => Object.keys(GROUPS).find(p => GROUPS[p].includes(v)) ?? v;
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
 export type ToastAction = { label: string; run: () => void };

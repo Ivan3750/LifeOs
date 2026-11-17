@@ -33,6 +33,8 @@ export const addD = (d: Date | number, n: number) => { const x = new Date(d); x.
 export const toMin = (t: string) => { const [a, b] = t.split(':').map(Number); return a * 60 + b; };
 export const hhmm = (d: Date) => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 export const TK = () => ymd(new Date());
+/** 'YYYY-MM-DD' as «17 березня». */
+export const fmtDate = (k: string) => { const d = new Date(k + 'T00:00'); return `${d.getDate()} ${MON[d.getMonth()]}`; };
 export const daysTo = (d: string) => Math.round((new Date(d + 'T00:00').getTime() - sod(new Date()).getTime()) / DAY);
 export const daysInMonth = () => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate(); };
 export const weekdayIdx = (d: Date = new Date()) => (d.getDay() + 6) % 7;

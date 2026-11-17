@@ -1,12 +1,20 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV, TABS, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
+import { NAV, parentOf, TABS, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
 import { fmt, MON, pad2, WD } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { SheetHost } from './Sheets';
 import { Palette } from './Palette';
 import { RemindHost } from './Reminders';
+import { useNeeds } from './needs';
+
+/** Number of needs that are hungry now, for the badge of the menu entry. */
+function HungryBadge() {
+  const { stats } = useNeeds();
+  const n = stats.filter(s => s.status === 'red').length;
+  return n > 0 ? <span className="badge red" title="Голодні потреби">{n}</span> : null;
+}
 
 export function ModeSeg() {
   const { S, setMode } = useStore();
@@ -25,9 +33,10 @@ function NavBtn({ k, step }: { k: string; step?: number }) {
   const [, l, i] = vinfo(k)!;
   const open = S.tasks.filter(t => !t.d).length;
   return (
-    <button onClick={() => go(k)} aria-current={k === view ? 'page' : undefined}>
+    <button onClick={() => go(k)} aria-current={k === parentOf(view) ? 'page' : undefined}>
       {step ? <span className="stepn">{step}</span> : <Icon n={i as IconName} />}<span className="nl">{l}</span>
       {k === 'tasks' && open > 0 && <span className="badge">{open}</span>}
+      {k === 'needs' && <HungryBadge />}
     </button>
   );
 }
