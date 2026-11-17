@@ -7,7 +7,6 @@ import { account, accOf, balance, convert, CUR_SIGN, curOfTx, fmtCur, monthOf, r
 import { addD, CATS, daysInMonth, MON, MONTHN, pctW, TK, WD, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { DelBtn } from '../shared';
-import { WoltCard } from '../Wolt';
 import { InsightsCard, MonthHero, Pots, RecurringCard, Trends } from '../MoneyExtras';
 
 type Filter = 'all' | AccId;
@@ -293,7 +292,6 @@ export function Money() {
         <AccountCard id="dk" mk={mk} active={filter === 'dk'} onPick={() => setFilter(filter === 'dk' ? 'all' : 'dk')} />
         <AccountCard id="ua" mk={mk} active={filter === 'ua'} onPick={() => setFilter(filter === 'ua' ? 'all' : 'ua')} />
         <TotalCard mk={mk} />
-        <WoltCard />
       </div>
       <div style={{ marginTop: 18 }}><InsightsCard mk={mk} /></div>
       <div className="grid" style={{ marginTop: 18 }}>

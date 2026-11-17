@@ -19,8 +19,7 @@ export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake' | 'na
 /** A mood check-in at a moment of the day. v: 1–10, energy: 1–5 (0 = not set). */
 export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
 /** Time spent on errands and other non-work things (shop, commute…). start/end are timestamps. */
-/** A logged activity. For a Wolt shift: orders (number of deliveries), earned (kr., tips included) and km driven. */
-export type Activity = { id: number; kind: string; title: string; start: number; end: number; orders?: number; earned?: number; km?: number; demo?: 1 };
+export type Activity = { id: number; kind: string; title: string; start: number; end: number; demo?: 1 };
 export type Note = { id: number; title: string; text: string; created: number; updated: number; pinned?: boolean; demo?: 1 };
 export type Cur = 'DKK' | 'UAH';
 export type AccId = 'dk' | 'ua';
@@ -28,9 +27,8 @@ export type AccId = 'dk' | 'ua';
 export type Account = { id: AccId; name: string; cur: Cur; opening: number; budget: number };
 /** amt is in the currency of its account (acc, 'dk' for records saved before accounts existed).
     xfer links the two halves of a transfer between accounts; transfers are not income or spending. */
-/** shift: id of the Wolt shift (activity) this income came from, so deleting the shift removes it too. */
 /** rec: id of the regular payment that created it, pot: id of the savings pot it feeds (a deposit leaves the account but is not spending). */
-export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; shift?: number; rec?: number; pot?: number; demo?: 1 };
+export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; rec?: number; pot?: number; demo?: 1 };
 /** A payment or income that repeats every month on `day` (29–31 means the last day of short months). from: first month it applies to ('YYYY-MM'). */
 export type Recurring = { id: number; name: string; type: 'in' | 'out'; amt: number; cat: string; acc: AccId; day: number; from: string; active: boolean };
 /** A savings pot. What is saved in it is worked out from the deposit records (Tx.pot), in kroner. */
@@ -114,8 +112,6 @@ export type State = {
   offDays?: Record<string, DayOff>;
   /** Daily goals for the body: glasses of water (default 8) and minutes of movement (default 30). */
   waterGoal?: number; moveGoal?: number;
-  /** Weekly earnings goal for Wolt, in kr. (0 or missing: no goal). */
-  woltGoal?: number;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;

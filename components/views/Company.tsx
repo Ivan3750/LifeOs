@@ -214,7 +214,7 @@ export function CoOverview() {
         <div className="card s6">
           <div className="ch"><Icon n="ads" className="ic" /><div><h3>Реклама цього місяця</h3><p>Скільки витрачено і що це дало</p></div><button className="sel" onClick={() => go('ads')}>Реклама</button></div>
           <div className="bigstat"><span className="v num">{money(ad.spend)}</span><span className="muted">{ad.leads} лідів · {ad.clients} клієнтів</span></div>
-          <div className="woltstats" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))', marginTop: 12 }}>
+          <div className="statgrid" style={{ gridTemplateColumns: 'repeat(3,minmax(0,1fr))', marginTop: 12 }}>
             <div><span>Ціна ліда</span><b className="num">{ad.cpl === null ? '—' : money(ad.cpl)}</b></div>
             <div><span>Ціна клієнта</span><b className="num">{ad.cac === null ? '—' : money(ad.cac)}</b></div>
             <div><span>Окупність</span><b className="num" style={{ color: roi === null ? undefined : roi >= 0 ? 'var(--good)' : 'var(--m1)' }}>{roi === null ? '—' : (roi >= 0 ? '+' : '') + Math.round(roi * 100) + '%'}</b></div>

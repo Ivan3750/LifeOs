@@ -7,7 +7,7 @@ import { quitOn } from './quit';
 import { socialOn } from './social';
 
 export const MOOD_TAGS = ['Радість', 'Спокій', 'Натхнення', 'Мотивація', 'Вдячність', 'Втома', 'Стрес', 'Тривога', 'Сум', 'Злість', 'Нудьга', 'Самотність'];
-export const ACT_KINDS = ['Wolt', 'Магазин', 'Дорога', 'Справи', 'Спорт', 'Готування', 'Прибирання', 'Відпочинок', 'Бізнес', 'Інше'];
+export const ACT_KINDS = ['Магазин', 'Дорога', 'Справи', 'Спорт', 'Готування', 'Прибирання', 'Відпочинок', 'Бізнес', 'Інше'];
 /** Energy is one of three levels, stored as 1, 3 or 5 so records from the older 1–5 scale still fit.
     level(): 0 not set, 1 low (1–2), 2 normal (3), 3 high (4–5). */
 export const ENERGY3 = [
@@ -170,9 +170,9 @@ export function dayScore(S: State, k: string, events: UiEvent[], sessions = S.se
   const dailyGoal = (S.goal * 60) / days;
   const fullTarget = Math.min(dailyGoal, ft.freeDay * 0.6);
   const target = fullTarget * (isToday && ft.freeDay ? ft.free / ft.freeDay : 1);
-  // everything that is work counts: focus, business and shifts on Wolt
-  const biz = bizMinutesOn(S, k), wolt = activityMinutesOn(S, k, 'Wolt'), done = ft.worked + biz + wolt;
-  const what = [`${Math.round(ft.worked)} хв фокусу`, biz >= 1 ? `${Math.round(biz)} хв бізнесу` : '', wolt >= 1 ? `${Math.round(wolt)} хв Wolt` : ''].filter(Boolean).join(' + ');
+  // everything that is work counts: focus and business
+  const biz = bizMinutesOn(S, k), done = ft.worked + biz;
+  const what = [`${Math.round(ft.worked)} хв фокусу`, biz >= 1 ? `${Math.round(biz)} хв бізнесу` : ''].filter(Boolean).join(' + ');
   // on a day without work what was done still counts, but 20 minutes already is a full mark
   if (!work && done < 1) skip('focus', 'Фокус і робота', `${quiet}, роботу не очікуємо`);
   else if (!work) add('focus', 'Фокус і робота', 20, done / 20, `${what} (${quiet}): що зроблено, те плюс, 20 хв уже повний бал`, 'work');

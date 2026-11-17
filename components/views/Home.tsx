@@ -373,7 +373,7 @@ function WeekSummary() {
   return (
     <div className="card s12">
       <div className="ch"><Icon n="trend" className="ic" /><div><h3>Тиждень у цифрах</h3><p>Останні 7 днів. Дні без записів і не робочі дні не псують середнє</p></div></div>
-      <div className="woltstats">{tiles.map(([l, v, sub]) => <div key={l}><span>{l}</span><b className="num">{v}</b><span style={{ marginTop: 2 }}>{sub}</span></div>)}</div>
+      <div className="statgrid">{tiles.map(([l, v, sub]) => <div key={l}><span>{l}</span><b className="num">{v}</b><span style={{ marginTop: 2 }}>{sub}</span></div>)}</div>
     </div>
   );
 }

@@ -154,34 +154,6 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
     dropEmptyNote(id: number) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id || x.title.trim() || x.text.trim()); }); },
     pinNote(id: number) { update(s => { const n = s.noteList.find(x => x.id === id); if (n) n.pinned = !n.pinned; }); },
     delNote(id: number, quiet = false) { update(s => { s.noteList = s.noteList.filter(x => x.id !== id); }); if (!quiet) toast('Нотатку видалено'); },
-    /** Ends the running Wolt shift with what it brought: the money becomes an income record on the Danish account. */
-    finishShift(v: { earned: number; orders: number; km: number }) {
-      const a = getS().act; if (!a) return;
-      const end = Date.now(), m = Math.round((end - a.start) / 6e4);
-      update(s => {
-        if (m >= 1) {
-          const id = s.nextId++;
-          s.activities.push({ id, ...a, end, ...(v.orders > 0 ? { orders: v.orders } : {}), ...(v.earned > 0 ? { earned: v.earned } : {}), ...(v.km > 0 ? { km: v.km } : {}) });
-          if (v.earned > 0) s.money.tx.push({ id: s.nextId++, type: 'in', amt: v.earned, cat: 'Wolt', note: `Зміна ${Math.floor(m / 60)} год ${m % 60} хв${v.orders ? `, ${v.orders} замовл.` : ''}`, date: ymd(new Date(end)), acc: 'dk', shift: id });
-        }
-        s.act = null;
-      });
-      toast(m >= 1 ? `Зміну записано: ${Math.floor(m / 60)} год ${m % 60} хв${v.earned ? ' · ' + fmtCur(v.earned, 'DKK') : ''}` : 'Менше хвилини, не записано');
-    },
-    /** A shift that was not timed: when it was and what it brought. */
-    addShift(v: { start: number; end: number; earned: number; orders: number; km: number }) {
-      if (v.end <= v.start) { toast('Кінець має бути пізніше за початок'); return false; }
-      update(s => {
-        const id = s.nextId++;
-        s.activities.push({ id, kind: 'Wolt', title: 'Зміна', start: v.start, end: v.end, ...(v.orders > 0 ? { orders: v.orders } : {}), ...(v.earned > 0 ? { earned: v.earned } : {}), ...(v.km > 0 ? { km: v.km } : {}) });
-        s.activities.sort((a, b) => a.start - b.start);
-        if (v.earned > 0) s.money.tx.push({ id: s.nextId++, type: 'in', amt: v.earned, cat: 'Wolt', note: `Зміна${v.orders ? `, ${v.orders} замовл.` : ''}`, date: ymd(new Date(v.end)), acc: 'dk', shift: id });
-      });
-      toast('Зміну додано'); return true;
-    },
-    /** Deletes a shift together with the income it recorded. */
-    delShift(id: number) { del(s => { s.activities = s.activities.filter(x => x.id !== id); s.money.tx = s.money.tx.filter(x => x.shift !== id); }, 'Зміну видалено'); },
-    setWoltGoal(n: number) { update(s => { s.woltGoal = Math.max(0, Math.round(n)); }); },
     startAct(kind: string, title: string) { update(s => { s.act = { kind, title: title.trim(), start: Date.now() }; }); },
     /** Saves the running activity; runs shorter than a minute are dropped. */
     stopAct() {

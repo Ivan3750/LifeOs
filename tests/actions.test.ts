@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { makeActions } from '@/lib/actions';
 import { makeState } from '@/lib/seed';
 import { goalProgress } from '@/lib/goals';
-import { dailyEarnings, hoursToGoal, woltStats } from '@/lib/wolt';
 import type { State } from '@/lib/types';
 import { ymd } from '@/lib/util';
 
@@ -32,42 +31,6 @@ describe('company chain', () => {
     A.invoiceProject(9); A.invoiceProject(9);
     expect(S.co.invoices).toHaveLength(1);
     expect(S.co.invoices[0]).toMatchObject({ project: 9, amt: 800 });
-  });
-});
-
-describe('wolt', () => {
-  it('a finished shift writes the shift and its income; deleting the shift removes both', () => {
-    const { S, A } = setup();
-    S.act = { kind: 'Wolt', title: 'Зміна', start: Date.now() - 3 * 36e5 };
-    A.finishShift({ earned: 420, orders: 9, km: 31 });
-    expect(S.act).toBeNull();
-    const shift = S.activities[0];
-    expect(shift).toMatchObject({ kind: 'Wolt', orders: 9, earned: 420, km: 31 });
-    expect(S.money.tx).toHaveLength(1);
-    expect(S.money.tx[0]).toMatchObject({ type: 'in', cat: 'Wolt', amt: 420, shift: shift.id });
-    const st = woltStats(S, 0);
-    expect(st.orders).toBe(9);
-    expect(st.earned).toBe(420);
-    expect(Math.round(st.perHour)).toBe(140);
-    expect(Math.round(st.perOrder)).toBe(47);
-    A.delShift(shift.id);
-    expect(S.activities).toHaveLength(0);
-    expect(S.money.tx).toHaveLength(0);
-  });
-  it('adds a past shift and shows it in the daily bars', () => {
-    const { S, A } = setup();
-    const start = new Date(); start.setHours(10, 0, 0, 0);
-    expect(A.addShift({ start: +start, end: +start + 2 * 36e5, earned: 200, orders: 4, km: 0 })).toBe(true);
-    const today = dailyEarnings(S, 3).at(-1)!;
-    expect(today.d).toBe(ymd(new Date()));
-    expect(today.earned).toBe(200);
-    expect(today.hours).toBeCloseTo(2);
-    expect(A.addShift({ start: +start, end: +start, earned: 1, orders: 0, km: 0 })).toBe(false);
-  });
-  it('estimates the hours left to a goal', () => {
-    expect(hoursToGoal(1000, 400, 100)).toBe(6);
-    expect(hoursToGoal(1000, 1200, 100)).toBe(0);
-    expect(hoursToGoal(1000, 400, 0)).toBe(0);
   });
 });
 
