@@ -1,5 +1,5 @@
 import { catOf, learn, unlearn } from './timeuse';
-import type { AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
+import type { Task, AccId, Account, AdSpend, Client, Recurring, DayOff, Deal, Goal, HealthField, Invoice, Lead, LeadStatus, Meal, Member, OffKind, Project, State, Tx } from './types';
 import { XFER_CAT, account, fmtCur, pendingRecurring, potSaved, recDate, shiftMk, toDKK } from './money';
 import { addD, AREAS, money, STAGES, TK, toMin, wStart, ymd } from './util';
 import type { Machine, Need, NeedLog, Person, Place, Review } from './types';
@@ -26,7 +26,7 @@ export type ActionDeps = {
 export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
   const hday = (s: State, k = TK()) => s.health[k] || (s.health[k] = { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0 });
   const LIM: Record<HealthField, [number, number]> = { water: [0, 20], sleep: [0, 16], steps: [0, 80000], workout: [0, 600], weight: [0, 350], mood: [0, 5] };
-  function addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number, due?: string) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}), ...(due ? { due } : {}) }); }); toast('Задачу додано'); }
+  function addTask(text: string, p: 'hi' | 'lo' = 'lo', goal?: number, due?: string, rep?: Task['rep']) { text = text.trim(); if (!text) return; update(s => { s.tasks.unshift({ id: s.nextId++, t: text, p, d: false, ...(goal ? { goal } : {}), ...(due ? { due } : {}), ...(rep ? { rep, due: due || TK() } : {}) }); }); toast(rep ? 'Повторювану задачу додано' : 'Задачу додано'); }
   return {
     setH(f: HealthField, v: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(v * 10) / 10)); delete h.demo; }); },
     addH(f: HealthField, d: number, k = TK()) { update(s => { const h = hday(s, k); const [a, b] = LIM[f]; h[f] = Math.max(a, Math.min(b, Math.round(((h[f] || 0) + d) * 10) / 10)); delete h.demo; }); },
@@ -44,7 +44,35 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       });
       toast('Задачу оновлено');
     },
-    toggleTask(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; t.d = !t.d; if (t.d) { t.doneAt = Date.now(); if (s.timer.task === t.t) s.timer.task = ''; } else delete t.doneAt; }); },
+    toggleTask(id: number) {
+      update(s => {
+        const t = s.tasks.find(x => x.id === id); if (!t) return;
+        t.d = !t.d;
+        if (t.d) {
+          t.doneAt = Date.now(); if (s.timer.task === t.t) s.timer.task = '';
+          // a repeating task comes back: the next one is due a day, a week or a month after this one (never in the past)
+          if (t.rep) {
+            const from = new Date((t.due && t.due > TK() ? t.due : TK()) + 'T00:00');
+            if (t.rep === 'month') from.setMonth(from.getMonth() + 1); else from.setDate(from.getDate() + (t.rep === 'week' ? 7 : 1));
+            s.tasks.unshift({ id: s.nextId++, t: t.t, p: t.p, d: false, rep: t.rep, due: ymd(from), ...(t.goal ? { goal: t.goal } : {}) });
+          }
+        } else delete t.doneAt;
+      });
+    },
+    /** Moves everything that is late to today, without a word of blame. */
+    moveOverdueToToday() { update(s => { for (const t of s.tasks) if (!t.d && t.due && t.due < TK()) t.due = TK(); }); toast('Прострочене перенесено на сьогодні'); },
+    /** A note becomes a task: its title, or its first line. */
+    noteToTask(id: number) {
+      const n = getS().noteList.find(x => x.id === id); if (!n) return false;
+      const text = (n.title.trim() || n.text.trim().split('\n')[0]).slice(0, 120); if (!text) return false;
+      addTask(text); return true;
+    },
+    /** An affirmation was read aloud today. Three different ones make the morning ritual. */
+    readAff(text: string, k = TK()) { update(s => { const a = (s.aff ||= { own: [], fav: [], read: {} }); const l = (a.read[k] ||= []); if (!l.includes(text)) l.push(text); for (const d of Object.keys(a.read).sort().slice(0, -60)) delete a.read[d]; }); },
+    toggleAffFav(text: string) { update(s => { const a = (s.aff ||= { own: [], fav: [], read: {} }); a.fav = a.fav.includes(text) ? a.fav.filter(x => x !== text) : [...a.fav, text]; }); },
+    addAffOwn(text: string) { text = text.trim().slice(0, 240); if (!text) return false; update(s => { const a = (s.aff ||= { own: [], fav: [], read: {} }); if (!a.own.includes(text)) a.own.push(text); }); toast('Твою афірмацію додано'); return true; },
+    delAffOwn(text: string) { update(s => { const a = s.aff; if (a) { a.own = a.own.filter(x => x !== text); a.fav = a.fav.filter(x => x !== text); } }); },
+    setBadCost(id: number, kr: number) { update(s => { const h = s.badHabits.find(x => x.id === id); if (!h) return; if (kr > 0) h.cost = Math.min(100000, Math.round(kr)); else delete h.cost; }); },
     togglePriority(id: number) { update(s => { const t = s.tasks.find(x => x.id === id); if (t) { t.p = t.p === 'hi' ? 'lo' : 'hi'; delete t.demo; } }); },
     setTaskDue(id: number, due?: string) { update(s => { const t = s.tasks.find(x => x.id === id); if (!t) return; if (due) t.due = due; else delete t.due; }); },
     /** Removes every finished task in one go (can be undone). */

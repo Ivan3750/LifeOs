@@ -27,6 +27,7 @@ export function stepsOn(S: State, k: string, worked = 0): { total: number; parts
   put('water', 'Вода', h && h.water >= waterGoal(S) ? 1 : 0, 'health');
   put('mood', 'Настрій записано', moodsOn(S, k).length ? 1 : 0, 'health');
   put('sleep', 'Сон записано', h && (h.bed || h.wake || h.sleep) ? 1 : 0, 'health');
+  put('aff', 'Афірмації', (S.aff?.read?.[k]?.length ?? 0) >= 3 ? 1 : 0, 'home');
   put('goal', 'Цілі', S.machines.reduce((a, m) => a + m.log.filter(l => l.date === k).reduce((b, l) => b + l.leads + l.clients, 0), 0), 'machine');
   return { total: parts.reduce((a, p) => a + p.n, 0), parts };
 }

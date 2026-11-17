@@ -7,7 +7,6 @@ import { Home } from './views/Home';
 import { Focus } from './views/Focus';
 import { TimePage } from './views/Time';
 import { CoachPage } from './views/Coach';
-import { QuitPage } from './views/Quit';
 import { Goals } from './views/Goals';
 import { Habits } from './views/Habits';
 import { Health } from './views/Health';
@@ -19,14 +18,13 @@ import { Ads, Clients, CoOverview, Deals, Invoices, Leads, Projects, Team } from
 import { Prefs } from './views/Prefs';
 import { Needs } from './views/Needs';
 import { Plan } from './views/Plan';
-import { People } from './views/People';
 import { Machine } from './views/Machine';
 import { Review } from './views/Review';
 
 const VIEW_COMPONENTS: Record<string, () => React.JSX.Element> = {
-  home: Home, focus: Focus, time: TimePage, coach: CoachPage, quit: QuitPage, tasks: Tasks, habits: Habits, health: Health, money: Money, goals: Goals,
+  home: Home, focus: Focus, time: TimePage, coach: CoachPage, tasks: Tasks, habits: Habits, health: Health, money: Money, goals: Goals,
   schedule: Schedule, notes: Notes, prefs: Prefs,
-  needs: Needs, plan: Plan, people: People, machine: Machine, review: Review,
+  needs: Needs, plan: Plan, machine: Machine, review: Review,
   co: CoOverview, leads: Leads, clients: Clients, ads: Ads, deals: Deals, projects: Projects, invoices: Invoices, team: Team,
 };
 

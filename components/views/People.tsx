@@ -73,14 +73,14 @@ function PlaceRow({ p }: { p: Place }) {
   );
 }
 
-/** People and places: who is in your life, when you last talked and what is next; clubs and communities with the day you were there or go. */
-export function People() {
+/** People and places: who is in your life, when you last talked and what is next; clubs and communities with the day you were there or go. It opens as a window from the home page and the daily minimum. */
+export function PeopleBody() {
   const { S, A } = useStore();
   const [f, setF] = useState({ name: '', kind: 'friend' as Person['kind'], every: '14', last: '' });
   const [pl, setPl] = useState({ name: '', what: '', url: '', going: '' });
   const ranked = [...S.people].sort((a, b) => overdue(S, b) - overdue(S, a) || a.name.localeCompare(b.name));
   return (
-    <section className="view">
+    <section className="peoplesheet">
       <div className="grid">
         <div className="card s7">
           <div className="ch"><Icon n="team" className="ic" /><div><h3>Люди</h3><p>Хто в тебе є, коли востаннє спілкувались і що далі. Найдовше без зв’язку: зверху</p></div></div>

@@ -24,10 +24,11 @@ function TaskRow({ t, minutes }: { t: Task; minutes: number }) {
       <button className="chk" role="checkbox" aria-checked={t.d} aria-label={t.d ? `Повернути в роботу: ${t.t}` : `Виконано: ${t.t}`} onClick={() => A.toggleTask(t.id)}>{t.d && <Icon n="check" />}</button>
       <div className="tmain">
         <button className="t" onClick={edit} title="Змінити задачу">{t.t}{t.p === 'hi' && !t.d && <span className="tstar" title="Важлива"><Icon n="star" /></span>}</button>
-        {(t.due || goal || minutes > 0) && (
+        {(t.due || goal || minutes > 0 || t.rep) && (
           <div className="tmeta">
             {t.due && <span className={`tm due ${t.d ? '' : st}`}><Icon n="schedule" />{dueLabel(t.due)}</span>}
             {goal && <button className="tm goal" title="Ця задача веде до цілі" onClick={() => go('goals')}><Icon n="goals" />{goal.title}</button>}
+            {t.rep && <span className="tm"><Icon n="refresh" />{t.rep === 'day' ? 'щодня' : t.rep === 'week' ? 'щотижня' : 'щомісяця'}</span>}
             {minutes > 0 && <span className="tm"><Icon n="focus" />{hmPlain(minutes)}</span>}
             {late && <button className="tm act" onClick={() => A.setTaskDue(t.id, TK())}>перенести на сьогодні</button>}
           </div>
@@ -50,6 +51,7 @@ export function Tasks() {
   const [hi, setHi] = useState(false);
   const [due, setDue] = useState('');
   const [goal, setGoal] = useState('');
+  const [rep, setRep] = useState<'' | 'day' | 'week' | 'month'>('');
 
   const today = TK(), t0 = sod(new Date()).getTime();
   const spent = useMemo(() => focusByTask(S), [S]);
@@ -71,8 +73,8 @@ export function Tasks() {
     e.preventDefault();
     const q = parseTask(text);
     if (!q.t) return;
-    A.addTask(q.t, hi || goal ? 'hi' : q.p, +goal || undefined, due || q.due);
-    setText(''); setDue(''); setHi(false);
+    A.addTask(q.t, hi || goal ? 'hi' : q.p, +goal || undefined, due || q.due, rep || undefined);
+    setText(''); setDue(''); setHi(false); setRep('');
   };
 
   const rows = (list: Task[]) => list.map(t => <TaskRow key={t.id} t={t} minutes={spent.get(t.t) || 0} />);
@@ -101,6 +103,9 @@ export function Tasks() {
           </div>
           <div className="addopts">
             <label className="field" htmlFor="taskDue">Термін<input id="taskDue" type="date" value={due} min={today} onChange={e => setDue(e.target.value)} /></label>
+            <label className="field" htmlFor="taskRep">Повторювати
+              <select id="taskRep" value={rep} onChange={e => setRep(e.target.value as typeof rep)}><option value="">Ні</option><option value="day">Щодня</option><option value="week">Щотижня</option><option value="month">Щомісяця</option></select>
+            </label>
             {S.goals.length > 0 && (
               <label className="field" htmlFor="taskGoal">Для цілі
                 <select id="taskGoal" value={goal} onChange={e => setGoal(e.target.value)}><option value="">Без цілі</option>{S.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select>
@@ -132,7 +137,7 @@ export function Tasks() {
               {hasDates
                 ? GROUPS.map(([k, label]) => {
                     const g = openPart.filter(t => dueState(t.due) === k);
-                    return g.length ? <div key={k} className="tgroup"><h4 className={k === 'overdue' ? 'late' : undefined}>{label}<span className="cnt">{g.length}</span></h4><div className="list">{rows(g)}</div></div> : null;
+                    return g.length ? <div key={k} className="tgroup"><h4 className={k === 'overdue' ? 'late' : undefined}>{label}<span className="cnt">{g.length}</span>{k === 'overdue' && <button className="linkbtn" style={{ marginLeft: 'auto' }} onClick={() => A.moveOverdueToToday()}>Усе на сьогодні</button>}</h4><div className="list">{rows(g)}</div></div> : null;
                   })
                 : openPart.length > 0 && <div className="list">{rows(openPart)}</div>}
               {f === 'all' && donePart.length > 0 && <div className="tgroup"><h4>Виконані<span className="cnt">{donePart.length}</span></h4><div className="list">{rows(donePart)}</div></div>}

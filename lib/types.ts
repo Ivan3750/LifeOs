@@ -2,7 +2,8 @@
 export type Session = { t: number; m: number; task?: string; demo?: 1 };
 /** goal: id of the goal this task moves forward. */
 /** due: date to finish by ('YYYY-MM-DD'), doneAt: when it was ticked off. */
-export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; due?: string; doneAt?: number; demo?: 1 };
+/** rep: the task comes back by itself when it is done (every day, week or month). */
+export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; due?: string; rep?: 'day' | 'week' | 'month'; doneAt?: number; demo?: 1 };
 /** need: id of the need this event was planned for (a slot made by the week planner); ok: it was done, and the need got its mark. */
 export type LocalEvent = { id: number; date: string; s: string; e: string; title: string; c: string; need?: number; ok?: 1; demo?: 1 };
 export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 1 };
@@ -63,7 +64,8 @@ export type Meal = { key: 'breakfast' | 'lunch' | 'dinner'; label: string; s: st
 export type SocialEntry = { id: number; date: string; platform: string; min: number; why?: string; cmp?: 1; demo?: 1 };
 /** A habit to quit. start: when the current clean streak began; best: the longest streak that was ended by a slip; slips: when it went wrong.
     A slip restarts the streak but the best streak and the total of clean days stay, so progress is never lost. */
-export type BadHabit = { id: number; name: string; start: number; best: number; slips: number[]; demo?: 1 };
+/** cost: what the habit cost per day (kr.), so the clean days can be shown as money kept. */
+export type BadHabit = { id: number; name: string; start: number; best: number; slips: number[]; cost?: number; demo?: 1 };
 /** A craving for a bad habit. trigger: what set it off (boredom, stress, social media…), outcome: held on or slipped, tool: what helped (exercise, breathing, game). */
 export type Craving = { id: number; t: number; habit: number; trigger: string; outcome: 'resisted' | 'slipped'; tool?: string; demo?: 1 };
 export type Mode = 'me' | 'co';
@@ -128,6 +130,8 @@ export type State = {
   icalUrls: string[];
   /** Personal touches: a line that is shown on the home screen instead of the general quotes, and the accent colour of the app (a key of ACCENTS). */
   motto?: string; accent?: string;
+  /** Affirmations: the person's own lines, the favourites, and what was read aloud each day (a day with three read counts as a step). */
+  aff?: { own: string[]; fav: string[]; read: Record<string, string[]> };
   /** Events of subscribed calendars that are hidden on this site only (the calendar itself is not touched). Keys are an occurrence id or a whole series id. */
   hiddenExt?: Record<string, 1>;
   /** What the events mean. evCats: exact (normalised) title → category; evWords: word stem → category → how often it was chosen. The app learns from both. */

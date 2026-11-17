@@ -7,6 +7,7 @@ import { planWeek } from '@/lib/planner';
 import { suggestPerson } from '@/lib/people';
 import { addD, plural, TK, wStart } from '@/lib/util';
 import { Icon } from './Icon';
+import { Burst } from './Burst';
 
 /** The needs of the week `off` weeks from this one (0 this, 1 next, -1 last), and the plan for it when `withPlan` is set. */
 export function useWeek(off: number, withPlan = false) {
@@ -82,6 +83,7 @@ export function DailyCard({ cls = 's7' }: { cls?: string }) {
         <Icon n="flag" className="ic" />
         <div><h3>Мінімум на сьогодні</h3><p>{done === 3 ? 'Мінімум виконано. Решта вже бонус' : 'Три речі, кожна в один дотик'}</p></div>
         <span className="muted num" style={{ marginLeft: 'auto', fontSize: 13 }}>{done}/3</span>
+        {done === 3 && <Burst />}
       </div>
       <div className="list">
         <div className={`item${st.move ? ' done' : ''}`}>
@@ -131,5 +133,24 @@ export function WeekReviewPrompt() {
         <button className="btn acc sm" style={{ marginLeft: 'auto' }} onClick={() => go('review')}>Почати</button>
       </div>
     </div>
+  );
+}
+
+/** The quick sheet «what was it?»: every need as one tap, the hungriest first. */
+export function MarkBody({ close }: { close: () => void }) {
+  const { A } = useStore();
+  const { stats } = useNeeds();
+  return (
+    <>
+      <div className="markgrid">
+        {stats.map(st => (
+          <button key={st.need.id} className={`mark hg ${st.status}`} onClick={() => { A.logNeed(st.need.id); close(); }}>
+            <span className="ndot" aria-hidden="true" /><b>{st.need.name}</b><small className="num">{st.done}/{st.need.weekly}</small>
+          </button>
+        ))}
+      </div>
+      {!stats.length && <p className="muted">Потреб немає. Увімкни їх у розділі «Цілі → Ритм тижня».</p>}
+      <p className="muted" style={{ fontSize: 12, margin: '14px 0 0' }}>Одним дотиком: відмічу сьогодні. Скасувати можна в «Ритмі тижня».</p>
+    </>
   );
 }

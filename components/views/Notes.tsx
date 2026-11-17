@@ -30,6 +30,7 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
       <div className="row" style={{ gap: 8 }}>
         <button className="btn ghost noteback" onClick={onBack}><Icon n="left" />Усі нотатки</button>
         <span className="muted" style={{ fontSize: 12, marginLeft: 'auto' }}>{saved || `Змінено ${noteDate(note.updated)}`}</span>
+        <button className="btn ghost sm" title="Зробити задачею" onClick={() => A.noteToTask(note.id)}><Icon n="tasks" />В задачу</button>
         <button className="x" title={note.pinned ? 'Відкріпити' : 'Закріпити вгорі'} aria-pressed={!!note.pinned} aria-label="Закріпити нотатку" style={note.pinned ? { color: 'var(--accent)', opacity: 1 } : undefined} onClick={() => A.pinNote(note.id)}><Icon n="pin" /></button>
         <DelBtn label="Видалити нотатку" onDelete={() => { dirty.current = false; A.delNote(note.id); onBack(); }} />
       </div>

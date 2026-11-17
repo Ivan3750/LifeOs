@@ -10,6 +10,8 @@ import { AD_CHANNELS, addD, CATS, COLORS, LEAD_SOURCES, LEAD_STATUS, STAGES, TK,
 import { Icon, type IconName } from './Icon';
 import { ModeSeg } from './Shell';
 import { SosBody } from './Sos';
+import { PeopleBody } from './views/People';
+import { MarkBody } from './needs';
 
 type Field = { k: string; label: string; type?: 'text' | 'number' | 'date' | 'time' | 'select' | 'textarea' | 'hidden'; req?: boolean; half?: boolean; ph?: string; val?: string; opts?: readonly (readonly [string, string])[] };
 /** del: shown as a two-click «Видалити» button in edit forms. */
@@ -47,7 +49,7 @@ function forms(st: Store): Record<string, FormSpec> {
 }
 
 const QA: Record<'me' | 'co', [string, string, IconName][]> = {
-  me: [['task', 'Задача', 'tasks'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['habit', 'Звичка', 'habits'], ['social', 'Соцмережі', 'wave'], ['sos', 'SOS потяг', 'alert'], ['note', 'Нотатка', 'notes']],
+  me: [['mark', 'Потреба: було', 'needs'], ['task', 'Задача', 'tasks'], ['people', 'Люди й клуби', 'team'], ['out', 'Витрата', 'money'], ['in', 'Дохід', 'money'], ['event', 'Подія', 'schedule'], ['habit', 'Звичка', 'habits'], ['social', 'Соцмережі', 'wave'], ['sos', 'SOS потяг', 'alert'], ['note', 'Нотатка', 'notes']],
   co: [['lead', 'Лід', 'leads'], ['client', 'Клієнт', 'user'], ['ad', 'Реклама', 'ads'], ['deal', 'Угода', 'deals'], ['invoice', 'Рахунок', 'invoice'], ['project', 'Проєкт', 'projects'], ['task', 'Задача', 'tasks'], ['event', 'Подія', 'schedule'], ['member', 'Учасник', 'team']],
 };
 
@@ -101,7 +103,7 @@ export function SheetHost() {
         <div className="qa-grid">
           {QA[m].map(([k, l, i]) => (
             <button key={k} onClick={() => {
-              setSheet(k === 'sos' ? { kind: 'sos' } : { kind: 'form', key: k });
+              setSheet(k === 'sos' ? { kind: 'sos' } : k === 'mark' ? { kind: 'mark' } : k === 'people' ? { kind: 'people' } : { kind: 'form', key: k });
             }}><Icon n={i} className="ic" />{l}</button>
           ))}
         </div>
@@ -118,6 +120,12 @@ export function SheetHost() {
         </div>
       </>
     );
+  } else if (sheet.kind === 'mark') {
+    title = 'Що було?';
+    body = <MarkBody close={close} />;
+  } else if (sheet.kind === 'people') {
+    title = 'Люди й клуби';
+    body = <PeopleBody />;
   } else if (sheet.kind === 'sos') {
     title = 'SOS: сильний потяг';
     body = <SosBody close={close} habit={sheet.habit} />;
@@ -131,7 +139,7 @@ export function SheetHost() {
   }
   return (
     <div className="sheet" onClick={e => { if (e.target === e.currentTarget) close(); }}>
-      <div className="sheet-p" role="dialog" aria-modal="true" aria-labelledby="sheetT">
+      <div className={`sheet-p${sheet.kind === 'people' ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby="sheetT">
         <div className="sheet-h"><b id="sheetT">{title}</b><button className="iconbtn sm" onClick={close} aria-label="Закрити"><Icon n="x" /></button></div>
         {body}
       </div>

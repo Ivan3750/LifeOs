@@ -1,4 +1,3 @@
-import type { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { isAuthed, unauthorized } from '@/lib/server/auth';
 import { db, dbConfigured, dbError } from '@/lib/server/db';
 
@@ -13,10 +12,10 @@ function parse(text: string) {
   try { const v = JSON.parse(text); return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch { return null; }
 }
 
-type Row = RowDataPacket & { data: string; version: number; updated_at: Date };
+type Row = { data: string; version: number; updated_at: Date };
 
 async function current() {
-  const [rows] = await (await db()).query<Row[]>('SELECT data, version, updated_at FROM pulse_state WHERE id = ?', [ID]);
+  const { rows } = await (await db()).query<Row>('SELECT data, version, updated_at FROM pulse_state WHERE id = $1', [ID]);
   return rows[0] || null;
 }
 
@@ -49,10 +48,11 @@ export async function PUT(req: Request) {
   const base = Number(body.baseVersion) || 0;
   try {
     const pool = await db();
-    const [res] = base === 0
-      ? await pool.query<ResultSetHeader>('INSERT IGNORE INTO pulse_state (id, data, version) VALUES (?, ?, 1)', [ID, text])
-      : await pool.query<ResultSetHeader>('UPDATE pulse_state SET data = ?, version = version + 1 WHERE id = ? AND version = ?', [text, ID, base]);
-    if (res.affectedRows === 0) {
+    // the first save creates the row; later ones only succeed if nobody saved in between
+    const res = base === 0
+      ? await pool.query('INSERT INTO pulse_state (id, data, version) VALUES ($1, $2, 1) ON CONFLICT (id) DO NOTHING', [ID, text])
+      : await pool.query('UPDATE pulse_state SET data = $1, version = version + 1, updated_at = now() WHERE id = $2 AND version = $3', [text, ID, base]);
+    if (!res.rowCount) {
       const row = await current();
       return Response.json({ error: 'conflict', version: row?.version ?? 0, data: row ? parse(row.data) : null }, { status: 409 });
     }
