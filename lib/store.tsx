@@ -209,7 +209,7 @@ function useStoreValue(dbOn: boolean) {
   }, [saveLocal]);
 
   /* ---------- server sync ----------
-     The whole state is one JSON document in MySQL with a version number.
+     The whole state is one JSON document in PostgreSQL with a version number.
      Local changes are saved after a short pause. A save based on an old version is refused by the server (409);
      then the changes of both devices are merged (see merge.ts) and saved again. */
   const [sync, setSync] = useState<SyncStatus>({ state: dbOn ? 'syncing' : 'local' });
