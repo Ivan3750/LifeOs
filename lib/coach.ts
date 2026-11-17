@@ -5,14 +5,15 @@ import { socialGoal, socialOn, socialPeriod } from './social';
 import { classify } from './timeuse';
 import { cravingStats, nextMilestone, streakDays, TRIGGERS } from './quit';
 import { goalProgress } from './goals';
-import { addD, hmPlain, plural, sod, toMin, ymd } from './util';
+import { budgetDKK, fmtCur, monthOf, txDKK } from './money';
+import { addD, daysInMonth, hmPlain, plural, sod, toMin, ymd } from './util';
 
 /* The advice system. Every day becomes a row of numbers from all parts of the app (sleep, bedtime, mood, tasks, focus, habits, social media,
    events, goals, business…). A curated list of «this → that» pairs is tested on the person's own days: is there a clear trend in the expected
    direction? Links that hold are joined into chains (short sleep → slower tasks → later bedtime → worse mood tomorrow). Today's state is then
    matched against them to say what to do and why. Besides this, plain rules watch deadlines, overdue things, pace and balance. */
 
-export type Metric = 'sleep' | 'bedTonight' | 'mood' | 'energy' | 'stress' | 'focus' | 'taskPace' | 'tasks' | 'habits' | 'water' | 'workout' | 'social' | 'lateWork' | 'goalMin' | 'load' | 'people';
+export type Metric = 'sleep' | 'bedTonight' | 'mood' | 'energy' | 'stress' | 'focus' | 'taskPace' | 'tasks' | 'habits' | 'water' | 'workout' | 'social' | 'lateWork' | 'goalMin' | 'bizMin' | 'load' | 'people' | 'spend';
 export type Row = { k: string } & Record<Metric, number | null>;
 export type Area = 'Сон і тіло' | 'Настрій' | 'Робота й бізнес' | 'Цілі й розвиток' | 'Увага й час' | 'Гроші' | 'Люди';
 
@@ -37,8 +38,10 @@ export const METRICS: Record<Metric, { name: string; fmt: (v: number) => string;
   social: { name: 'соцмережі', fmt: min, better: -1, area: 'Увага й час' },
   lateWork: { name: 'робота пізно ввечері', fmt: min, better: -1, area: 'Увага й час' },
   goalMin: { name: 'час на цілі', fmt: min, better: 1, area: 'Цілі й розвиток' },
+  bizMin: { name: 'час на бізнес', fmt: min, better: 1, area: 'Робота й бізнес' },
   load: { name: 'зайнятість подіями', fmt: min, better: -1, area: 'Увага й час' },
   people: { name: 'живе спілкування', fmt: min, better: 1, area: 'Люди' },
+  spend: { name: 'витрати', fmt: v => `${Math.round(v)} kr.`, better: -1, area: 'Гроші' },
 };
 
 /** The last `days` days. Totals are null before the first record of that kind, so days before tracking are not counted as zeros.
@@ -53,10 +56,13 @@ export function coachRows(S: State, eventsOn: (k: string) => UiEvent[], days = 6
   const late = new Map<string, number>();
   const addLate = (a: number, b: number) => { const d0 = sod(a).getTime(), from = d0 + (21 * 60 + 30) * 6e4; const m = Math.max(0, Math.min(b, d0 + 864e5) - Math.max(a, from)) / 6e4; if (m > 0) late.set(day(a), (late.get(day(a)) || 0) + m); };
   S.sessions.forEach(s => addLate(s.t, s.t + s.m * 6e4));
+  S.activities.filter(a => a.kind === 'Бізнес').forEach(a => addLate(a.start, a.end));
+  const bizAct = by(S.activities.filter(a => a.kind === 'Бізнес'), a => day(a.start), a => (a.end - a.start) / 6e4);
   const tasks = by(S.tasks.filter(t => t.d && t.doneAt), t => day(t.doneAt!), () => 1);
+  const spend = by(S.money.tx.filter(t => t.type === 'out' && !t.xfer && !t.pot), t => t.date, t => txDKK(S, t));
   const habitDays = by(S.habits.flatMap(h => Object.keys(h.days)), d => d, () => 1);
   const first = (m: Map<string, number>) => [...m.keys()].sort()[0] ?? '9999';
-  const f = { focus: first(focus), tasks: first(tasks), habits: first(habitDays) };
+  const f = { focus: first(focus), tasks: first(tasks), spend: first(spend), habits: first(habitDays) };
   const rows = keys.map(k => {
     const h = S.health[k], ms = moodsOn(S, k), en = ms.filter(m => m.energy > 0).map(m => energyLevel(m.energy) as number);
     const evs = eventsOn(k).filter(e => e.act === undefined && e.nap === undefined && !e.allDay);
@@ -69,8 +75,10 @@ export function coachRows(S: State, eventsOn: (k: string) => UiEvent[], days = 6
       focus: fo, tasks: tk, taskPace: fo && tk ? fo / tk : null, water: h && h.water > 0 ? h.water : null, workout: h ? h.workout : null,
       habits: S.habits.length && k >= f.habits ? (habitDays.get(k) || 0) / S.habits.length : null,
       social: so, lateWork: fo !== null ? late.get(k) || 0 : null, goalMin: fo !== null ? goalMin.get(k) || 0 : null,
+      bizMin: S.co.deals.length + S.co.invoices.length > 0 || S.activities.some(a => a.kind === 'Бізнес') ? (bizAct.get(k) || 0) + evs.filter(e => classify(S, e.title).cat === 'biz').reduce((a, e) => a + evMin(e), 0) : null,
       load: evs.length ? evs.reduce((a, e) => a + evMin(e), 0) : (S.events.length || k < ymd(now) ? 0 : null),
       people: evs.filter(e => classify(S, e.title).cat === 'people').reduce((a, e) => a + evMin(e), 0) || (S.events.length ? 0 : null),
+      spend: total(spend, f.spend),
     } as Row;
   });
   // the bedtime that follows a day is logged on the next one
@@ -117,6 +125,7 @@ const PAIRS: Pair[] = [
   { d: 'stress', o: 'sleep', lag: 1, h: -1, why: 'Стрес підвищує кортизол увечері, і заснути важче.', fix: 'У дні зі стресом зроби розвантаження: прогулянка, дихання, запис думок.' },
   { d: 'stress', o: 'focus', lag: 0, h: -1, why: 'Тривога займає робочу памʼять, тому на задачу лишається менше уваги.', fix: 'Запиши, що тривожить, і виділи на це 10 хвилин, а потім повертайся до роботи.' },
   { d: 'mood', o: 'focus', lag: 1, h: 1, why: 'Поганий настрій вчора зазвичай означає менше сил на складне сьогодні.', fix: 'Після важкого дня став на ранок одну просту задачу, щоб розігнатися.' },
+  { d: 'spend', o: 'mood', lag: 1, h: -1, why: 'Імпульсні витрати часто йдуть за поганим самопочуттям і потім додають тривоги.', fix: 'Коли хочеться купити «щоб розрадитись», зачекай добу.' },
 ];
 
 export type Link = {
@@ -290,9 +299,9 @@ export function coach(S: State, eventsOn: (k: string) => UiEvent[], now = new Da
 
   /* ---- work, tasks, goals ---- */
   const late = S.tasks.filter(x => !x.d && x.due && x.due < today);
-  if (late.length) add({ id: 'overdue', area: 'Робота й бізнес', tone: 'info', weight: 80, title: `${late.length} ${plural(late.length, 'задача', 'задачі', 'задач')} з минулих днів`,
-    facts: late.slice(0, 3).map(x => x.t), why: 'Відкриті справи тихо забирають увагу, навіть коли ти про них не думаєш.',
-    action: 'Для кожної вибери: зробити сьогодні, перенести або прибрати. Почни з найменшої.', to: 'tasks' });
+  if (late.length) add({ id: 'overdue', area: 'Робота й бізнес', tone: 'warn', weight: 80, title: `${late.length} ${plural(late.length, 'прострочена задача', 'прострочені задачі', 'прострочених задач')}`,
+    facts: late.slice(0, 3).map(x => x.t), why: 'Прострочене тисне на голову й забирає увагу від нового: навіть коли ти про нього не думаєш, мозок тримає його «відкритим».',
+    action: 'Для кожної вирішити: зробити сьогодні, перенести на конкретну дату або видалити. Почни з найменшої.', to: 'tasks' });
   const wkGoal = S.goal * 60, wkStart = sod(addD(now, -((now.getDay() + 6) % 7))).getTime();
   const wkDone = S.sessions.filter(s => s.t >= wkStart).reduce((a, s) => a + s.m, 0), dayIdx = (now.getDay() + 6) % 7, workLeft = [...Array(7)].filter((_, i) => i >= dayIdx && isWorkDay(S, ymd(addD(sod(now), i - dayIdx)))).length;
   if (wkGoal > 0 && workLeft > 0 && dayIdx >= 1) {
@@ -308,8 +317,24 @@ export function coach(S: State, eventsOn: (k: string) => UiEvent[], now = new Da
   if (idle.length && !soon.length) add({ id: 'goal-idle', area: 'Цілі й розвиток', tone: 'info', weight: 50, title: `Ціль «${idle[0].title}» цього тижня без фокусу`,
     facts: [], why: 'Цілі зростають із повторюваних невеликих кроків. Один блок на тиждень майже не змінює траєкторію.', action: 'Привʼяжи до цілі задачу й запусти 25 хв фокусу.', to: 'goals' });
   const risk = S.habits.map(h => ({ h, n: (() => { let n = 0; for (let i = 1; i < 60 && h.days[ymd(addD(now, -i))]; i++) n++; return n; })() })).filter(x => x.n >= 3 && !x.h.days[today]);
-  if (risk.length && hour >= 16) add({ id: 'streak', area: 'Цілі й розвиток', tone: 'info', weight: 58, title: `«${risk[0].h.name}» сьогодні ще не відмічено (${risk[0].n} дн поспіль)`,
-    facts: [], why: 'Серія збільшує шанс повторити: кожен новий день легший за попередній, поки ти її не перервеш.', action: 'Навіть мінімальна версія на 2 хвилини зараховується.', to: 'habits' });
+  if (risk.length && hour >= 16) add({ id: 'streak', area: 'Цілі й розвиток', tone: 'info', weight: 58, title: `Не обірви серію «${risk[0].h.name}» (${risk[0].n} дн)`,
+    facts: [], why: 'Серія збільшує шанс повторити: кожен новий день легший за попередній, поки ти її не перервеш.', action: 'Навіть мінімальна версія (2 хвилини) зберігає серію.', to: 'habits' });
+
+  /* ---- business ---- */
+  const dueLeads = S.co.leads.filter(l => l.next && l.next < today && l.status !== 'won' && l.status !== 'dead');
+  if (dueLeads.length) add({ id: 'leads', area: 'Робота й бізнес', tone: 'warn', weight: 76, title: `${dueLeads.length} ${plural(dueLeads.length, 'лід', 'ліди', 'лідів')} чекає на відповідь довше, ніж планувалося`,
+    facts: dueLeads.slice(0, 3).map(l => l.name), why: 'Інтерес клієнта згасає за дні, а не за тижні. Швидка відповідь часто вирішує, хто отримає замовлення.', action: 'Напиши коротке повідомлення першому ліду зараз: скрипт є в розділі «Ліди».', to: 'leads' });
+  const unpaid = S.co.invoices.filter(i => !i.paid && i.due < today);
+  if (unpaid.length) add({ id: 'invoices', area: 'Робота й бізнес', tone: 'warn', weight: 77, title: `${unpaid.length} ${plural(unpaid.length, 'рахунок', 'рахунки', 'рахунків')} прострочено`,
+    facts: unpaid.slice(0, 3).map(i => `${i.client}: ${i.amt}`), why: 'Чим довше борг, тим менша ймовірність його повернути без неприємної розмови.', action: 'Надішли нагадування сьогодні, ввічливо, з номером рахунку й датою.', to: 'invoices' });
+  const biz = rows.slice(-7).map(r => r.bizMin).filter((v): v is number => v !== null);
+  if (biz.length >= 5 && biz.reduce((a, b) => a + b, 0) < 60 && (S.co.deals.length || S.co.leads.length)) add({ id: 'biz-time', area: 'Робота й бізнес', tone: 'info', weight: 52, title: 'На бізнес цього тижня майже не було часу',
+    facts: [`За 7 днів: ${hmPlain(biz.reduce((a, b) => a + b, 0))}`], why: 'Бізнес росте від регулярного невеликого часу, а не від разових ривків перед дедлайном.', action: 'Заплануй 30–60 хв щодня на ліди й угоди та запиши це як активність «Бізнес».', to: 'co' });
+
+  /* ---- money ---- */
+  const b = budgetDKK(S), spent = monthOf(S, today.slice(0, 7)).filter(x => x.type === 'out' && !x.xfer && !x.pot).reduce((a, x) => a + txDKK(S, x), 0), share = now.getDate() / daysInMonth();
+  if (b > 0 && spent > b * share * 1.15 && spent > b * 0.3) add({ id: 'spend', area: 'Гроші', tone: 'warn', weight: 68, title: `Витрати йдуть швидше за бюджет: ${Math.round((spent / b) * 100)}% при ${Math.round(share * 100)}% місяця`,
+    facts: [`Витрачено ${fmtCur(spent, 'DKK')} із ${fmtCur(b, 'DKK')}`], why: 'Бюджет рівномірний, а витрати зазвичай накопичуються першими днями. Якщо не гальмувати зараз, кінець місяця доведеться жити без запасу.', action: `Обмеж необовʼязкове до кінця тижня: тримай ≈ ${fmtCur(Math.max(0, b - spent) / Math.max(1, daysInMonth() - now.getDate() + 1), 'DKK')} на день.`, to: 'money' });
 
   /* ---- body today ---- */
   const hw = S.health[today];

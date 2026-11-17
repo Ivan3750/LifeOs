@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dayScore, freeTime, isWorkDay, sleepGuess, sleepRhythm } from '@/lib/score';
+import { dayScore, freeTime, isWorkDay, sleepRhythm } from '@/lib/score';
 import { makeState } from '@/lib/seed';
 import { addD, ymd } from '@/lib/util';
 import type { State } from '@/lib/types';
@@ -72,15 +72,23 @@ describe('dayScore: steady sleep, business and social media', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     s.activities.push({ id: 5, kind: 'Бізнес', title: '', start: new Date(day + 'T10:00').getTime(), end: new Date(day + 'T14:00').getTime() });
     const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(22);
+    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(20);
     expect(r.parts.some(p => p.key === 'biz')).toBe(false);
+  });
+
+  it('counts a Wolt shift as work too', () => {
+    const s = blank(); s.health[day] = night('23:30', '07:30');
+    s.activities.push({ id: 6, kind: 'Wolt', title: 'Зміна', start: new Date(day + 'T12:00').getTime(), end: new Date(day + 'T16:00').getTime() });
+    const r = dayScore(s, day, [], [], NOW);
+    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(20);
+    expect(r.parts.find(p => p.key === 'focus')?.hint).toContain('Wolt');
   });
 
   it('judges the tasks of the day: closed against due and still open', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     expect(dayScore(s, day, [], [], NOW).skipped.some(x => x.key === 'tasks')).toBe(true);
     s.tasks.push({ id: 1, t: 'a', p: 'lo', d: true, doneAt: new Date(day + 'T14:00').getTime() }, { id: 2, t: 'b', p: 'lo', d: false, due: day });
-    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'tasks')?.got).toBe(3.5);
+    expect(dayScore(s, day, [], [], NOW).parts.find(p => p.key === 'tasks')?.got).toBe(2.5);
   });
 
   it('counts social media added afterwards for a past day', () => {
@@ -125,6 +133,8 @@ describe('dayScore: steady sleep, business and social media', () => {
     s.goals.push({ id: 9, title: 'g', area: 'Карʼєра', target: 10, cur: 1, unit: '', due: '' });
     s.tasks.push({ id: 1, t: 'a', p: 'lo', d: true, doneAt: new Date(day + 'T14:00').getTime(), goal: 9 });
     s.sessions.push({ t: new Date(day + 'T15:00').getTime(), m: 60, task: 'a' });
+    s.money.accounts[0].budget = 3000;
+    s.money.tx.push({ id: 5, type: 'out', amt: 10, cat: 'Їжа', note: '', date: day, acc: 'dk' });
     const r = dayScore(s, day, [], s.sessions, NOW);
     expect(r.groups.reduce((a, g) => a + g.max, 0)).toBe(100);
     expect(r.coverage).toBe(1);
@@ -136,27 +146,7 @@ describe('dayScore: steady sleep, business and social media', () => {
     s.moods.push({ id: 2, t: new Date(day + 'T12:00').getTime(), v: 9, energy: 3, tags: [], note: '' });
     const r = dayScore(s, day, [], [], NOW);
     expect(r.coverage).toBeLessThan(0.45);
-    expect(r.groups.map(g => g.key)).toEqual(['mind']);   // not written down is never counted as 0
-    expect(r.total).toBe(100);
-  });
-
-  it('does not punish what was not logged: empty water, movement, habits and focus are left out', () => {
-    const s = blank();
-    s.habits.push({ id: 1, name: 'h', days: {} }, { id: 2, name: 'g', days: {} });
-    s.moods.push({ id: 2, t: new Date(day + 'T12:00').getTime(), v: 7, energy: 3, tags: [], note: '' });
-    const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.map(p => p.key)).toEqual(['mood']);
-    expect(r.skipped.map(p => p.key)).toEqual(expect.arrayContaining(['focus', 'water', 'move', 'habits']));
-    expect(r.total).toBe(100);
-  });
-
-  it('still counts partly done habits, and an empty workday for someone who uses the focus timer', () => {
-    const s = blank();
-    s.habits.push({ id: 1, name: 'h', days: { [day]: 1 } }, { id: 2, name: 'g', days: {} });
-    s.sessions.push({ t: new Date('2026-03-12T09:00').getTime(), m: 60 });   // the timer was used three days earlier
-    const r = dayScore(s, day, [], s.sessions, NOW);
-    expect(r.parts.find(p => p.key === 'habits')!.got).toBe(6);              // 1 of 2 habits: half of 12
-    expect(r.parts.find(p => p.key === 'focus')!.got).toBe(0);               // the timer is in use, so an empty workday counts
+    expect(r.groups.map(g => g.key)).toEqual(['work', 'body', 'mind']);   // a finished day counts empty focus, water and movement as 0
   });
 });
 
@@ -205,36 +195,5 @@ describe('days and rhythm', () => {
     const r = sleepRhythm(s, K);
     expect(r.wake).toBe(7 * 60);
     expect(r.bed).toBe(24 * 60);
-  });
-});
-
-describe('effortless days', () => {
-  it('a day with only a closed task and a focus session is still judged, and nothing unlogged counts as zero', () => {
-    const s = blank();
-    s.tasks.push({ id: 1, t: 'Звіт', p: 'hi', d: true, doneAt: new Date(K + 'T10:00').getTime() });
-    const sessions = [{ t: new Date(K + 'T09:00').getTime(), m: 40 }];
-    s.sessions = sessions;
-    const r = dayScore(s, K, [], sessions, NOW);
-    expect(r.total).not.toBeNull();
-    expect(r.total as number).toBeGreaterThan(60);
-    for (const key of ['sleep', 'sleepreg', 'water', 'move', 'mood', 'social']) expect(r.parts.some(p => p.key === key)).toBe(false);
-  });
-});
-
-describe('tasks alone', () => {
-  it('a day with only a closed task is judged too', () => {
-    const s = blank();
-    s.tasks.push({ id: 1, t: 'Звіт', p: 'lo', d: true, doneAt: new Date(K + 'T10:00').getTime() });
-    expect(dayScore(s, K, [], [], NOW).total).not.toBeNull();
-  });
-});
-
-describe('sleepGuess', () => {
-  it('falls back to the wanted times, then follows the typical nights', () => {
-    const s = blank();
-    s.bedTarget = '23:00'; s.wakeTarget = '07:00';
-    expect(sleepGuess(s, K)).toMatchObject({ bed: '23:00', wake: '07:00', hours: 8, typical: false });
-    for (let i = 1; i <= 4; i++) s.health[ymd(addD(new Date(K + 'T00:00'), -i))] = { water: 0, sleep: 0, mood: 0, steps: 0, workout: 0, weight: 0, bed: '00:30', wake: '08:00' };
-    expect(sleepGuess(s, K)).toMatchObject({ bed: '00:30', wake: '08:00', hours: 7.5, typical: true });
   });
 });

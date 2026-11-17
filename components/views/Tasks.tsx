@@ -11,7 +11,7 @@ import { Empty, IconBtn } from '../shared';
 type Filter = 'open' | 'today' | 'done' | 'all';
 
 const GROUPS: [DueState, string][] = [
-  ['overdue', 'З минулих днів'], ['today', 'Сьогодні'], ['tomorrow', 'Завтра'], ['week', 'Цього тижня'], ['later', 'Пізніше'], ['none', 'Без терміну'],
+  ['overdue', 'Прострочені'], ['today', 'Сьогодні'], ['tomorrow', 'Завтра'], ['week', 'Цього тижня'], ['later', 'Пізніше'], ['none', 'Без терміну'],
 ];
 
 function TaskRow({ t, minutes }: { t: Task; minutes: number }) {
@@ -82,7 +82,7 @@ export function Tasks() {
       <div className="vh">
         <div>
           <h2>Задачі</h2>
-          <p>{open.length ? `${open.length} ${plural(open.length, 'відкрита', 'відкриті', 'відкритих')}` : 'Усе зроблено'}{overdue > 0 && <span className="late-note"> · {overdue} з минулих днів</span>}</p>
+          <p>{open.length ? `${open.length} ${plural(open.length, 'відкрита', 'відкриті', 'відкритих')}` : 'Усе зроблено'}{overdue > 0 && <span className="late-note"> · {overdue} {plural(overdue, 'прострочена', 'прострочені', 'прострочених')}</span>}</p>
         </div>
         {planned > 0 && (
           <div className="tprog" role="img" aria-label={`Сьогодні виконано ${doneToday} з ${planned}`}>

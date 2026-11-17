@@ -1,44 +1,34 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { NAV_MORE, navOf, parentOf, tabsOf, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
+import { NAV, TABS, timerLeftAt, useNow, useStore, vinfo } from '@/lib/store';
 import { fmt, MON, pad2, WD } from '@/lib/util';
 import { Icon, type IconName } from './Icon';
 import { SheetHost } from './Sheets';
 import { Palette } from './Palette';
 import { RemindHost } from './Reminders';
-import { useNeeds } from './needs';
 
-/** Number of needs that are hungry now, for the badge of the menu entry. */
-function HungryBadge() {
-  const { stats } = useNeeds();
-  const n = stats.filter(s => s.status === 'red').length;
-  return n > 0 ? <span className="badge red" title="Голодні потреби">{n}</span> : null;
+export function ModeSeg() {
+  const { S, setMode } = useStore();
+  return (
+    <div className="modeseg" role="group" aria-label="Режим">
+      <button aria-pressed={S.mode !== 'co'} onClick={() => setMode('me')}>Особисте</button>
+      <button aria-pressed={S.mode === 'co'} onClick={() => setMode('co')}>Компанія</button>
+    </div>
+  );
 }
 
-function NavBtn({ k }: { k: string }) {
+const CO_FLOW = ['leads', 'clients', 'deals', 'projects', 'invoices'];
+
+function NavBtn({ k, step }: { k: string; step?: number }) {
   const { S, view, go } = useStore();
   const [, l, i] = vinfo(k)!;
   const open = S.tasks.filter(t => !t.d).length;
   return (
-    <button onClick={() => go(k)} aria-current={k === parentOf(view) ? 'page' : undefined}>
-      <Icon n={i as IconName} /><span className="nl">{l}</span>
+    <button onClick={() => go(k)} aria-current={k === view ? 'page' : undefined}>
+      {step ? <span className="stepn">{step}</span> : <Icon n={i as IconName} />}<span className="nl">{l}</span>
       {k === 'tasks' && open > 0 && <span className="badge">{open}</span>}
-      {k === 'needs' && <HungryBadge />}
     </button>
-  );
-}
-
-/** Rarely used sections, folded under «Ще». The fold opens by itself when one of them is the current page. */
-function MoreNav() {
-  const { view } = useStore();
-  const [open, setOpen] = useState(false);
-  const shown = open || NAV_MORE.includes(parentOf(view));
-  return (
-    <>
-      <button className="navmore" aria-expanded={shown} onClick={() => setOpen(o => !o)}><Icon n="more" /><span className="nl">Ще</span><Icon n="right" className="icn chev" /></button>
-      {shown && NAV_MORE.map(k => <NavBtn key={k} k={k} />)}
-    </>
   );
 }
 
@@ -84,6 +74,7 @@ function TopBar() {
   return (
     <div className="top">
       <span className="logo mlogo"><Icon n="logo" /></span>
+      <div className="mslot"><ModeSeg /></div>
       <button className="search" onClick={() => setPalette(true)} aria-label="Відкрити пошук і команди">
         <Icon n="search" /><span className="lbl">Пошук чи команда…</span><kbd>Ctrl K</kbd>
       </button>
@@ -102,7 +93,7 @@ function TopBar() {
             {S.log.length ? S.log.slice(0, 8).map(l => {
               const t = new Date(l.t);
               return <div className="item" key={l.t}><span className="sw c1" /><span className="t">{l.msg}</span><span className="muted num" style={{ fontSize: 11 }}>{pad2(t.getHours())}:{pad2(t.getMinutes())}</span></div>;
-            }) : <p className="muted" style={{ padding: 8, margin: 0 }}>Сповіщень поки немає. Тут зʼявляться завершені сесії та досягнуті цілі.</p>}
+            }) : <p className="muted" style={{ padding: 8, margin: 0 }}>Сповіщень поки немає. Тут зʼявляться завершені сесії та виграні угоди.</p>}
           </div>
         )}
       </div>
@@ -116,7 +107,7 @@ function TopBar() {
 
 export function Shell({ children }: { children: ReactNode }) {
   const { S, view, toastMsg, setToast, setSheet, setPalette, sheet, palette } = useStore();
-  const tabs = tabsOf(S);
+  const m = S.mode === 'co' ? 'co' : 'me';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -134,9 +125,17 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="app">
         <aside className="side">
           <div className="brand"><span className="logo"><Icon n="logo" /></span>LifeOs</div>
+          <ModeSeg />
           <nav className="nav">
-            {navOf(S).filter(k => !NAV_MORE.includes(k)).map(k => <NavBtn key={k} k={k} />)}
-            <MoreNav />
+            {m === 'co'
+              ? <>
+                  {NAV.co.slice(0, 1).map(k => <NavBtn key={k} k={k} />)}
+                  <span className="navh">Шлях клієнта</span>
+                  {CO_FLOW.map((k, i) => <NavBtn key={k} k={k} step={i + 1} />)}
+                  <span className="navh">Інструменти</span>
+                  {NAV.co.filter(k => k !== 'co' && !CO_FLOW.includes(k)).map(k => <NavBtn key={k} k={k} />)}
+                </>
+              : NAV[m].map(k => <NavBtn key={k} k={k} />)}
           </nav>
           <MiniTimer />
         </aside>
@@ -147,8 +146,8 @@ export function Shell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <nav className="tabbar" aria-label="Основні розділи">
-        {tabs.map(k => <NavBtn key={k} k={k} />)}
-        <button onClick={() => setSheet({ kind: 'more' })} aria-current={tabs.includes(parentOf(view)) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
+        {TABS[m].map(k => <NavBtn key={k} k={k} />)}
+        <button onClick={() => setSheet({ kind: 'more' })} aria-current={TABS[m].includes(view) ? undefined : 'page'}><Icon n="more" /><span className="nl">Ще</span></button>
       </nav>
       <button className="fab" onClick={() => setSheet({ kind: 'qa' })} aria-label="Швидко додати"><Icon n="plus" /></button>
       <SheetHost />
