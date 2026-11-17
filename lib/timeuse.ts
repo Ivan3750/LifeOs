@@ -123,7 +123,7 @@ export function timeLedger(S: State, days: string[], eventsOn: (k: string) => Ui
     put('rem', Math.max(0, win - used));
   }
   const rows: LedgerRow[] = [];
-  const meta: Record<string, [string, string]> = { sleep: ['Сон', '#8B7CF6'], focus: ['Фокус', '#FF5B1F'], act: ['Справи (дорога, магазин…)', '#2B2723'], social: ['Соцмережі', '#E5484D'], rem: ['Без обліку', '#D8D3CC'] };
+  const meta: Record<string, [string, string]> = { sleep: ['Сон', '#8B7CF6'], focus: ['Фокус', '#FF5B1F'], act: ['Справи (Wolt, дорога…)', '#2B2723'], social: ['Соцмережі', '#E5484D'], rem: ['Без обліку', '#D8D3CC'] };
   for (const [key, min] of Object.entries(acc)) {
     if (key.startsWith('ev:')) { const c = catOf(key.slice(3)); rows.push({ key, label: c.label, color: c.color, min }); }
     else rows.push({ key, label: meta[key][0], color: meta[key][1], min });

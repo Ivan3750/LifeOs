@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, type FormEvent } from 'react';
-import { fill, habitsShown, logFocus, useStore } from '@/lib/store';
+import { fill, logFocus, useStore } from '@/lib/store';
 import { stripDemo } from '@/lib/seed';
 import { DN, plural, TK } from '@/lib/util';
 import { dayPlan, sleepRhythm } from '@/lib/score';
@@ -137,7 +137,7 @@ function parseBackup(text: string): { state: State } | { error: string } {
   try { j = JSON.parse(text); } catch { return { error: 'Це не JSON-файл' }; }
   const data = (j as { app?: string; data?: unknown })?.app === 'pulse-os' || (j as { app?: string })?.app === 'lifeos' ? (j as { data: unknown }).data : j;
   const d = data as Partial<State> | null;
-  if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.tasks) || !Array.isArray(d.habits)) return { error: 'У файлі нема даних Pulse OS' };
+  if (!d || typeof d !== 'object' || Array.isArray(d) || !Array.isArray(d.tasks) || !Array.isArray(d.habits) || !d.money || !d.co) return { error: 'У файлі нема даних Pulse OS' };
   return { state: fill(d as State) };
 }
 
@@ -180,7 +180,7 @@ export function Prefs() {
     const r = parseBackup(await f.text());
     if ('error' in r) { toast(r.error); return; }
     if (!window.confirm('Замінити всі поточні дані даними з файлу? Поточні дані буде втрачено (зроби експорт, якщо вони потрібні).')) return;
-    update(s => { const keep = { view: s.view, theme: s.theme, log: s.log, unread: s.unread }; for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k]; Object.assign(s, r.state, keep); });
+    update(s => { const keep = { view: s.view, mode: s.mode, theme: s.theme, log: s.log, unread: s.unread }; for (const k of Object.keys(s)) delete (s as unknown as Record<string, unknown>)[k]; Object.assign(s, r.state, keep); });
     toast('Дані відновлено з копії');
   };
   const THEMES: [Theme, string][] = [['system', 'Як у системі'], ['light', 'Світла'], ['dark', 'Темна']];
@@ -199,11 +199,19 @@ export function Prefs() {
         </div>
 
         <div className="card s6 cardcol">
+          <div className="ch" style={{ margin: 0 }}><Icon n="money" className="ic" /><div><h3>Компанія</h3><p>Для режиму «Компанія»</p></div></div>
+          <div className="fgrid">
+            <TextField id="pCo" label="Назва" value={S.co.name} fallback="Моя компанія" onSave={v => update(s => { s.co.name = v; })} />
+            <NumField id="pCoGoal" label="Ціль виручки на місяць, kr." value={S.co.goal} min={1000} max={100000000} onSave={n => update(s => { s.co.goal = n; })} />
+          </div>
+        </div>
+
+        <div className="card s6 cardcol">
           <div className="ch" style={{ margin: 0 }}><Icon n="focus" className="ic" /><div><h3>Фокус</h3><p>Таймер і тижнева ціль</p></div></div>
           <div className="fgrid">
             <NumField id="pGoal" label="Ціль на тиждень, год" value={S.goal} min={1} max={80} onSave={n => update(s => { s.goal = n; })} />
-            <NumField id="pFocus" label="Фокус, хв" value={S.focusMin} min={5} max={120} onSave={n => update(s => { if (!s.timer.running && s.timer.mode === 'focus') { logFocus(s); s.timer.sid = 0; delete s.timer.dur; s.timer.left = n * 60; } s.focusMin = n; })} />
-            <NumField id="pBreak" label="Перерва, хв" value={S.breakMin} min={1} max={60} onSave={n => update(s => { s.breakMin = n; if (!s.timer.running && s.timer.mode === 'break') { delete s.timer.dur; s.timer.left = n * 60; } })} />
+            <NumField id="pFocus" label="Фокус, хв" value={S.focusMin} min={5} max={120} onSave={n => update(s => { if (!s.timer.running && s.timer.mode === 'focus') { logFocus(s); s.timer.sid = 0; s.timer.left = n * 60; } s.focusMin = n; })} />
+            <NumField id="pBreak" label="Перерва, хв" value={S.breakMin} min={1} max={60} onSave={n => update(s => { s.breakMin = n; if (!s.timer.running && s.timer.mode === 'break') s.timer.left = n * 60; })} />
           </div>
           <div>
             <div className="fl">Робочі дні</div>
@@ -229,14 +237,6 @@ export function Prefs() {
               <label className="field" htmlFor="pBed">Засинати о<input id="pBed" type="time" value={S.bedTarget} onChange={e => e.target.value && update(s => { s.bedTarget = e.target.value; })} /></label>
               <label className="field" htmlFor="pWake">Прокидатися о<input id="pWake" type="time" value={S.wakeTarget} onChange={e => e.target.value && update(s => { s.wakeTarget = e.target.value; })} /></label>
             </div>
-          </div>
-        </div>
-
-        <div className="card s6 cardcol">
-          <div className="ch" style={{ margin: 0 }}><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>Щоденні відмітки. Дані не видаляються, коли розділ сховано</p></div></div>
-          <div className="seg">
-            <button aria-pressed={!habitsShown(S)} onClick={() => update(s => { s.habitsOn = false; })}>Сховати</button>
-            <button aria-pressed={habitsShown(S)} onClick={() => update(s => { s.habitsOn = true; })}>Показувати</button>
           </div>
         </div>
 
@@ -281,12 +281,10 @@ export function Prefs() {
             <button className="btn ghost" onClick={() => fileRef.current?.click()}>Відновити з копії</button>
             <input ref={fileRef} type="file" accept="application/json,.json" hidden aria-label="Файл резервної копії" onChange={restore} />
           </div>
-          {S.demo && (
-            <div className="prefdemo">
-              <p className="help" style={{ margin: '0 0 10px' }}>Зараз у застосунку показані демонстраційні дані. Прибери їх, коли будеш готовий вести власні.</p>
-              <button className="btn ghost" onClick={() => { update(stripDemo); toast('Демо-дані прибрано'); }}>Прибрати демо-дані</button>
-            </div>
-          )}
+          <div className="prefdemo">
+            <p className="help" style={{ margin: '0 0 10px' }}>{S.demo ? 'Зараз у застосунку показані демонстраційні дані. Прибери їх, коли будеш готовий вести власні.' : 'Демонстраційних даних немає.'}</p>
+            <button className="btn ghost" disabled={!S.demo} onClick={() => { update(stripDemo); toast('Демо-дані прибрано'); }}>Прибрати демо-дані</button>
+          </div>
         </div>
 
         <div className="s6"><AccountSettings /></div>
