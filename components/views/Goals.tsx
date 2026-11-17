@@ -2,6 +2,10 @@
 
 import { useRef, useState, type FormEvent } from 'react';
 import type { Goal } from '@/lib/types';
+import type { NeedStat } from '@/lib/needs';
+import { GOAL_TEMPLATES, rhythmOf, rhythmOnly } from '@/lib/goalplan';
+import { machinePlan } from '@/lib/machine';
+import { NeedBar, useWeek } from '../needs';
 import { goalStep, useStore } from '@/lib/store';
 import { goalProgress } from '@/lib/goals';
 import { AREAS, daysTo, fmtN, sum } from '@/lib/util';
@@ -21,19 +25,23 @@ function Dots({ value, onPick, label }: { value: number; onPick: (n: number) => 
 }
 
 /** One goal: a bar and one line when closed; steps, tasks and editing when opened. */
-function GoalItem({ g }: { g: Goal }) {
+function GoalItem({ g, stats }: { g: Goal; stats: NeedStat[] }) {
   const { S, A, update, go } = useStore();
+  const rh = rhythmOf(stats, g.id), ronly = rhythmOnly(g, rh.needs.length > 0);
+  const [rname, setRname] = useState(''), [rweekly, setRweekly] = useState('3');
+  const loose = S.needs.filter(n => !n.goal);
+  const money = S.machines.filter(m => m.goal === g.id);
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState(false);
   const [e, setE] = useState({ title: g.title, target: String(g.target || ''), unit: g.unit, due: g.due });
   const [step, setStep] = useState('');
   const [task, setTask] = useState('');
   const steps = g.steps || [], rating = g.kind === 'rating', bySteps = !rating && (steps.length > 0 || !g.target);
-  const prog = goalProgress(g), left = g.due ? daysTo(g.due) : null;
+  const prog = ronly ? rh.share : goalProgress(g), left = g.due ? daysTo(g.due) : null;
   const done = prog >= 1 && (rating || steps.length > 0 || g.target > 0);
   const tasks = S.tasks.filter(t => t.goal === g.id && !t.d);
   const save = () => { A.updateGoal(g.id, { title: e.title.trim() || g.title, target: Math.max(0, +e.target || 0), unit: e.unit.trim(), due: e.due }); setEdit(false); };
-  const summary = rating ? `${g.cur} з 10 · мета ${g.target}` : bySteps ? `${steps.filter(s => s.d).length} з ${steps.length} кроків` : `${fmtN(g.cur)} / ${fmtN(g.target)} ${g.unit}`;
+  const summary = ronly ? `ритм тижня ${Math.round(rh.share * 100)}%` : rating ? `${g.cur} з 10 · мета ${g.target}` : bySteps ? `${steps.filter(s => s.d).length} з ${steps.length} кроків` : `${fmtN(g.cur)} / ${fmtN(g.target)} ${g.unit}`;
   return (
     <div className={`goal2${done ? ' done' : ''}`}>
       <button className="g2head" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -44,6 +52,29 @@ function GoalItem({ g }: { g: Goal }) {
       </button>
       {open && (
         <div className="g2body">
+          <div className="rhythm">
+            <span className="muted" style={{ fontSize: 12 }}>Тижневий ритм цієї цілі{rh.needs.length ? '' : ': поки порожньо'}</span>
+            {rh.needs.map(st => (
+              <div className={`rrow hg ${st.status}`} key={st.need.id}>
+                <span className="ndot" aria-hidden="true" /><b>{st.need.name}</b><span className="muted num">{st.done}/{st.need.weekly}</span>
+                <NeedBar st={st} />
+                <button className="ib" title="Було ще раз" aria-label={`Відмітити: ${st.need.name}`} onClick={() => A.logNeed(st.need.id)}><Icon n="plus" className="icn sm" /></button>
+                <button className="ib" title="Відв’язати від цілі" aria-label={`Відв’язати: ${st.need.name}`} onClick={() => A.updateNeed(st.need.id, { goal: null })}><Icon n="x" /></button>
+              </div>
+            ))}
+            {money.map(m => { const p = machinePlan(m); return <button key={m.id} className="rmoney" onClick={() => go('machine')}><Icon n="trend" className="icn sm" />«{m.title}»: цього тижня зроблено {Math.round(p.share * 100)}%<Icon n="right" className="icn" /></button>; })}
+            <form className="row" onSubmit={e => { e.preventDefault(); if (A.addRhythm(g.id, rname, +rweekly || 3)) { setRname(''); setRweekly('3'); } }}>
+              <input className="gin" style={{ flex: '1 1 160px', margin: 0 }} aria-label="Нова щотижнева дія" placeholder="+ щотижнева дія, напр. «Читати Біблію»" value={rname} onChange={x => setRname(x.target.value)} />
+              <input className="gin" style={{ width: 64, margin: 0 }} type="number" min="1" max="14" aria-label="Разів на тиждень" value={rweekly} onChange={x => setRweekly(x.target.value)} />
+              <span className="muted" style={{ fontSize: 12 }}>раз/тиж.</span>
+            </form>
+            {loose.length > 0 && (
+              <select className="gin" aria-label="Додати наявну потребу до цілі" value="" onChange={x => { if (x.target.value) A.updateNeed(+x.target.value, { goal: g.id }); }}>
+                <option value="">+ додати наявну потребу…</option>
+                {loose.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+              </select>
+            )}
+          </div>
           {rating && <p className="help" style={{ margin: 0 }}>Ця ціль росте разом із оцінкою сфери «{g.area}»: була {g.from}, зараз {g.cur}, мета {g.target}. Підвищуй оцінку зверху, коли відчуваєш прогрес, і додавай кроки, що до нього ведуть.</p>}
           {!rating && !bySteps && (
             <div className="row">
@@ -152,6 +183,7 @@ function AddGoal({ area, onDone }: { area: string; onDone: () => void }) {
 
 export function Goals() {
   const { S, A } = useStore();
+  const { stats } = useWeek(0);
   const [adding, setAdding] = useState<string | null>(null);
   const top = useRef<HTMLDivElement>(null);
   const avg = sum(S.wheel) / AREAS.length;
@@ -166,6 +198,18 @@ export function Goals() {
         <div><h2>Цілі та сфери життя</h2><p>{S.goals.length ? `${active} ${active === 1 ? 'ціль у роботі' : 'цілей у роботі'} · середній баланс ${avg.toFixed(1)} з 10` : 'Оціни сфери життя й постав цілі там, де хочеш рости.'}</p></div>
         <button className="btn acc" style={{ marginLeft: 'auto' }} onClick={() => startAdd(weakest)}>+ Ціль</button>
       </div>
+
+      {(() => {
+        const used = new Set(S.goals.map(g => g.title)), free = GOAL_TEMPLATES.filter(t => !used.has(t.title));
+        return free.length > 0 && (
+          <div className="card" style={{ marginTop: 18 }}>
+            <div className="ch"><Icon n="flag" className="ic" /><div><h3>Швидкий початок</h3><p>Ціль разом із щотижневим ритмом: одним дотиком. Потім усе можна змінити</p></div></div>
+            <div className="tplgrid">
+              {free.map(t => <button key={t.key} className="tpl" onClick={() => A.goalFromTemplate(t.key)}><b>{t.title}</b><small>{t.hint}</small><em>{t.area}</em></button>)}
+            </div>
+          </div>
+        );
+      })()}
 
       <div ref={top} style={{ scrollMarginTop: 12 }}>{adding !== null && <div style={{ marginTop: 18 }}><AddGoal key={adding} area={adding} onDone={() => setAdding(null)} /></div>}</div>
 
@@ -194,7 +238,7 @@ export function Goals() {
               </div>
               <Dots value={S.wheel[i]} onPick={n => A.setWheel(i, n)} label={`Оцінка сфери ${a}`} />
               <div className="area-goals">
-                {goals.map(g => <GoalItem key={g.id} g={g} />)}
+                {goals.map(g => <GoalItem key={g.id} g={g} stats={stats} />)}
               </div>
               <button className="area-add" onClick={() => startAdd(a)}>+ ціль у цій сфері</button>
             </div>
@@ -202,7 +246,7 @@ export function Goals() {
         })}
       </div>
 
-      {other.length > 0 && <div className="card" style={{ marginTop: 18 }}><div className="ch"><div><h3>Інші цілі</h3></div></div>{other.map(g => <GoalItem key={g.id} g={g} />)}</div>}
+      {other.length > 0 && <div className="card" style={{ marginTop: 18 }}><div className="ch"><div><h3>Інші цілі</h3></div></div>{other.map(g => <GoalItem key={g.id} g={g} stats={stats} />)}</div>}
       {!S.goals.length && <div className="card" style={{ marginTop: 18 }}><Empty icon="goals" title="Цілей ще нема" text="Обери сферу, у якій хочеш рости, і постав першу ціль: кроками, числом або оцінкою сфери." /></div>}
     </section>
   );

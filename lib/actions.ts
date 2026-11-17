@@ -4,6 +4,7 @@ import { XFER_CAT, account, fmtCur, pendingRecurring, potSaved, recDate, shiftMk
 import { addD, AREAS, money, STAGES, TK, toMin, wStart, ymd } from './util';
 import type { Machine, Need, NeedLog, Person, Place, Review } from './types';
 import type { Slot } from './planner';
+import { GOAL_TEMPLATES } from './goalplan';
 import type { Suggestion } from './review';
 import { parseTask } from './tasks';
 import { moodCause } from './correlations';
@@ -258,7 +259,7 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       update(s => { const x = s.goals.find(y => y.id === id)!; x.cur = cur; delete x.demo; });
       if (g.cur < g.target && cur >= g.target) notify('Ціль досягнуто: ' + g.title);
     },
-    delGoal(id: number) { del(s => { s.goals = s.goals.filter(x => x.id !== id); s.tasks.forEach(t => { if (t.goal === id) delete t.goal; }); }); },
+    delGoal(id: number) { del(s => { s.goals = s.goals.filter(x => x.id !== id); s.tasks.forEach(t => { if (t.goal === id) delete t.goal; }); s.needs.forEach(n => { if (n.goal === id) delete n.goal; }); s.machines.forEach(m => { if (m.goal === id) delete m.goal; }); }); },
     addDeal(v: { title: string; client: string; amt: number; stage: string }) { update(s => { s.co.deals.push({ id: s.nextId++, title: v.title, client: v.client, amt: v.amt || 0, stage: (v.stage || 'lead') as 'lead' }); }); toast('Угоду додано'); },
     /** Moves a deal one stage. Winning it starts the rest of the chain by itself: a project to do the work and an invoice to get paid (only once per deal). */
     moveDeal(id: number, dir: number) {
@@ -380,16 +381,17 @@ function makeNeedActions({ update, getS, toast, del }: ActionDeps) {
   }
   const needId = (s: State, key: string) => s.needs.find(n => n.key === key && n.on)?.id;
   return {
-    addNeed(v: { name: string; weekly: number } & Partial<Pick<Need, 'min' | 'from' | 'to' | 'days' | 'kw'>>) {
+    addNeed(v: { name: string; weekly: number } & Partial<Pick<Need, 'min' | 'from' | 'to' | 'days' | 'kw' | 'goal'>>) {
       const name = v.name.trim(); if (!name) return false;
-      update(s => { s.needs.push({ id: s.nextId++, name, weekly: clampN(v.weekly || 3, 1, 14), ...PLAIN_NEED, ...(v.min ? { min: clampN(v.min, 5, 480) } : {}), ...(v.from ? { from: v.from } : {}), ...(v.to ? { to: v.to } : {}), ...(v.days ? { days: v.days } : {}), ...(v.kw?.length ? { kw: v.kw } : {}) }); });
+      update(s => { s.needs.push({ id: s.nextId++, name, weekly: clampN(v.weekly || 3, 1, 14), ...PLAIN_NEED, ...(v.min ? { min: clampN(v.min, 5, 480) } : {}), ...(v.from ? { from: v.from } : {}), ...(v.to ? { to: v.to } : {}), ...(v.days ? { days: v.days } : {}), ...(v.kw?.length ? { kw: v.kw } : {}), ...(v.goal ? { goal: v.goal } : {}) }); });
       toast('Потребу додано'); return true;
     },
-    updateNeed(id: number, v: Partial<Pick<Need, 'name' | 'weekly' | 'on' | 'min' | 'from' | 'to' | 'days' | 'kw'>>) {
+    updateNeed(id: number, v: Partial<Pick<Need, 'name' | 'weekly' | 'on' | 'min' | 'from' | 'to' | 'days' | 'kw'>> & { goal?: number | null }) {
       update(s => {
         const n = s.needs.find(x => x.id === id); if (!n) return;
-        const { name, weekly, min, kw, ...rest } = v;
+        const { name, weekly, min, kw, goal, ...rest } = v;
         Object.assign(n, rest);
+        if (goal !== undefined) { if (goal && s.goals.some(g => g.id === goal)) n.goal = goal; else delete n.goal; }
         if (name !== undefined && name.trim()) n.name = name.trim();
         if (weekly !== undefined) n.weekly = clampN(weekly, 1, 14);
         if (min !== undefined) n.min = clampN(min, 5, 480);
@@ -507,16 +509,33 @@ function makeNeedActions({ update, getS, toast, del }: ActionDeps) {
       });
     },
 
-    addMachine(v: { title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string }) {
+    /** A goal made of ready needs: the goal is created and the needs it is made of become its weekly rhythm. */
+    goalFromTemplate(key: string) {
+      const t = GOAL_TEMPLATES.find(x => x.key === key); if (!t) return;
+      update(s => {
+        const id = s.nextId++;
+        s.goals.push({ id, title: t.title, area: t.area, target: 0, cur: 0, unit: '', due: '' });
+        for (const k of t.needs) { const n = s.needs.find(x => x.key === k); if (n && !n.goal) { n.goal = id; n.on = true; } }
+      });
+      toast(`Ціль «${t.title}» додано з тижневим ритмом`);
+    },
+    /** A new weekly action for a goal. */
+    addRhythm(goal: number, name: string, weekly: number) {
+      name = name.trim(); if (!name || !getS().goals.some(g => g.id === goal)) return false;
+      update(s => { if (s.goals.some(g => g.id === goal)) s.needs.push({ id: s.nextId++, name, weekly: clampN(weekly || 3, 1, 14), ...PLAIN_NEED, goal }); });
+      toast('Ритм додано'); return true;
+    },
+    addMachine(v: { title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string; goal?: number }) {
       const title = v.title.trim(); if (!title || !(v.target > 0) || !(v.price > 0)) return false;
       const url = (v.url || '').trim();
-      update(s => { s.machines.push({ id: s.nextId++, title, target: Math.round(v.target), saved: Math.max(0, Math.round(v.saved || 0)), due: v.due, price: Math.round(v.price), conv: clampN(v.conv || 20, 1, 100), ...(/^https?:\/\//i.test(url) ? { url } : {}), log: [] }); });
+      update(s => { s.machines.push({ id: s.nextId++, ...(v.goal ? { goal: v.goal } : {}), title, target: Math.round(v.target), saved: Math.max(0, Math.round(v.saved || 0)), due: v.due, price: Math.round(v.price), conv: clampN(v.conv || 20, 1, 100), ...(/^https?:\/\//i.test(url) ? { url } : {}), log: [] }); });
       toast('Ціль додано'); return true;
     },
-    updateMachine(id: number, v: Partial<Pick<Machine, 'title' | 'target' | 'saved' | 'due' | 'price' | 'conv'>>) {
+    updateMachine(id: number, v: Partial<Pick<Machine, 'title' | 'target' | 'saved' | 'due' | 'price' | 'conv'>> & { goal?: number | null }) {
       update(s => {
         const m = s.machines.find(x => x.id === id); if (!m) return;
         if (v.title?.trim()) m.title = v.title.trim();
+        if (v.goal !== undefined) { if (v.goal && s.goals.some(g => g.id === v.goal)) m.goal = v.goal; else delete m.goal; }
         if (v.target !== undefined && v.target > 0) m.target = Math.round(v.target);
         if (v.saved !== undefined) m.saved = Math.max(0, Math.round(v.saved));
         if (v.due !== undefined) m.due = v.due;

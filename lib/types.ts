@@ -72,8 +72,9 @@ export type Theme = 'system' | 'light' | 'dark';
 /** A need: something that goes hungry when it is missed (sport, people, something new, faith, rest…). weekly: how many times a week it should be met.
     min, from, to, days: how long one slot is and when in the day it suits (the week planner uses them).
     cat, kw, workout, machine: what is counted automatically (calendar events of that kind or with those words in the title, workouts logged in «Тіло», logged work on an income goal). */
+/** goal: id of the goal this need is the weekly rhythm of (a need without a goal is a basic need). */
 export type Need = {
-  id: number; key?: string; name: string; weekly: number; on: boolean;
+  id: number; key?: string; name: string; weekly: number; on: boolean; goal?: number;
   min: number; from: string; to: string; days: 'any' | 'weekend' | 'weekdays';
   cat?: string; kw?: string[]; workout?: boolean; machine?: boolean;
 };
@@ -91,7 +92,7 @@ export type Place = { id: number; name: string; what: string; url?: string; was?
 export type MachineLog = { id: number; date: string; leads: number; clients: number; money: number };
 /** A goal that is a sum of money (a car…): it is broken down into clients and leads per week.
     price: what one client brings, conv: share of leads that become clients (%), saved: what is already there. */
-export type Machine = { id: number; title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string; log: MachineLog[] };
+export type Machine = { id: number; goal?: number; title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string; log: MachineLog[] };
 /** The Sunday review of one week. ratings: need id → 1–5; focus: needs that get the first slots next week; accepted: suggestions taken. */
 export type Review = { ratings: Record<string, number>; focus: number[]; accepted: string[]; done?: number };
 

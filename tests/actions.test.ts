@@ -3,7 +3,6 @@ import { makeActions } from '@/lib/actions';
 import { makeState } from '@/lib/seed';
 import { goalProgress } from '@/lib/goals';
 import type { State } from '@/lib/types';
-import { ymd } from '@/lib/util';
 
 function setup() {
   const S: State = makeState(false);

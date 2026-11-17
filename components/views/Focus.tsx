@@ -123,7 +123,7 @@ const hms = (sec: number) => `${Math.floor(sec / 3600)}:${pad2(Math.floor(sec / 
 
 /** Stopwatch for errands: start when you leave, stop when you are back. */
 function ActTimer() {
-  const { S, A, go } = useStore();
+  const { S, A } = useStore();
   const now = useNow(1000, !!S.act);
   const [kind, setKind] = useState(ACT_KINDS[0]);
   const [title, setTitle] = useState('');
