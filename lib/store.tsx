@@ -23,29 +23,32 @@ const LOCAL_KEYS = ['view', 'mode', 'theme', 'log', 'unread'] as const;
 const keepLocal = (next: State, cur: State): State => { const o = { ...next } as Record<string, unknown>; for (const k of LOCAL_KEYS) o[k] = cur[k]; return o as State; };
 
 export const VIEWS: [string, string, string][] = [
-  ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['time', 'Час', 'clock'], ['coach', 'Поради', 'life'], ['quit', 'Відмова', 'flame'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
+  ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['time', 'Час', 'clock'], ['coach', 'Поради', 'life'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
   ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
   ['co', 'Огляд', 'company'], ['leads', 'Ліди', 'leads'], ['clients', 'Клієнти', 'user'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
-  ['needs', 'Ритм тижня', 'needs'], ['plan', 'План тижня', 'schedule'], ['people', 'Люди', 'team'], ['machine', 'Гроші → дії', 'trend'], ['review', 'Огляд тижня', 'check'],
+  ['needs', 'Ритм тижня', 'needs'], ['plan', 'План тижня', 'schedule'], ['machine', 'Гроші → дії', 'trend'], ['review', 'Огляд тижня', 'check'],
 ];
 export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'focus', 'time', 'coach', 'tasks', 'habits', 'quit', 'health', 'money', 'goals', 'people', 'schedule', 'notes', 'prefs'],
-  co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
+  me: ['home', 'goals', 'focus', 'tasks', 'habits', 'health', 'money', 'schedule', 'prefs'],
+  co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'prefs'],
 };
 export const TABS: Record<Mode, string[]> = { me: ['home', 'goals', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
 const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
-const ME_ONLY = ['home', 'needs', 'plan', 'people', 'machine', 'review', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'goals'];
-/** Sections that live inside another one as tabs: goals and their weekly rhythm (the needs), the week plan, money goals and the review. Every view keeps its own key, so go('plan') still works. */
-export const GROUPS: Record<string, string[]> = { goals: ['goals', 'needs', 'plan', 'machine', 'review'] };
-export const TAB_LABEL: Record<string, string> = { goals: 'Цілі', needs: 'Ритм тижня', plan: 'План тижня', machine: 'Гроші → дії', review: 'Огляд' };
+const ME_ONLY = ['home', 'needs', 'plan', 'machine', 'review', 'focus', 'time', 'coach', 'habits', 'health', 'money', 'goals'];
+/** Old keys that now live inside another section: the habits to quit are on the habits page. */
+const ALIAS: Record<string, string> = { quit: 'habits' };
+export const canon = (v: string) => ALIAS[v] ?? v;
+/** Sections that live inside another one as tabs: goals with their weekly rhythm, plan, money and review; focus with where the time goes and advice; tasks with notes. Every view keeps its own key, so go('plan') still works. */
+export const GROUPS: Record<string, string[]> = { goals: ['goals', 'needs', 'plan', 'machine', 'review'], focus: ['focus', 'time', 'coach'], tasks: ['tasks', 'notes'] };
+export const TAB_LABEL: Record<string, string> = { goals: 'Цілі', needs: 'Ритм тижня', plan: 'План тижня', machine: 'Гроші → дії', review: 'Огляд', focus: 'Фокус', time: 'Куди йде час', coach: 'Поради', tasks: 'Задачі', notes: 'Нотатки' };
 /** The section a view belongs to in the menu: «plan» sits under «needs», and so on. */
 export const parentOf = (v: string) => Object.keys(GROUPS).find(p => GROUPS[p].includes(v)) ?? v;
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
 export type ToastAction = { label: string; run: () => void };
 /** init pre-fills form fields by key, e.g. { date, s, e } when adding an event at a picked time. */
-export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'sos'; habit?: number } | { kind: 'form'; key: string; init?: Record<string, string> } | null;
+export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'people' } | { kind: 'mark' } | { kind: 'sos'; habit?: number } | { kind: 'form'; key: string; init?: Record<string, string> } | null;
 export type CalStatus = { state: 'idle' | 'loading' | 'ok' | 'none' | 'error'; at?: number; errors?: string[]; count?: number };
 
 const durOf = (s: State, m: 'focus' | 'break') => (m === 'focus' ? s.focusMin : s.breakMin) * 60;
@@ -158,7 +161,7 @@ function useStoreValue(dbOn: boolean) {
     const s = load(), h = location.hash.slice(1), mode: Mode = CO_ONLY.includes(h) ? 'co' : ME_ONLY.includes(h) ? 'me' : s.mode;
     return mode === s.mode ? s : { ...s, mode };
   });
-  const [view, setView] = useState(() => { const h = location.hash.slice(1); return vinfo(h) ? h : vinfo(S.view) ? S.view : 'home'; });
+  const [view, setView] = useState(() => { const h = canon(location.hash.slice(1)); return vinfo(h) ? h : vinfo(canon(S.view)) ? canon(S.view) : 'home'; });
   const [toastMsg, setToast] = useState<{ msg: string; id: number; action?: ToastAction } | null>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [palette, setPalette] = useState(false);
@@ -356,6 +359,9 @@ function useStoreValue(dbOn: boolean) {
   }, [update, toast]);
 
   const go = useCallback((v: string) => {
+    // the people and clubs list is a window, not a page
+    if (v === 'people') { setSheet({ kind: 'people' }); return; }
+    v = canon(v);
     if (!vinfo(v)) v = 'home';
     setView(v);
     setSheet(null);

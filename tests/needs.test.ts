@@ -365,3 +365,69 @@ describe('goals and needs together', () => {
     expect(S.needs.some(n => n.name === 'x')).toBe(false);
   });
 });
+
+describe('tasks, notes and quitting', () => {
+  it('a repeating task comes back with the next date when it is done', () => {
+    const { S, A } = setup();
+    A.addTask('Полити квіти', 'lo', undefined, undefined, 'week');
+    const t = S.tasks[0];
+    expect(t.rep).toBe('week');
+    A.toggleTask(t.id);
+    expect(S.tasks).toHaveLength(2);
+    const next = S.tasks[0];
+    expect(next).toMatchObject({ t: 'Полити квіти', d: false, rep: 'week' });
+    expect(next.due! > t.due!).toBe(true);
+    expect(S.tasks[1].d).toBe(true);
+    // taking the tick back does not create another one
+    A.toggleTask(t.id);
+    expect(S.tasks).toHaveLength(2);
+  });
+
+  it('moves everything late to today and turns a note into a task', () => {
+    const { S, A } = setup();
+    A.addTask('Стара', 'lo', undefined, '2020-01-01');
+    A.addTask('Нова', 'lo', undefined, '2999-01-01');
+    A.moveOverdueToToday();
+    expect(S.tasks.find(t => t.t === 'Стара')!.due! >= '2026').toBe(true);
+    expect(S.tasks.find(t => t.t === 'Нова')!.due).toBe('2999-01-01');
+    const id = A.addNote('Купити хліб\nі молоко');
+    expect(A.noteToTask(id)).toBe(true);
+    expect(S.tasks[0].t).toBe('Купити хліб');
+    expect(A.noteToTask(123456)).toBe(false);
+  });
+
+  it('keeps the money a habit would have cost', () => {
+    const { S, A } = setup();
+    A.addBad('Енергетики');
+    const id = S.badHabits[0].id;
+    A.setBadCost(id, 25);
+    expect(S.badHabits[0].cost).toBe(25);
+    A.setBadCost(id, 0);
+    expect(S.badHabits[0].cost).toBeUndefined();
+  });
+});
+
+describe('affirmations', () => {
+  it('counts what was read aloud once per line, and three make a step', async () => {
+    const { stepsOn } = await import('@/lib/momentum');
+    const { S, A } = setup();
+    A.readAff('Одна', K0); A.readAff('Одна', K0); A.readAff('Друга', K0);
+    expect(S.aff!.read[K0]).toEqual(['Одна', 'Друга']);
+    expect(stepsOn(S, K0).parts.some(p => p.key === 'aff')).toBe(false);
+    A.readAff('Третя', K0);
+    expect(stepsOn(S, K0).parts.find(p => p.key === 'aff')?.n).toBe(1);
+  });
+
+  it('keeps favourites and own lines, and removes an own line everywhere', () => {
+    const { S, A } = setup();
+    expect(A.addAffOwn('   ')).toBe(false);
+    expect(A.addAffOwn('Я встигаю')).toBe(true);
+    A.toggleAffFav('Я встигаю'); A.toggleAffFav('Чужа');
+    expect(S.aff!.fav).toEqual(['Я встигаю', 'Чужа']);
+    A.toggleAffFav('Чужа');
+    A.delAffOwn('Я встигаю');
+    expect(S.aff!.own).toEqual([]);
+    expect(S.aff!.fav).toEqual([]);
+  });
+});
+const K0 = '2026-03-18';

@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useNow, useStore } from '@/lib/store';
 import { bestStreak, cleanDays, cravingStats, dayMarks, MILESTONES, nextMilestone, streakDays, streakHours, TOOLS, TRIGGERS } from '@/lib/quit';
 import type { BadHabit } from '@/lib/types';
-import { DN, hhmm, MON, pctW, plural, weekdayIdx } from '@/lib/util';
+import { DN, fmtN, hhmm, MON, pctW, plural, weekdayIdx } from '@/lib/util';
 import { Icon } from '../Icon';
 import { DelBtn, Empty } from '../shared';
 
@@ -36,6 +36,10 @@ function HabitCard({ h, now }: { h: BadHabit; now: number }) {
         <div><span className="k">Найкраща</span><span className="v num">{best}<small>дн</small></span></div>
         <div><span className="k">Чистих днів</span><span className="v num">{cleanDays(h, now)}</span></div>
         <div><span className="k">Від</span><span className="v num" style={{ fontSize: 15 }}>{new Date(h.start).getDate()} {MON[new Date(h.start).getMonth()].slice(0, 3)}</span></div>
+      </div>
+      <div className="qcost">
+        {h.cost ? <span>Не витрачено: <b className="num">{fmtN(h.cost * cleanDays(h, now))} kr.</b><small className="muted"> ({fmtN(h.cost)} kr. на день)</small></span> : <span className="muted">Скільки це коштувало на день?</span>}
+        <input className="gin" type="number" min="0" aria-label={`Скільки коштувала звичка «${h.name}» на день, kr.`} placeholder="kr./день" defaultValue={h.cost || ''} onBlur={e => A.setBadCost(h.id, +e.target.value || 0)} />
       </div>
       {reached.length > 0 && <div className="tags small">{reached.map(m => <span key={m}>{m} дн ✓</span>)}</div>}
       <div className="row">
@@ -90,14 +94,15 @@ function Triggers() {
   );
 }
 
-export function QuitPage() {
+/** The habits to quit: streaks, cravings and the SOS button. It lives on the habits page, under the habits to build. */
+export function QuitSection() {
   const { S, A, setSheet } = useStore();
   const now = useNow(60_000);
   const [name, setName] = useState('');
   const add = (e: FormEvent) => { e.preventDefault(); if (A.addBad(name)) setName(''); };
   return (
-    <section className="view">
-      <div className="vh"><div><h2>Відмова від звичок</h2><p>Лічильник днів без зривів. Зрив перезапускає серію, але найкращий результат і чисті дні не втрачаються.</p></div></div>
+    <section id="quit" style={{ marginTop: 28 }}>
+      <div className="vh"><div><h2>Кинути шкідливе</h2><p>Лічильник днів без зривів. Зрив перезапускає серію, але найкращий результат і чисті дні не втрачаються.</p></div></div>
 
       <div className="card sosbanner">
         <div><b>Сильний потяг просто зараз?</b><p>Натисни кнопку: вправи, дихання або гра на 2 хвилини, а потім відміть, як минуло.</p></div>

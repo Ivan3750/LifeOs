@@ -61,6 +61,9 @@ export function Focus() {
             <button aria-pressed={T.mode === 'focus'} onClick={() => setTimerMode('focus')}>Фокус {S.focusMin}</button>
             <button aria-pressed={T.mode === 'break'} onClick={() => setTimerMode('break')}>Перерва {S.breakMin}</button>
           </div>
+          <div className="presets" role="group" aria-label="Скільки хвилин фокусу">
+            {[15, 25, 50, 90].map(m => <button key={m} aria-pressed={S.focusMin === m} disabled={T.running} onClick={() => update(s => { s.focusMin = m; if (!s.timer.running && s.timer.mode === 'focus') s.timer.left = m * 60; })}>{m} хв</button>)}
+          </div>
           <div className="timer">
             <div className="face">
               <svg viewBox="0 0 200 200" aria-hidden="true">

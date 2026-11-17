@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { addD, DN, TK, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { DelBtn, Empty, habStreak } from '../shared';
+import { QuitSection } from './Quit';
 
 export function Habits() {
   const { S, A, setSheet } = useStore();
@@ -63,6 +64,19 @@ export function Habits() {
           </div>
         )}
       </div>
+      {S.habits.length > 0 && (
+        <div className="card" style={{ marginTop: 18 }}>
+          <div className="ch"><Icon n="habits" className="ic" /><div><h3>Останні 5 тижнів</h3><p>Чим насиченіший квадрат, тим більше звичок виконано того дня</p></div></div>
+          <div className="hheat" role="img" aria-label="Виконання звичок за 5 тижнів">
+            {DN.map(d => <span key={d} className="hd">{d[0]}</span>)}
+            {[...Array(35)].map((_, i) => {
+              const day = addD(wStart(), i - 28), key = ymd(day), n = S.habits.filter(h => h.days[key]).length, p = n / S.habits.length, future = day > now;
+              return <i key={key} className={key === k ? 'today' : ''} title={`${day.getDate()}.${String(day.getMonth() + 1).padStart(2, '0')}: ${n} з ${S.habits.length}`} style={{ opacity: future ? 0.12 : n ? 0.3 + 0.7 * p : 0.12 }} />;
+            })}
+          </div>
+        </div>
+      )}
+      <QuitSection />
     </section>
   );
 }
