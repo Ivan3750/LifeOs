@@ -76,14 +76,6 @@ describe('dayScore: steady sleep, business and social media', () => {
     expect(r.parts.some(p => p.key === 'biz')).toBe(false);
   });
 
-  it('counts a Wolt shift as work too', () => {
-    const s = blank(); s.health[day] = night('23:30', '07:30');
-    s.activities.push({ id: 6, kind: 'Wolt', title: 'Зміна', start: new Date(day + 'T12:00').getTime(), end: new Date(day + 'T16:00').getTime() });
-    const r = dayScore(s, day, [], [], NOW);
-    expect(r.parts.find(p => p.key === 'focus')?.got).toBe(20);
-    expect(r.parts.find(p => p.key === 'focus')?.hint).toContain('Wolt');
-  });
-
   it('judges the tasks of the day: closed against due and still open', () => {
     const s = blank(); s.health[day] = night('23:30', '07:30');
     expect(dayScore(s, day, [], [], NOW).skipped.some(x => x.key === 'tasks')).toBe(true);

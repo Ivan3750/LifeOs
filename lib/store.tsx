@@ -9,6 +9,7 @@ import { mergeStates } from './merge';
 import { extOn, seriesSizes } from './extcal';
 import { addD, hhmm, sod, ymd } from './util';
 import { dayScore } from './score';
+import { applyAccent } from './theme';
 
 export { goalStep };
 
@@ -23,21 +24,21 @@ const keepLocal = (next: State, cur: State): State => { const o = { ...next } as
 
 export const VIEWS: [string, string, string][] = [
   ['home', 'Головна', 'home'], ['focus', 'Фокус', 'focus'], ['time', 'Час', 'clock'], ['coach', 'Поради', 'life'], ['quit', 'Відмова', 'flame'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'],
-  ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['wolt', 'Wolt', 'wolt'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
+  ['health', 'Здоровʼя', 'health'], ['money', 'Фінанси', 'money'], ['goals', 'Цілі', 'goals'], ['schedule', 'Розклад', 'schedule'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
   ['co', 'Огляд', 'company'], ['leads', 'Ліди', 'leads'], ['clients', 'Клієнти', 'user'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
-  ['needs', 'Потреби', 'needs'], ['plan', 'План тижня', 'schedule'], ['people', 'Люди', 'team'], ['machine', 'Ціль → дії', 'trend'], ['review', 'Огляд тижня', 'check'],
+  ['needs', 'Ритм тижня', 'needs'], ['plan', 'План тижня', 'schedule'], ['people', 'Люди', 'team'], ['machine', 'Гроші → дії', 'trend'], ['review', 'Огляд тижня', 'check'],
 ];
 export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'needs', 'focus', 'time', 'coach', 'tasks', 'habits', 'quit', 'health', 'money', 'wolt', 'goals', 'schedule', 'notes', 'prefs'],
+  me: ['home', 'focus', 'time', 'coach', 'tasks', 'habits', 'quit', 'health', 'money', 'goals', 'people', 'schedule', 'notes', 'prefs'],
   co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
 };
-export const TABS: Record<Mode, string[]> = { me: ['home', 'needs', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
+export const TABS: Record<Mode, string[]> = { me: ['home', 'goals', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
 const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
-const ME_ONLY = ['home', 'needs', 'plan', 'people', 'machine', 'review', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'wolt', 'goals'];
-/** Sections that live inside another one as tabs: the needs and everything around them. Every view keeps its own key, so go('plan') still works. */
-export const GROUPS: Record<string, string[]> = { needs: ['needs', 'plan', 'people', 'machine', 'review'] };
-export const TAB_LABEL: Record<string, string> = { needs: 'Потреби', plan: 'План тижня', people: 'Люди', machine: 'Ціль → дії', review: 'Огляд' };
+const ME_ONLY = ['home', 'needs', 'plan', 'people', 'machine', 'review', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'goals'];
+/** Sections that live inside another one as tabs: goals and their weekly rhythm (the needs), the week plan, money goals and the review. Every view keeps its own key, so go('plan') still works. */
+export const GROUPS: Record<string, string[]> = { goals: ['goals', 'needs', 'plan', 'machine', 'review'] };
+export const TAB_LABEL: Record<string, string> = { goals: 'Цілі', needs: 'Ритм тижня', plan: 'План тижня', machine: 'Гроші → дії', review: 'Огляд' };
 /** The section a view belongs to in the menu: «plan» sits under «needs», and so on. */
 export const parentOf = (v: string) => Object.keys(GROUPS).find(p => GROUPS[p].includes(v)) ?? v;
 export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
@@ -171,6 +172,7 @@ function useStoreValue(dbOn: boolean) {
     if (S.theme === 'system') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = S.theme;
   }, [S?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { applyAccent(S?.accent); }, [S?.accent]);
 
   const toast = useCallback((msg: string, action?: ToastAction) => {
     clearTimeout(toastT.current);

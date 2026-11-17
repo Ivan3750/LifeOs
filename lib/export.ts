@@ -8,7 +8,7 @@ import { LEAD_STATUS, STAGES } from './util';
 
 export const SECTIONS = [
   ['focus', 'Фокус і сесії'], ['tasks', 'Задачі'], ['habits', 'Звички'], ['health', 'Сон, вода, рух'], ['moods', 'Настрій'],
-  ['acts', 'Справи і зміни Wolt'], ['money', 'Фінанси'], ['events', 'Події: мої і з календарів'], ['goals', 'Цілі і сфери життя'],
+  ['acts', 'Справи й відлік часу'], ['money', 'Фінанси'], ['events', 'Події: мої і з календарів'], ['goals', 'Цілі і сфери життя'],
   ['notes', 'Нотатки'], ['quit', 'Відмова від звичок і потяги'], ['company', 'Компанія: ліди, клієнти, угоди, проєкти, рахунки, реклама'],
 ] as const;
 export type SectionKey = (typeof SECTIONS)[number][0];
@@ -46,8 +46,8 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
     S.cravings.filter(c => inP(day(c.t), p)).sort((a, b) => a.t - b.t).map(c => [day(c.t), clock(c.t), S.badHabits.find(h => h.id === c.habit)?.name || '', c.outcome === 'resisted' ? 'витримав' : 'зрив', c.trigger, c.tool ? ({ exercise: 'вправи', breath: 'дихання', game: 'гра' } as Record<string, string>)[c.tool] || c.tool : '']));
   add('moods', 'Настрій', 'nastrij', ['Дата', 'Час', 'Настрій 1–10', 'Сили', 'Теги', 'Нотатка'],
     S.moods.filter(m => inP(day(m.t), p)).sort((a, b) => a.t - b.t).map(m => [day(m.t), clock(m.t), m.v, m.energy ? ({ 1: 'мало', 3: 'нормально', 5: 'багато' } as Record<number, string>)[m.energy <= 2 ? 1 : m.energy === 3 ? 3 : 5] : '', m.tags.join('; '), m.note]));
-  add('acts', 'Справи', 'spravy', ['Дата', 'Початок', 'Кінець', 'Хвилин', 'Тип', 'Що', 'Замовлень', 'Заробіток, kr.', 'Км'],
-    S.activities.filter(a => inP(day(a.start), p)).sort((a, b) => a.start - b.start).map(a => [day(a.start), clock(a.start), clock(a.end), dur(a.start, a.end), a.kind, a.title, a.orders ?? '', a.earned ?? '', a.km ?? '']));
+  add('acts', 'Справи', 'spravy', ['Дата', 'Початок', 'Кінець', 'Хвилин', 'Тип', 'Що'],
+    S.activities.filter(a => inP(day(a.start), p)).sort((a, b) => a.start - b.start).map(a => [day(a.start), clock(a.start), clock(a.end), dur(a.start, a.end), a.kind, a.title]));
   add('money', 'Фінанси', 'finansy', ['Дата', 'Рахунок', 'Валюта', 'Тип', 'Категорія', 'Сума', 'Сума, kr. за курсом', 'Нотатка'],
     S.money.tx.filter(t => inP(t.date, p)).sort((a, b) => a.date.localeCompare(b.date)).map(t => {
       const a = account(S, accOf(t));

@@ -19,8 +19,7 @@ export type HealthField = Exclude<keyof HealthDay, 'demo' | 'bed' | 'wake' | 'na
 /** A mood check-in at a moment of the day. v: 1–10, energy: 1–5 (0 = not set). */
 export type MoodEntry = { id: number; t: number; v: number; energy: number; tags: string[]; note: string; demo?: 1 };
 /** Time spent on errands and other non-work things (shop, commute…). start/end are timestamps. */
-/** A logged activity. For a Wolt shift: orders (number of deliveries), earned (kr., tips included) and km driven. */
-export type Activity = { id: number; kind: string; title: string; start: number; end: number; orders?: number; earned?: number; km?: number; demo?: 1 };
+export type Activity = { id: number; kind: string; title: string; start: number; end: number; demo?: 1 };
 export type Note = { id: number; title: string; text: string; created: number; updated: number; pinned?: boolean; demo?: 1 };
 export type Cur = 'DKK' | 'UAH';
 export type AccId = 'dk' | 'ua';
@@ -28,9 +27,8 @@ export type AccId = 'dk' | 'ua';
 export type Account = { id: AccId; name: string; cur: Cur; opening: number; budget: number };
 /** amt is in the currency of its account (acc, 'dk' for records saved before accounts existed).
     xfer links the two halves of a transfer between accounts; transfers are not income or spending. */
-/** shift: id of the Wolt shift (activity) this income came from, so deleting the shift removes it too. */
 /** rec: id of the regular payment that created it, pot: id of the savings pot it feeds (a deposit leaves the account but is not spending). */
-export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; shift?: number; rec?: number; pot?: number; demo?: 1 };
+export type Tx = { id: number; type: 'in' | 'out'; amt: number; cat: string; note: string; date: string; acc?: AccId; xfer?: number; rec?: number; pot?: number; demo?: 1 };
 /** A payment or income that repeats every month on `day` (29–31 means the last day of short months). from: first month it applies to ('YYYY-MM'). */
 export type Recurring = { id: number; name: string; type: 'in' | 'out'; amt: number; cat: string; acc: AccId; day: number; from: string; active: boolean };
 /** A savings pot. What is saved in it is worked out from the deposit records (Tx.pot), in kroner. */
@@ -74,8 +72,9 @@ export type Theme = 'system' | 'light' | 'dark';
 /** A need: something that goes hungry when it is missed (sport, people, something new, faith, rest…). weekly: how many times a week it should be met.
     min, from, to, days: how long one slot is and when in the day it suits (the week planner uses them).
     cat, kw, workout, machine: what is counted automatically (calendar events of that kind or with those words in the title, workouts logged in «Тіло», logged work on an income goal). */
+/** goal: id of the goal this need is the weekly rhythm of (a need without a goal is a basic need). */
 export type Need = {
-  id: number; key?: string; name: string; weekly: number; on: boolean;
+  id: number; key?: string; name: string; weekly: number; on: boolean; goal?: number;
   min: number; from: string; to: string; days: 'any' | 'weekend' | 'weekdays';
   cat?: string; kw?: string[]; workout?: boolean; machine?: boolean;
 };
@@ -93,7 +92,7 @@ export type Place = { id: number; name: string; what: string; url?: string; was?
 export type MachineLog = { id: number; date: string; leads: number; clients: number; money: number };
 /** A goal that is a sum of money (a car…): it is broken down into clients and leads per week.
     price: what one client brings, conv: share of leads that become clients (%), saved: what is already there. */
-export type Machine = { id: number; title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string; log: MachineLog[] };
+export type Machine = { id: number; goal?: number; title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string; log: MachineLog[] };
 /** The Sunday review of one week. ratings: need id → 1–5; focus: needs that get the first slots next week; accepted: suggestions taken. */
 export type Review = { ratings: Record<string, number>; focus: number[]; accepted: string[]; done?: number };
 
@@ -114,8 +113,6 @@ export type State = {
   offDays?: Record<string, DayOff>;
   /** Daily goals for the body: glasses of water (default 8) and minutes of movement (default 30). */
   waterGoal?: number; moveGoal?: number;
-  /** Weekly earnings goal for Wolt, in kr. (0 or missing: no goal). */
-  woltGoal?: number;
   sessions: Session[]; tasks: Task[]; events: LocalEvent[];
   timer: Timer;
   log: { t: number; msg: string }[]; unread: boolean; nextId: number;
@@ -129,6 +126,8 @@ export type State = {
   mode: Mode; view: string;
   co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[] };
   icalUrls: string[];
+  /** Personal touches: a line that is shown on the home screen instead of the general quotes, and the accent colour of the app (a key of ACCENTS). */
+  motto?: string; accent?: string;
   /** Events of subscribed calendars that are hidden on this site only (the calendar itself is not touched). Keys are an occurrence id or a whole series id. */
   hiddenExt?: Record<string, 1>;
   /** What the events mean. evCats: exact (normalised) title → category; evWords: word stem → category → how often it was chosen. The app learns from both. */

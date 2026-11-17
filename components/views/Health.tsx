@@ -8,8 +8,10 @@ import { addD, DAY, DN, hhmm, MON, pad2, plural, TK, toMin, WD, wStart, ymd } fr
 import { Icon } from '../Icon';
 import { Face } from '../Face';
 import { LinksCard } from '../Advice';
-import { Bars, Trend } from '../charts';
-import { clock, sleepNights, sleepStability } from '@/lib/sleep';
+import { Bars, Ring, Trend } from '../charts';
+import { useNeeds } from '../needs';
+import { clock, sleepNights, sleepStability, sleepTotal } from '@/lib/sleep';
+import type { State } from '@/lib/types';
 import { avg, DelBtn, LifeTiles } from '../shared';
 
 /** Tags that lift the mood and tags that weigh on it, so they can be shown in two calm groups. */
@@ -243,7 +245,7 @@ function BedChart({ target }: { target: number }) {
       <rect x={L} y={y(target)} width={W - L - 8} height={y(target + 30) - y(target)} fill="var(--good)" opacity=".18" rx="4" />
       {ticks.map(m => <g key={m}><line x1={L} x2={W - 8} y1={y(m)} y2={y(m)} stroke="var(--line)" strokeDasharray="3 4" /><text className="chart-text" x="0" y={y(m) + 4}>{clock(m)}</text></g>)}
       <polyline points={nights.map((n, i) => `${x(i).toFixed(1)},${y(n.bed!).toFixed(1)}`).join(' ')} fill="none" stroke="var(--muted)" strokeWidth="1.4" opacity=".6" />
-      {nights.map((n, i) => <circle key={n.k} cx={x(i)} cy={y(n.bed!)} r="4.5" fill={n.bed! <= target + 30 ? 'var(--good)' : n.bed! <= target + 90 ? 'var(--accent-2)' : 'var(--m1)'}><title>{`${n.k}: заснув о ${clock(n.bed!)}`}</title></circle>)}
+      {nights.map((n, i) => <circle key={n.k} cx={x(i)} cy={y(n.bed!)} r="4.5" fill={n.bed! <= target + 30 ? 'var(--good)' : 'var(--accent-2)'}><title>{`${n.k}: заснув о ${clock(n.bed!)}`}</title></circle>)}
     </svg>
   );
 }
@@ -251,8 +253,8 @@ function BedChart({ target }: { target: number }) {
 /** Sleep as a rhythm: how steady the bedtime and wake time are, where you are against the wanted times, and what to do about it. */
 function SleepRhythmCard() {
   const { S } = useStore();
-  const r = sleepStability(S, 14), word = r.steady === null ? '—' : r.steady >= 75 ? 'Стабільний' : r.steady >= 50 ? 'Нерівний' : 'Хаотичний';
-  const tone = r.steady === null ? undefined : r.steady >= 75 ? 'var(--good)' : r.steady >= 50 ? 'var(--accent)' : 'var(--m1)';
+  const r = sleepStability(S, 14), word = r.steady === null ? '—' : r.steady >= 75 ? 'Стабільний' : r.steady >= 50 ? 'Майже рівний' : 'Ще плаває';
+  const tone = r.steady === null ? undefined : r.steady >= 75 ? 'var(--good)' : 'var(--accent)';
   const bedWindow = `${clock(r.target)}–${clock(r.target + 30)}`;
   return (
     <div className="card cardcol">
@@ -269,7 +271,7 @@ function SleepRhythmCard() {
           </div>
           <div className="bedchart"><BedChart target={r.target} /></div>
           {r.earlier >= 30 && <p className="help" style={{ margin: 0 }}><b>Добрий рух:</b> останнім часом ти засинаєш приблизно на {Math.round(r.earlier)} хв раніше, ніж на початку періоду. Продовжуй саме це.</p>}
-          {r.earlier <= -30 && <p className="help" style={{ margin: 0 }}><b>Увага:</b> останнім часом ти засинаєш приблизно на {Math.round(-r.earlier)} хв пізніше, ніж на початку періоду.</p>}
+          {r.earlier <= -30 && <p className="help" style={{ margin: 0 }}><b>Помічаю:</b> останнім часом ти засинаєш приблизно на {Math.round(-r.earlier)} хв пізніше, ніж на початку періоду.</p>}
           {r.avgHours >= 7 && r.lateNights > r.bedNights / 2 && <p className="help" style={{ margin: 0 }}>Тривалість сну в нормі, але час засинання «плаває» і часто пізній: це і є головна проблема, а не кількість годин.</p>}
         </>
       ) : <p className="help" style={{ margin: 0 }}>Запиши, коли заснув і прокинувся, у плитці «Сон» хоча б 3 ночі, і я покажу, наскільки твій режим стабільний.</p>}
@@ -287,8 +289,23 @@ function SleepRhythmCard() {
   );
 }
 
+/** The four rings of a day: how much of sleep, water, movement there is, and whether the mood was noted. They only fill up. */
+function dayRings(S: State, k: string) {
+  const h = S.health[k], hours = sleepTotal(h), ms = moodsOn(S, k), last = ms[ms.length - 1];
+  const want = Math.max(6, (((toMin(S.wakeTarget) - toMin(S.bedTarget)) + 1440) % 1440) / 60), wg = waterGoal(S), mg = moveGoal(S);
+  return [
+    { key: 'sleep', label: 'Сон', pct: hours / want, color: 'var(--sleep)', value: hours ? `${String(hours).replace('.', ',')} г` : '—' },
+    { key: 'water', label: 'Вода', pct: (h?.water || 0) / wg, color: 'var(--water)', value: `${h?.water || 0}/${wg}` },
+    { key: 'move', label: 'Рух', pct: (h?.workout || 0) / mg, color: 'var(--good)', value: h?.workout ? `${Math.round(h.workout)} хв` : '—' },
+    { key: 'mood', label: 'Настрій', pct: last ? last.v / 10 : 0, color: 'var(--accent)', value: last ? `${last.v}/10` : '—' },
+  ];
+}
+
 export function Health() {
   const { S } = useStore();
+  const { stats } = useNeeds();
+  const sportStat = stats.find(x => x.need.key === 'sport');
+  const [tab, setTab] = useState<'today' | 'sleep' | 'mood' | 'trends'>('today');
   const [moodDay, setMoodDay] = useState(TK);
   const [healthDay, setHealthDay] = useState(TK);
   const [editing, setEditing] = useState<MoodEntry | null>(null);
@@ -308,12 +325,22 @@ export function Health() {
     if (!ms.length) return '—';
     const m = Math.round(avg(ms)) % 1440; return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`;
   };
+  const rings = dayRings(S, healthDay);
   return (
     <section className="view">
-      <div className="vh"><div><h2>Здоровʼя</h2><p>Відмічай щодня. Настрій можна записувати кілька разів на день. Графіки показують останні 14 днів.</p></div></div>
+      <div className="vh"><div><h2>Здоровʼя</h2><p>Відмічай одним дотиком. Кільця рахують, скільки вже є, і ніколи не показують «мало»</p></div></div>
+      <div className="subtabs" role="tablist" style={{ marginBottom: 16 }}>
+        {([['today', 'Сьогодні'], ['sleep', 'Сон'], ['mood', 'Настрій'], ['trends', 'Динаміка']] as const).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>)}
+      </div>
+      {tab === 'today' && (
+        <>
+          <div className="card">
+            <div className="ch"><Icon n="health" className="ic" /><div><h3>Кільця дня</h3><p>{isT ? 'Сьогодні' : `${WD[dd.getDay()]}, ${dd.getDate()} ${MON[dd.getMonth()]}`}{sportStat ? ` · спорт цього тижня: ${sportStat.done} з ${sportStat.need.weekly}` : ''}</p></div></div>
+            <div className="hrings">{rings.map(r => <Ring key={r.key} pct={r.pct} color={r.color} label={r.label} value={r.value} />)}</div>
+          </div>
       <div className="card">
         <div className="ch">
-          <div><h3>{isT ? 'Сьогодні' : `${WD[dd.getDay()]}, ${dd.getDate()} ${MON[dd.getMonth()]}`}</h3><p>{isT ? 'Сон, вода, рух і вага. Минулі дні можна доповнити стрілками' : 'Доповнюєш минулий день. Ці дані йдуть в оцінку того дня'}{hday?.demo ? ' · демо-дані' : ''}</p></div>
+          <div><h3>{isT ? 'Сьогодні' : `${WD[dd.getDay()]}, ${dd.getDate()} ${MON[dd.getMonth()]}`}</h3><p>{isT ? 'Сон, вода, рух і вага. Минулі дні можна доповнити стрілками' : 'Доповнюєш минулий день: ці записи стануть частиною того дня'}{hday?.demo ? ' · демо-дані' : ''}</p></div>
           <div className="row" style={{ marginLeft: 'auto', gap: 6, flexWrap: 'nowrap' }}>
             {!isT && <button className="btn ghost" onClick={() => setHealthDay(TK())}>Сьогодні</button>}
             <button className="btn ghost cal-nav" aria-label="Попередній день" onClick={() => setHealthDay(ymd(addD(dd, -1)))}>‹</button>
@@ -322,9 +349,19 @@ export function Health() {
         </div>
         <LifeTiles full k={healthDay} />
       </div>
-      <SleepRhythmCard />
-      <HealthWeek />
-      <div className="grid">
+          <HealthWeek />
+        </>
+      )}
+      {tab === 'sleep' && (
+        <>
+          <SleepRhythmCard />
+          <div className="grid" style={{ marginTop: 18 }}>
+        <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
+          </div>
+        </>
+      )}
+      {tab === 'mood' && (
+        <div className="grid">
         <div className="card s5" ref={formCard}>
           <div className="ch"><div><h3>{editing ? 'Змінити запис' : 'Як ти зараз?'}</h3><p>{editing ? `Запис від ${new Date(editing.t).getDate()} ${MON[new Date(editing.t).getMonth()]}, ${hhmm(new Date(editing.t))}` : 'Запиши настрій з часом і деталями'}</p></div></div>
           <MoodForm key={editing?.id ?? 'new'} edit={editing} onDone={() => setEditing(null)} />
@@ -332,13 +369,17 @@ export function Health() {
         <div className="card s7"><MoodLog k={moodDay} setK={setMoodDay} onEdit={startEdit} /></div>
         <div className="card s5"><MoodMonth k={moodDay} setK={setMoodDay} /></div>
         <div className="card s7"><MoodInsights /></div>
-        <LinksCard />
         <div className="card s6"><div className="ch"><div><h3>Настрій</h3><p>Середній настрій {moodAv.toFixed(1)} з 10</p></div></div><Bars vals={moods.map(v => Math.round(v * 10) / 10)} max={10} color={v => moodColor(v)} unit="/10" /></div>
-        <div className="card s6"><div className="ch"><div><h3>Сон</h3><p>У середньому {av('sleep').toFixed(1)} год · засинаєш о {avgTime('bed')}, прокидаєшся о {avgTime('wake')}</p></div></div><Bars vals={ser('sleep')} max={12} color="var(--sleep)" target={8} unit=" год" /></div>
+        </div>
+      )}
+      {tab === 'trends' && (
+        <div className="grid">
         <div className="card s6"><div className="ch"><div><h3>Вода</h3><p>{av('water') ? `У середньому ${av('water').toFixed(1)} склянки на день · ціль ${waterGoal(S)}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('water')} max={Math.max(12, waterGoal(S) + 2)} color={v => (v >= waterGoal(S) ? 'var(--good)' : 'var(--accent-2)')} target={waterGoal(S)} unit=" склянок" /></div>
         <div className="card s6"><div className="ch"><div><h3>Рух</h3><p>{av('workout') ? `У середньому ${Math.round(av('workout'))} хв на день · ціль ${moveGoal(S)}` : 'Ще нічого не записано'}</p></div></div><Bars vals={ser('workout')} max={Math.max(90, moveGoal(S) * 2)} color={v => (v >= moveGoal(S) ? 'var(--good)' : 'var(--accent)')} target={moveGoal(S)} unit=" хв" /></div>
         {wts.length > 1 && <div className="card s6"><div className="ch"><div><h3>Вага</h3><p>{wts[0]} → {wts[wts.length - 1]} кг за 14 днів ({wts[wts.length - 1] - wts[0] >= 0 ? '+' : ''}{(Math.round((wts[wts.length - 1] - wts[0]) * 10) / 10)} кг)</p></div></div><Trend vals={wAll} unit="кг" /></div>}
-      </div>
+          <LinksCard />
+        </div>
+      )}
     </section>
   );
 }

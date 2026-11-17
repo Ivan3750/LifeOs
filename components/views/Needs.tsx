@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Need } from '@/lib/types';
+import type { NeedStat } from '@/lib/needs';
 import { useStore } from '@/lib/store';
 import { DN, MON, plural, wStart } from '@/lib/util';
 import { Icon } from '../Icon';
@@ -12,13 +13,14 @@ const DAYS_OPTS: [Need['days'], string][] = [['any', 'Будь-який день
 
 /** Everything about one need that can be changed. */
 function NeedEditor({ n }: { n: Need }) {
-  const { A } = useStore();
-  const [v, setV] = useState({ name: n.name, weekly: String(n.weekly), min: String(n.min), from: n.from, to: n.to, days: n.days, kw: (n.kw || []).join(', ') });
-  const save = () => A.updateNeed(n.id, { name: v.name, weekly: +v.weekly || n.weekly, min: +v.min || n.min, from: v.from || n.from, to: v.to || n.to, days: v.days, kw: v.kw.split(',').map(x => x.trim().toLowerCase()).filter(Boolean) });
+  const { S, A } = useStore();
+  const [v, setV] = useState({ goal: String(n.goal ?? ''), name: n.name, weekly: String(n.weekly), min: String(n.min), from: n.from, to: n.to, days: n.days, kw: (n.kw || []).join(', ') });
+  const save = () => A.updateNeed(n.id, { name: v.name, weekly: +v.weekly || n.weekly, min: +v.min || n.min, from: v.from || n.from, to: v.to || n.to, goal: +v.goal || null, days: v.days, kw: v.kw.split(',').map(x => x.trim().toLowerCase()).filter(Boolean) });
   const id = (k: string) => `ne${n.id}${k}`;
   return (
     <div className="gedit">
       <div className="fgrid">
+        <label className="field" htmlFor={id('g')}>Для цілі<select id={id('g')} value={v.goal} onChange={e => setV({ ...v, goal: e.target.value })}><option value="">Без цілі (основа)</option>{S.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
         <label className="field" htmlFor={id('n')}>Назва<input id={id('n')} value={v.name} onChange={e => setV({ ...v, name: e.target.value })} /></label>
         <label className="field" htmlFor={id('w')}>Разів на тиждень<input id={id('w')} type="number" min="1" max="14" value={v.weekly} onChange={e => setV({ ...v, weekly: e.target.value })} /></label>
         <label className="field" htmlFor={id('m')}>Один раз, хвилин<input id={id('m')} type="number" min="5" max="480" value={v.min} onChange={e => setV({ ...v, min: e.target.value })} /></label>
@@ -66,6 +68,28 @@ function Settings() {
   );
 }
 
+function NeedRow({ st, today }: { st: NeedStat; today: number }) {
+  const { A } = useStore();
+  return (
+    <div className={`nrow hg ${st.status}`} key={st.need.id}>
+      <div className="nmain">
+        <b>{st.need.name}</b>
+        <HungerTag st={st} />
+        <span className="muted num" style={{ fontSize: 13, marginLeft: 'auto' }}>{st.done} з {st.need.weekly}</span>
+      </div>
+      <NeedBar st={st} />
+      <div className="nfoot">
+        <span className="ndots" aria-hidden="true">{DN.map((d, i) => <i key={d} className={st.byDay[i] ? 'on' : i === today ? 'now' : ''} title={d}>{d[0]}</i>)}</span>
+        <small className="muted">{st.planned ? `заплановано ще ${st.planned}` : ''}{st.planned && st.auto ? ' · ' : ''}{st.auto ? `знайдено в даних: ${st.auto}` : ''}</small>
+        <span className="nact">
+          {st.manual > 0 && <button className="ib" title="Забрати останню відмітку" aria-label={`Забрати відмітку: ${st.need.name}`} onClick={() => A.unlogNeed(st.need.id)}><Icon n="left" className="icn sm" /></button>}
+          <button className="btn acc sm" aria-label={`Відмітити: ${st.need.name}`} onClick={() => A.logNeed(st.need.id)}><Icon n="plus" className="icn sm" />Було</button>
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /** The dashboard of needs: which ones are hungry this week. */
 export function Needs() {
   const { S, A, go } = useStore();
@@ -73,6 +97,8 @@ export function Needs() {
   const ws = wStart(new Date(now)), end = new Date(ws.getTime() + 6 * 864e5);
   const red = stats.filter(s => s.status === 'red').length, warn = stats.filter(s => s.status === 'warn').length;
   const today = (new Date(now).getDay() + 6) % 7;
+  const linked = (g: number) => stats.filter(s => s.need.goal === g);
+  const groups = [...S.goals.filter(g => linked(g.id).length).map(g => ({ id: g.id, title: g.title, items: linked(g.id) })), { id: 0, title: '', items: stats.filter(s => !s.need.goal || !S.goals.some(g => g.id === s.need.goal)) }].filter(g => g.items.length);
   return (
     <section className="view">
       <div className="grid">
@@ -86,22 +112,10 @@ export function Needs() {
             <button className="sel" onClick={() => go('plan')}>Скласти план</button>
           </div>
           <div className="list">
-            {stats.map(st => (
-              <div className={`nrow hg ${st.status}`} key={st.need.id}>
-                <div className="nmain">
-                  <b>{st.need.name}</b>
-                  <HungerTag st={st} />
-                  <span className="muted num" style={{ fontSize: 13, marginLeft: 'auto' }}>{st.done} з {st.need.weekly}</span>
-                </div>
-                <NeedBar st={st} />
-                <div className="nfoot">
-                  <span className="ndots" aria-hidden="true">{DN.map((d, i) => <i key={d} className={st.byDay[i] ? 'on' : i === today ? 'now' : ''} title={d}>{d[0]}</i>)}</span>
-                  <small className="muted">{st.planned ? `заплановано ще ${st.planned}` : ''}{st.planned && st.auto ? ' · ' : ''}{st.auto ? `знайдено в даних: ${st.auto}` : ''}</small>
-                  <span className="nact">
-                    {st.manual > 0 && <button className="ib" title="Забрати останню відмітку" aria-label={`Забрати відмітку: ${st.need.name}`} onClick={() => A.unlogNeed(st.need.id)}><Icon n="left" className="icn sm" /></button>}
-                    <button className="btn acc sm" aria-label={`Відмітити: ${st.need.name}`} onClick={() => A.logNeed(st.need.id)}><Icon n="plus" className="icn sm" />Було</button>
-                  </span>
-                </div>
+            {groups.map(g => (
+              <div key={g.id} className="ngroup">
+                <h4>{g.id ? <>Для цілі «{g.title}»</> : 'Основа: що потрібно завжди'}{g.id > 0 && <button className="linkbtn" onClick={() => go('goals')}>до цілі</button>}</h4>
+                {g.items.map(st => <NeedRow key={st.need.id} st={st} today={today} />)}
               </div>
             ))}
             {!stats.length && <p className="muted" style={{ margin: 0 }}>Усі потреби вимкнені. Увімкни їх нижче.</p>}

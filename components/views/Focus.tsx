@@ -4,7 +4,6 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ACT_KINDS } from '@/lib/score';
 import { liveSessions, timerLeftAt, useNow, useStore } from '@/lib/store';
 import { goalFocusOn, goalTasks } from '@/lib/goals';
-import { WoltCard } from '../Wolt';
 import { addD, DN, fmt, hhmm, hmPlain, MON, pad2, pctW, sod, sum, TK, WD, weekdayIdx, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
 import { DelBtn, Empty, weekMinutes } from '../shared';
@@ -114,7 +113,6 @@ export function Focus() {
           {tab === 'manual' && <ManualTime />}
           {tab === 'log' && <ActLog />}
         </div>
-        <div className="s12"><WoltCard /></div>
       </div>
     </section>
   );
@@ -125,7 +123,7 @@ const hms = (sec: number) => `${Math.floor(sec / 3600)}:${pad2(Math.floor(sec / 
 
 /** Stopwatch for errands: start when you leave, stop when you are back. */
 function ActTimer() {
-  const { S, A, go } = useStore();
+  const { S, A } = useStore();
   const now = useNow(1000, !!S.act);
   const [kind, setKind] = useState(ACT_KINDS[0]);
   const [title, setTitle] = useState('');
@@ -137,9 +135,7 @@ function ActTimer() {
         <>
           <div className="actrun"><span className="dot" /><div><b>{a.kind}{a.title && <span className="muted"> · {a.title}</span>}</b><small>з {hhmm(new Date(a.start))}</small></div><span className="num">{hms(Math.max(0, Math.round((now - a.start) / 1000)))}</span></div>
           <div className="row">
-            {a.kind === 'Wolt'
-              ? <button className="btn acc" onClick={() => go('wolt')}><Icon n="check" />Завершити в Wolt</button>
-              : <button className="btn acc" onClick={A.stopAct}><Icon n="check" />Завершити</button>}
+            <button className="btn acc" onClick={A.stopAct}><Icon n="check" />Завершити</button>
             <button className="btn ghost" onClick={A.cancelAct}>Скасувати</button>
           </div>
         </>

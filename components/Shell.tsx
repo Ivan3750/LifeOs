@@ -36,7 +36,7 @@ function NavBtn({ k, step }: { k: string; step?: number }) {
     <button onClick={() => go(k)} aria-current={k === parentOf(view) ? 'page' : undefined}>
       {step ? <span className="stepn">{step}</span> : <Icon n={i as IconName} />}<span className="nl">{l}</span>
       {k === 'tasks' && open > 0 && <span className="badge">{open}</span>}
-      {k === 'needs' && <HungryBadge />}
+      {k === 'goals' && <HungryBadge />}
     </button>
   );
 }

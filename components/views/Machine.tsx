@@ -26,7 +26,8 @@ function MachineCard({ m }: { m: MachineT }) {
   const now = useNow(60_000), at = new Date(now);
   const p = machinePlan(m, at), left = daysLeft(m);
   const [edit, setEdit] = useState(false);
-  const [v, setV] = useState({ title: m.title, target: String(m.target), saved: String(m.saved), due: m.due, price: String(m.price), conv: String(m.conv) });
+  const { S } = useStore();
+  const [v, setV] = useState({ goal: String(m.goal ?? ''), title: m.title, target: String(m.target), saved: String(m.saved), due: m.due, price: String(m.price), conv: String(m.conv) });
   const [sum, setSum] = useState('');
   const ws = ymd(wStart(at));
   const recent = m.log.filter(l => l.date >= ws).sort((a, b) => b.date.localeCompare(a.date));
@@ -85,6 +86,7 @@ function MachineCard({ m }: { m: MachineT }) {
       {edit && (
         <div className="gedit">
           <div className="fgrid">
+            <label className="field" htmlFor={id('o')}>Для цілі<select id={id('o')} value={v.goal} onChange={e => setV({ ...v, goal: e.target.value })}><option value="">Без цілі</option>{S.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
             <label className="field" htmlFor={id('t')}>Назва<input id={id('t')} value={v.title} onChange={e => setV({ ...v, title: e.target.value })} /></label>
             <label className="field" htmlFor={id('g')}>Скільки потрібно, кр<input id={id('g')} type="number" min="1" value={v.target} onChange={e => setV({ ...v, target: e.target.value })} /></label>
             <label className="field" htmlFor={id('s')}>Вже є, кр<input id={id('s')} type="number" min="0" value={v.saved} onChange={e => setV({ ...v, saved: e.target.value })} /></label>
@@ -92,7 +94,7 @@ function MachineCard({ m }: { m: MachineT }) {
             <label className="field" htmlFor={id('p')}>Скільки приносить клієнт, кр<input id={id('p')} type="number" min="1" value={v.price} onChange={e => setV({ ...v, price: e.target.value })} /></label>
             <label className="field" htmlFor={id('c')}>Лідів, що стають клієнтами, %<input id={id('c')} type="number" min="1" max="100" value={v.conv} onChange={e => setV({ ...v, conv: e.target.value })} /></label>
           </div>
-          <button className="btn acc sm" style={{ alignSelf: 'flex-start' }} onClick={() => { A.updateMachine(m.id, { title: v.title, target: +v.target, saved: +v.saved || 0, due: v.due, price: +v.price, conv: +v.conv }); setEdit(false); }}>Зберегти</button>
+          <button className="btn acc sm" style={{ alignSelf: 'flex-start' }} onClick={() => { A.updateMachine(m.id, { goal: +v.goal || null, title: v.title, target: +v.target, saved: +v.saved || 0, due: v.due, price: +v.price, conv: +v.conv }); setEdit(false); }}>Зберегти</button>
         </div>
       )}
       <div className="g2foot">
@@ -104,15 +106,16 @@ function MachineCard({ m }: { m: MachineT }) {
 }
 
 function NewMachine({ first }: { first: boolean }) {
-  const { A } = useStore();
+  const { S, A } = useStore();
   const [open, setOpen] = useState(first);
-  const [v, setV] = useState({ title: '', target: '', saved: '', due: '', price: '', conv: '20', url: '' });
+  const [v, setV] = useState({ goal: '', title: '', target: '', saved: '', due: '', price: '', conv: '20', url: '' });
   if (!open) return <button className="moretoggle" onClick={() => setOpen(true)}><Icon n="plus" className="icn sm" /><span>Нова ціль з грошима</span></button>;
   return (
     <div className="card s12">
       <div className="ch"><Icon n="goals" className="ic" /><div><h3>Нова ціль з грошима</h3><p>Скажи, скільки потрібно, і я розкладу на клієнтів, лідів і тиждень</p></div></div>
-      <form className="cardcol" onSubmit={e => { e.preventDefault(); if (A.addMachine({ title: v.title, target: +v.target, saved: +v.saved || 0, due: v.due, price: +v.price, conv: +v.conv || 20, url: v.url })) { setV({ title: '', target: '', saved: '', due: '', price: '', conv: '20', url: '' }); setOpen(false); } }}>
+      <form className="cardcol" onSubmit={e => { e.preventDefault(); if (A.addMachine({ title: v.title, target: +v.target, saved: +v.saved || 0, due: v.due, price: +v.price, conv: +v.conv || 20, url: v.url, goal: +v.goal || undefined })) { setV({ goal: '', title: '', target: '', saved: '', due: '', price: '', conv: '20', url: '' }); setOpen(false); } }}>
         <div className="fgrid">
+          <label className="field" htmlFor="nmO">Для цілі<select id="nmO" value={v.goal} onChange={e => setV({ ...v, goal: e.target.value })}><option value="">Без цілі</option>{S.goals.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}</select></label>
           <label className="field" htmlFor="nmT">Що це<input id="nmT" value={v.title} placeholder="Машина" autoComplete="off" required onChange={e => setV({ ...v, title: e.target.value })} /></label>
           <label className="field" htmlFor="nmG">Скільки потрібно, кр<input id="nmG" type="number" min="1" required value={v.target} onChange={e => setV({ ...v, target: e.target.value })} /></label>
           <label className="field" htmlFor="nmS">Вже є, кр<input id="nmS" type="number" min="0" value={v.saved} onChange={e => setV({ ...v, saved: e.target.value })} /></label>

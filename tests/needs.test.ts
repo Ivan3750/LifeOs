@@ -314,3 +314,54 @@ describe('saved data', () => {
     expect(fill(own).needs).toHaveLength(1);
   });
 });
+
+describe('goals and needs together', () => {
+  it('a goal made from a template takes its needs as the weekly rhythm', async () => {
+    const { rhythmOf, rhythmOnly } = await import('@/lib/goalplan');
+    const { S, A, eventsOn } = setup();
+    A.goalFromTemplate('balance');
+    const g = S.goals[0];
+    expect(g.title).toBe('Відпочивати й пробувати нове');
+    expect(S.needs.filter(n => n.goal === g.id).map(n => n.key).sort()).toEqual(['new', 'rest']);
+    A.logNeed(3, '2026-03-17'); A.logNeed(3, '2026-03-18'); A.logNeed(5, '2026-03-17');
+    const r = rhythmOf(weekStats(S, WS, eventsOn, NOW.getTime()), g.id);
+    expect(r.needs).toHaveLength(2);
+    // rest 1 of 3, new 2 of 5
+    expect(r.share).toBeCloseTo((1 / 3 + 2 / 5) / 2, 5);
+    expect(rhythmOnly(g, true)).toBe(true);
+    expect(rhythmOnly({ ...g, target: 10 }, true)).toBe(false);
+  });
+
+  it('does not take a need that already belongs to another goal', () => {
+    const { S, A } = setup();
+    A.goalFromTemplate('fit');
+    const fit = S.goals[0].id;
+    A.addGoal({ title: 'Інша', area: 'Здоровʼя', target: 0, unit: '', due: '' });
+    A.updateNeed(1, { goal: S.goals[1].id });
+    expect(S.needs[0].goal).toBe(S.goals[1].id);
+    A.goalFromTemplate('fit');
+    expect(S.needs[0].goal).toBe(S.goals[1].id);
+    expect(fit).not.toBe(S.goals[1].id);
+  });
+
+  it('adds a weekly action for a goal and frees everything when the goal is deleted', () => {
+    const { S, A } = setup();
+    A.addGoal({ title: 'Ціль', area: 'Розвиток', target: 0, unit: '', due: '' });
+    const id = S.goals[0].id;
+    expect(A.addRhythm(id, 'Читати Біблію', 3)).toBe(true);
+    expect(S.needs.at(-1)).toMatchObject({ name: 'Читати Біблію', weekly: 3, goal: id });
+    A.addMachine({ title: 'Машина', target: 1000, saved: 0, due: '', price: 100, conv: 20, goal: id });
+    expect(S.machines[0].goal).toBe(id);
+    A.delGoal(id);
+    expect(S.needs.at(-1)!.goal).toBeUndefined();
+    expect(S.machines[0].goal).toBeUndefined();
+  });
+
+  it('ignores a goal that does not exist', () => {
+    const { S, A } = setup();
+    A.updateNeed(1, { goal: 999 });
+    expect(S.needs[0].goal).toBeUndefined();
+    expect(A.addRhythm(999, 'x', 2)).toBe(false);
+    expect(S.needs.some(n => n.name === 'x')).toBe(false);
+  });
+});
