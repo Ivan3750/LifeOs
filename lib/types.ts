@@ -126,6 +126,8 @@ export type State = {
   mode: Mode; view: string;
   co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[] };
   icalUrls: string[];
+  /** Personal touches: a line that is shown on the home screen instead of the general quotes, and the accent colour of the app (a key of ACCENTS). */
+  motto?: string; accent?: string;
   /** Events of subscribed calendars that are hidden on this site only (the calendar itself is not touched). Keys are an occurrence id or a whole series id. */
   hiddenExt?: Record<string, 1>;
   /** What the events mean. evCats: exact (normalised) title → category; evWords: word stem → category → how often it was chosen. The app learns from both. */

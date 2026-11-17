@@ -9,6 +9,7 @@ import { mergeStates } from './merge';
 import { extOn, seriesSizes } from './extcal';
 import { addD, hhmm, sod, ymd } from './util';
 import { dayScore } from './score';
+import { applyAccent } from './theme';
 
 export { goalStep };
 
@@ -32,7 +33,7 @@ export const NAV: Record<Mode, string[]> = {
   me: ['home', 'focus', 'time', 'coach', 'tasks', 'habits', 'quit', 'health', 'money', 'goals', 'people', 'schedule', 'notes', 'prefs'],
   co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'notes', 'prefs'],
 };
-export const TABS: Record<Mode, string[]> = { me: ['home', 'needs', 'focus', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
+export const TABS: Record<Mode, string[]> = { me: ['home', 'goals', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
 const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
 const ME_ONLY = ['home', 'needs', 'plan', 'people', 'machine', 'review', 'focus', 'time', 'coach', 'quit', 'habits', 'health', 'money', 'goals'];
 /** Sections that live inside another one as tabs: goals and their weekly rhythm (the needs), the week plan, money goals and the review. Every view keeps its own key, so go('plan') still works. */
@@ -171,6 +172,7 @@ function useStoreValue(dbOn: boolean) {
     if (S.theme === 'system') delete document.documentElement.dataset.theme;
     else document.documentElement.dataset.theme = S.theme;
   }, [S?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { applyAccent(S?.accent); }, [S?.accent]);
 
   const toast = useCallback((msg: string, action?: ToastAction) => {
     clearTimeout(toastT.current);

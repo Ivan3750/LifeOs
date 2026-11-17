@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { scoreColor } from '@/lib/score';
 import { useStore } from '@/lib/store';
 import { addD, DN, TK, weekdayIdx, wStart, ymd } from '@/lib/util';
 import { Icon } from '../Icon';
@@ -58,7 +57,7 @@ export function Habits() {
           <div className="scorehist" style={{ marginTop: 18 }}>
             {hist.map(h => (
               <button key={+h.w0} aria-pressed={+h.w0 === +ws} title={`Тиждень з ${h.w0.getDate()}.${String(h.w0.getMonth() + 1).padStart(2, '0')}: ${h.p ?? '—'}%`} onClick={() => setOff(Math.round((+h.w0 - +wStart()) / 6048e5))}>
-                <i style={{ height: Math.max(3, (h.p ?? 0) * 0.44), background: scoreColor(h.p) }} /><span>{h.w0.getDate()}.{String(h.w0.getMonth() + 1).padStart(2, '0')}</span><b className="num">{h.p ?? '—'}</b>
+                <i style={{ height: Math.max(3, (h.p ?? 0) * 0.44), background: 'var(--accent)', opacity: h.p === null ? 0.25 : 0.45 + 0.55 * (h.p / 100) }} /><span>{h.w0.getDate()}.{String(h.w0.getMonth() + 1).padStart(2, '0')}</span><b className="num">{h.p ?? '—'}</b>
               </button>
             ))}
           </div>

@@ -356,7 +356,7 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
         if (kind) o[k] = { kind, note: note ?? o[k]?.note ?? '' }; else delete o[k];
         s.offDays = o;
       });
-      toast(kind ? 'День позначено: оцінка буде м’якшою' : 'Позначку дня знято');
+      toast(kind ? 'День позначено' : 'Позначку дня знято');
     },
     addMember(v: { name: string; role: string }) { update(s => { s.co.team.push({ id: s.nextId++, ...v, load: 50 }); }); toast('Учасника додано'); },
     updateMember(id: number, v: Partial<Pick<Member, 'name' | 'role'>>) { update(s => { const m = s.co.team.find(x => x.id === id); if (m) { Object.assign(m, v); delete m.demo; } }); toast('Учасника оновлено'); },

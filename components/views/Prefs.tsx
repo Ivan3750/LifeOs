@@ -7,6 +7,7 @@ import { DN, plural, TK } from '@/lib/util';
 import { dayPlan, sleepRhythm } from '@/lib/score';
 import type { State, Theme } from '@/lib/types';
 import { Icon } from '../Icon';
+import { ACCENTS } from '@/lib/theme';
 import { ExportCard } from '../ExportCard';
 import { CalStatusChip } from './Schedule';
 import { SYNC_TEXT } from '../Shell';
@@ -191,6 +192,12 @@ export function Prefs() {
         <div className="card s6 cardcol">
           <div className="ch" style={{ margin: 0 }}><Icon n="user" className="ic" /><div><h3>Профіль</h3><p>Як до тебе звертатися й який вигляд має застосунок</p></div></div>
           <TextField id="pName" label="Імʼя" value={S.name} fallback="Друже" onSave={v => update(s => { s.name = v; })} />
+          <TextField id="pMotto" label="Мій девіз (замість загальних цитат на головній)" value={S.motto || ''} fallback="" onSave={v => update(s => { if (v) s.motto = v; else delete s.motto; })} />
+          <div className="field">Колір
+            <div className="swatches" role="radiogroup" aria-label="Колір застосунку">
+              {Object.entries(ACCENTS).map(([k, c]) => <button key={k} role="radio" aria-checked={(S.accent || 'sun') === k} title={c.name} aria-label={c.name} style={{ background: `linear-gradient(135deg, ${c.a}, ${c.b})` }} onClick={() => update(s => { if (k === 'sun') delete s.accent; else s.accent = k; })} />)}
+            </div>
+          </div>
           <div className="field">Тема
             <div className="seg themeseg" role="group" aria-label="Тема">
               {THEMES.map(([v, l]) => <button key={v} aria-pressed={S.theme === v} onClick={() => update(s => { s.theme = v; }, true)}>{l}</button>)}
@@ -232,7 +239,7 @@ export function Prefs() {
           </div>
           <div>
             <div className="fl">Режим сну</div>
-            <p className="help" style={{ marginBottom: 10 }}>Сон у оцінці дня рахується не лише за довжиною, а й за тим, чи ти засинаєш і прокидаєшся вчасно. Засинання до 30 хв після цільового часу ще вважається добрим.</p>
+            <p className="help" style={{ marginBottom: 10 }}>Режим сну показується не лише за довжиною, а й за тим, чи ти засинаєш і прокидаєшся вчасно. Засинання до 30 хв після цільового часу ще вважається добрим.</p>
             <div className="fgrid">
               <label className="field" htmlFor="pBed">Засинати о<input id="pBed" type="time" value={S.bedTarget} onChange={e => e.target.value && update(s => { s.bedTarget = e.target.value; })} /></label>
               <label className="field" htmlFor="pWake">Прокидатися о<input id="pWake" type="time" value={S.wakeTarget} onChange={e => e.target.value && update(s => { s.wakeTarget = e.target.value; })} /></label>
