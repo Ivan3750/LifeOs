@@ -1,6 +1,8 @@
 import { catOf, learn, unlearn } from './timeuse';
-import type { DayOff, Goal, HealthField, Meal, OffKind, State } from './types';
-import { AREAS, TK, toMin } from './util';
+import type { DayOff, Goal, HealthField, Machine, Meal, Need, NeedLog, OffKind, Person, Place, Review, State } from './types';
+import { AREAS, TK, toMin, wStart, ymd } from './util';
+import type { Slot } from './planner';
+import type { Suggestion } from './review';
 import { parseTask } from './tasks';
 import { moodCause } from './correlations';
 
@@ -224,7 +226,199 @@ export function makeActions({ update, getS, toast, notify, del }: ActionDeps) {
       });
       toast(kind ? 'День позначено: оцінка буде м’якшою' : 'Позначку дня знято');
     },
+    ...makeNeedActions({ update, getS, toast, notify, del }),
   };
 }
 
 export type Actions = ReturnType<typeof makeActions>;
+
+const PLAIN_NEED = { on: true, min: 30, from: '17:00', to: '21:00', days: 'any' } as const;
+const clampN = (v: number, a: number, b: number) => Math.max(a, Math.min(b, Math.round(v) || 0));
+
+/** Needs, the daily minimum, people, places, the money goal and the weekly review. */
+function makeNeedActions({ update, getS, toast, del }: ActionDeps) {
+  /** Marks a need as met on day k. Returns the id of the mark. */
+  function mark(s: State, need: number, k: string, src: NeedLog['src'], ref?: number) {
+    const id = s.nextId++;
+    s.needLog.push({ id, need, date: k, t: Date.now(), src, ...(ref !== undefined ? { ref } : {}) });
+    return id;
+  }
+  const needId = (s: State, key: string) => s.needs.find(n => n.key === key && n.on)?.id;
+  return {
+    addNeed(v: { name: string; weekly: number } & Partial<Pick<Need, 'min' | 'from' | 'to' | 'days' | 'kw'>>) {
+      const name = v.name.trim(); if (!name) return false;
+      update(s => { s.needs.push({ id: s.nextId++, name, weekly: clampN(v.weekly || 3, 1, 14), ...PLAIN_NEED, ...(v.min ? { min: clampN(v.min, 5, 480) } : {}), ...(v.from ? { from: v.from } : {}), ...(v.to ? { to: v.to } : {}), ...(v.days ? { days: v.days } : {}), ...(v.kw?.length ? { kw: v.kw } : {}) }); });
+      toast('Потребу додано'); return true;
+    },
+    updateNeed(id: number, v: Partial<Pick<Need, 'name' | 'weekly' | 'on' | 'min' | 'from' | 'to' | 'days' | 'kw'>>) {
+      update(s => {
+        const n = s.needs.find(x => x.id === id); if (!n) return;
+        const { name, weekly, min, kw, ...rest } = v;
+        Object.assign(n, rest);
+        if (name !== undefined && name.trim()) n.name = name.trim();
+        if (weekly !== undefined) n.weekly = clampN(weekly, 1, 14);
+        if (min !== undefined) n.min = clampN(min, 5, 480);
+        if (kw !== undefined) { if (kw.length) n.kw = kw; else delete n.kw; }
+      });
+    },
+    delNeed(id: number) { del(s => { s.needs = s.needs.filter(x => x.id !== id); s.needLog = s.needLog.filter(l => l.need !== id); s.events.forEach(e => { if (e.need === id) delete e.need; }); }, 'Потребу видалено'); },
+    /** One more time the need was met. */
+    logNeed(id: number, k = TK(), src: NeedLog['src'] = 'manual') { update(s => { if (s.needs.some(n => n.id === id)) mark(s, id, k, src); }); },
+    /** Takes back the last mark of the need this week. Only marks made by hand can be taken back; what the calendar gave stays. */
+    unlogNeed(id: number, at = new Date()) {
+      update(s => {
+        const from = ymd(wStart(at)), last = s.needLog.filter(l => l.need === id && l.date >= from).sort((a, b) => b.t - a.t || b.id - a.id)[0];
+        if (last) s.needLog = s.needLog.filter(l => l.id !== last.id);
+      });
+    },
+
+    /** The daily minimum: movement (or one new thing) is ticked on day k; ticking it again takes it back. */
+    toggleDaily(what: 'move' | 'nov', k = TK()) {
+      update(s => {
+        const d = (s.daily[k] ||= {});
+        if (d[what]) {
+          delete d[what];
+          if (what === 'nov') { const id = needId(s, 'new'); s.needLog = s.needLog.filter(l => !(l.need === id && l.date === k && l.src === 'daily')); }
+          if (!d.move && !d.nov) delete s.daily[k];
+          return;
+        }
+        d[what] = 1;
+        if (what === 'nov') { const id = needId(s, 'new'); if (id) mark(s, id, k, 'daily'); }
+      });
+    },
+
+    /** A person is added to the list; `last` is the day you last were in touch, if you remember. */
+    addPerson(v: { name: string; kind: Person['kind']; every: number; last?: string; next?: string; nextDate?: string }) {
+      const name = v.name.trim(); if (!name) return false;
+      update(s => {
+        const id = s.nextId++;
+        s.people.push({ id, name, kind: v.kind, every: clampN(v.every, 1, 365), ...(v.next?.trim() ? { next: v.next.trim() } : {}), ...(v.nextDate ? { nextDate: v.nextDate } : {}) });
+        if (v.last && v.last <= TK()) s.touches.push({ id: s.nextId++, person: id, date: v.last, kind: 'msg' });
+      });
+      toast('Людину додано'); return true;
+    },
+    updatePerson(id: number, v: { name?: string; kind?: Person['kind']; every?: number; next?: string; nextDate?: string }) {
+      update(s => {
+        const p = s.people.find(x => x.id === id); if (!p) return;
+        if (v.name?.trim()) p.name = v.name.trim();
+        if (v.kind) p.kind = v.kind;
+        if (v.every !== undefined) p.every = clampN(v.every, 1, 365);
+        if (v.next !== undefined) { if (v.next.trim()) p.next = v.next.trim(); else delete p.next; }
+        if (v.nextDate !== undefined) { if (v.nextDate) p.nextDate = v.nextDate; else delete p.nextDate; }
+      });
+    },
+    delPerson(id: number) {
+      del(s => {
+        const touches = new Set(s.touches.filter(t => t.person === id).map(t => t.id));
+        s.people = s.people.filter(p => p.id !== id); s.touches = s.touches.filter(t => t.person !== id);
+        s.needLog = s.needLog.filter(l => !(l.src === 'people' && l.ref !== undefined && touches.has(l.ref)));
+      }, 'Людину видалено');
+    },
+    /** A message or a meeting. A meeting also counts for the need «Люди» (and «Стосунки» with a partner); a planned date that has come is cleared. */
+    addTouch(person: number, kind: 'msg' | 'meet', k = TK()) {
+      const p = getS().people.find(x => x.id === person); if (!p) return;
+      update(s => {
+        const id = s.nextId++;
+        s.touches.push({ id, person, date: k, kind });
+        const q = s.people.find(x => x.id === person)!;
+        if (q.nextDate && q.nextDate <= k) { delete q.nextDate; if (kind === 'meet') delete q.next; }
+        if (kind === 'meet') {
+          const a = needId(s, 'people'); if (a) mark(s, a, k, 'people', id);
+          if (q.kind === 'partner') { const b = needId(s, 'love'); if (b) mark(s, b, k, 'people', id); }
+        }
+      });
+      toast(kind === 'meet' ? `${p.name}: зустріч записана` : `${p.name}: повідомлення записане`);
+    },
+    delTouch(id: number) { del(s => { s.touches = s.touches.filter(t => t.id !== id); s.needLog = s.needLog.filter(l => !(l.src === 'people' && l.ref === id)); }, 'Запис видалено'); },
+
+    addPlace(v: { name: string; what: string; url?: string; going?: string }) {
+      const name = v.name.trim(); if (!name) return false;
+      const url = (v.url || '').trim();
+      update(s => { s.places.push({ id: s.nextId++, name, what: v.what.trim(), ...(/^https?:\/\//i.test(url) ? { url } : {}), ...(v.going ? { going: v.going } : {}) }); });
+      toast('Місце додано'); return true;
+    },
+    updatePlace(id: number, v: Partial<Pick<Place, 'name' | 'what' | 'was' | 'going'>>) {
+      update(s => {
+        const p = s.places.find(x => x.id === id); if (!p) return;
+        if (v.name?.trim()) p.name = v.name.trim();
+        if (v.what !== undefined) p.what = v.what.trim();
+        if (v.was !== undefined) { if (v.was) p.was = v.was; else delete p.was; }
+        if (v.going !== undefined) { if (v.going) p.going = v.going; else delete p.going; }
+      });
+    },
+    delPlace(id: number) { del(s => { s.places = s.places.filter(p => p.id !== id); }, 'Місце видалено'); },
+    /** You were there: the date is saved, the planned date is cleared and the need «Люди» gets its mark. */
+    visitPlace(id: number, k = TK()) {
+      update(s => {
+        const p = s.places.find(x => x.id === id); if (!p) return;
+        p.was = k; if (p.going && p.going <= k) delete p.going;
+        const a = needId(s, 'people'); if (a) mark(s, a, k, 'place', id);
+      });
+      toast('Записано. Це спілкування теж зараховане');
+    },
+
+    /** The slots of the week planner become events of the schedule. */
+    planSlots(slots: Slot[]) {
+      if (!slots.length) return;
+      update(s => { for (const x of slots) { const n = s.needs.find(y => y.id === x.need); if (n) s.events.push({ id: s.nextId++, date: x.date, s: x.s, e: x.e, title: n.name, c: 'c3', need: n.id }); } });
+      toast(slots.length === 1 ? 'Додано в розклад' : `Додано в розклад: ${slots.length}`);
+    },
+    /** A planned slot was done: the event is ticked and the need gets its mark. Ticking it again takes both back. */
+    toggleSlot(eventId: number) {
+      update(s => {
+        const e = s.events.find(x => x.id === eventId); if (!e?.need) return;
+        if (e.ok) { delete e.ok; s.needLog = s.needLog.filter(l => !(l.src === 'plan' && l.ref === eventId)); }
+        else { e.ok = 1; mark(s, e.need, e.date, 'plan', eventId); }
+      });
+    },
+
+    addMachine(v: { title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string }) {
+      const title = v.title.trim(); if (!title || !(v.target > 0) || !(v.price > 0)) return false;
+      const url = (v.url || '').trim();
+      update(s => { s.machines.push({ id: s.nextId++, title, target: Math.round(v.target), saved: Math.max(0, Math.round(v.saved || 0)), due: v.due, price: Math.round(v.price), conv: clampN(v.conv || 20, 1, 100), ...(/^https?:\/\//i.test(url) ? { url } : {}), log: [] }); });
+      toast('Ціль додано'); return true;
+    },
+    updateMachine(id: number, v: Partial<Pick<Machine, 'title' | 'target' | 'saved' | 'due' | 'price' | 'conv'>>) {
+      update(s => {
+        const m = s.machines.find(x => x.id === id); if (!m) return;
+        if (v.title?.trim()) m.title = v.title.trim();
+        if (v.target !== undefined && v.target > 0) m.target = Math.round(v.target);
+        if (v.saved !== undefined) m.saved = Math.max(0, Math.round(v.saved));
+        if (v.due !== undefined) m.due = v.due;
+        if (v.price !== undefined && v.price > 0) m.price = Math.round(v.price);
+        if (v.conv !== undefined) m.conv = clampN(v.conv, 1, 100);
+      });
+    },
+    delMachine(id: number) { del(s => { s.machines = s.machines.filter(m => m.id !== id); }, 'Ціль видалено'); },
+    /** Work on a money goal today: leads found, clients won, money received. All of the day goes into one record. */
+    logMachine(id: number, v: { leads?: number; clients?: number; money?: number }, k = TK()) {
+      update(s => {
+        const m = s.machines.find(x => x.id === id); if (!m) return;
+        let l = m.log.find(x => x.date === k);
+        if (!l) { l = { id: s.nextId++, date: k, leads: 0, clients: 0, money: 0 }; m.log.push(l); }
+        l.leads = Math.max(0, l.leads + Math.round(v.leads || 0)); l.clients = Math.max(0, l.clients + Math.round(v.clients || 0)); l.money = Math.max(0, l.money + Math.round(v.money || 0));
+        if (!l.leads && !l.clients && !l.money) m.log = m.log.filter(x => x.id !== l!.id);
+      });
+    },
+    delMachineLog(id: number, logId: number) { del(s => { const m = s.machines.find(x => x.id === id); if (m) m.log = m.log.filter(l => l.id !== logId); }); },
+
+    /** A mark from 1 to 5 for a need in the review of the week wk. */
+    rateNeed(wk: string, need: number, v: number) {
+      update(s => { const r: Review = (s.reviews[wk] ||= { ratings: {}, focus: [], accepted: [] }); r.ratings[need] = clampN(v, 1, 5); });
+    },
+    /** Takes a suggestion of the review: a new target, or the first slots for the need next week. */
+    applySuggestion(wk: string, sg: Suggestion) {
+      update(s => {
+        const r: Review = (s.reviews[wk] ||= { ratings: {}, focus: [], accepted: [] }), n = s.needs.find(x => x.id === sg.need);
+        if (!n || r.accepted.includes(sg.id)) return;
+        if (sg.kind === 'focus') { if (!r.focus.includes(n.id)) r.focus.push(n.id); } else if (sg.target) n.weekly = clampN(sg.target, 1, 14);
+        r.accepted.push(sg.id);
+      });
+      toast(sg.kind === 'focus' ? 'Додано. Наступного тижня це піде першим' : 'Ціль змінено');
+    },
+    finishReview(wk: string) {
+      update(s => { const r: Review = (s.reviews[wk] ||= { ratings: {}, focus: [], accepted: [] }); r.done = Date.now(); });
+      toast('Огляд збережено. Гарного тижня');
+    },
+  };
+}

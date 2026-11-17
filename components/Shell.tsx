@@ -7,6 +7,14 @@ import { Icon, type IconName } from './Icon';
 import { SheetHost } from './Sheets';
 import { Palette } from './Palette';
 import { RemindHost } from './Reminders';
+import { useNeeds } from './needs';
+
+/** Number of needs that are hungry now, for the badge of the menu entry. */
+function HungryBadge() {
+  const { stats } = useNeeds();
+  const n = stats.filter(s => s.status === 'red').length;
+  return n > 0 ? <span className="badge red" title="Голодні потреби">{n}</span> : null;
+}
 
 function NavBtn({ k }: { k: string }) {
   const { S, view, go } = useStore();
@@ -16,6 +24,7 @@ function NavBtn({ k }: { k: string }) {
     <button onClick={() => go(k)} aria-current={k === parentOf(view) ? 'page' : undefined}>
       <Icon n={i as IconName} /><span className="nl">{l}</span>
       {k === 'tasks' && open > 0 && <span className="badge">{open}</span>}
+      {k === 'needs' && <HungryBadge />}
     </button>
   );
 }

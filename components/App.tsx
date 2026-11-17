@@ -15,13 +15,18 @@ import { Notes } from './views/Notes';
 import { Schedule } from './views/Schedule';
 import { Tasks } from './views/Tasks';
 import { Prefs } from './views/Prefs';
+import { Needs } from './views/Needs';
+import { Plan } from './views/Plan';
+import { People } from './views/People';
+import { Machine } from './views/Machine';
+import { Review } from './views/Review';
 
 const VIEW_COMPONENTS: Record<string, () => React.JSX.Element> = {
   home: Home, focus: Focus, time: TimePage, coach: CoachPage, quit: QuitPage, tasks: Tasks, habits: Habits, health: Health, goals: Goals,
-  schedule: Schedule, notes: Notes, prefs: Prefs,
+  schedule: Schedule, notes: Notes, prefs: Prefs, needs: Needs, plan: Plan, people: People, machine: Machine, review: Review,
 };
 
-/** Related sections share one menu entry and switch between each other here: tasks and goals, habits and habits to quit, advice and time use. */
+/** Related sections share one menu entry and switch between each other here: tasks and goals, habits and habits to quit, advice and time use, needs and everything around them. */
 function SubTabs() {
   const { view, go } = useStore();
   const group = GROUPS[parentOf(view)];

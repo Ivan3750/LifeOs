@@ -1,5 +1,6 @@
 import type { State } from './types';
 import { addD, pad2, rng, sod, wStart, ymd } from './util';
+import { DEFAULT_NEEDS } from './needs';
 
 /** Fresh state. With demo=true it is filled with clearly marked example data . */
 export function makeState(demo: boolean): State {
@@ -124,6 +125,7 @@ export function makeState(demo: boolean): State {
     wheel: demo ? [7, 6, 5, 8, 6, 4, 7, 6] : [5, 5, 5, 5, 5, 5, 5, 5],
     view: 'home', plan: { date: '', ids: [] }, wins: {}, icalUrls: [],
     evCats: {}, evWords: {}, social, badHabits, cravings, socialGoals: { Instagram: 30, YouTube: 60 }, bedTarget: '23:30', wakeTarget: '07:30',
+    needs: DEFAULT_NEEDS.map(n => ({ ...n })), needLog: [], daily: {}, reviews: {}, people: [], touches: [], places: [], machines: [],
   };
 }
 

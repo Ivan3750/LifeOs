@@ -12,6 +12,8 @@ import { YesterdayCard } from '../Brief';
 import { LifeTiles, QUICK_MOODS } from '../shared';
 import { Face } from '../Face';
 import { HabitsToday, HomeExtras, SchedCard } from './DayParts';
+import { DailyCard, NeedsCard } from '../needs';
+import { weekKey } from '@/lib/needs';
 
 /** The one thing to do now: what is running, what is going on in the calendar, or the next task with a button to start it. */
 function NowCard() {
@@ -215,6 +217,22 @@ function ReviewCard() {
   );
 }
 
+/** On Sunday: a reminder of the five-minute review of the week, until it is done. */
+function WeekReviewPrompt() {
+  const { S, go } = useStore();
+  const now = useNow(60_000), d = new Date(now);
+  if (d.getDay() !== 0 || S.reviews[weekKey(d)]?.done || !S.needs.some(n => n.on)) return null;
+  return (
+    <div className="card s12 reviewprompt">
+      <div className="ch" style={{ marginBottom: 0 }}>
+        <Icon n="check" className="ic" />
+        <div><h3>Недільний огляд · 5 хвилин</h3><p>Оціни кожну потребу від 1 до 5. Я запропоную 1–2 зміни на наступний тиждень</p></div>
+        <button className="btn acc sm" style={{ marginLeft: 'auto' }} onClick={() => go('review')}>Почати</button>
+      </div>
+    </div>
+  );
+}
+
 /** First launch only: three optional questions, so nothing has to be set up by hand afterwards. */
 function OnboardCard() {
   const { S, A } = useStore();
@@ -256,6 +274,11 @@ export function Home() {
         {S.onboarded === false && <OnboardCard />}
 
         {evening && <ReviewCard />}
+
+        <WeekReviewPrompt />
+
+        <DailyCard cls="s7" />
+        <NeedsCard cls="s5" />
 
         <PlanCard />
         <ResetCard />

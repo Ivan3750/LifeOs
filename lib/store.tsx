@@ -24,14 +24,15 @@ export const VIEWS: [string, string, string][] = [
   ['home', 'Зараз', 'home'], ['focus', 'Фокус', 'focus'], ['tasks', 'Задачі', 'tasks'], ['habits', 'Звички', 'habits'], ['health', 'Тіло', 'health'],
   ['schedule', 'Розклад', 'schedule'], ['coach', 'Поради', 'life'], ['time', 'Час', 'clock'], ['quit', 'Відмова', 'flame'], ['goals', 'Цілі', 'goals'],
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
+  ['needs', 'Потреби', 'needs'], ['plan', 'План тижня', 'schedule'], ['people', 'Люди', 'team'], ['machine', 'Ціль → дії', 'trend'], ['review', 'Огляд тижня', 'check'],
 ];
-export const NAV: string[] = ['home', 'focus', 'tasks', 'habits', 'health', 'schedule', 'coach', 'notes', 'prefs'];
+export const NAV: string[] = ['home', 'needs', 'focus', 'tasks', 'habits', 'health', 'schedule', 'coach', 'notes', 'prefs'];
 /** Entries the sidebar keeps folded under «Ще»: used rarely, so they do not crowd the daily ones. */
 export const NAV_MORE: string[] = ['coach', 'notes', 'prefs'];
 /** Sections that live inside another one as tabs (tasks and goals, habits and habits to quit, advice and time use).
     Every view keeps its own key, so links such as go('quit') still work. */
-export const GROUPS: Record<string, string[]> = { tasks: ['tasks', 'goals'], habits: ['habits', 'quit'], coach: ['coach', 'time'] };
-export const TAB_LABEL: Record<string, string> = { tasks: 'Задачі', goals: 'Цілі', habits: 'Звички', quit: 'Шкідливі звички', coach: 'Поради', time: 'Куди йде час' };
+export const GROUPS: Record<string, string[]> = { tasks: ['tasks', 'goals'], habits: ['habits', 'quit'], coach: ['coach', 'time'], needs: ['needs', 'plan', 'people', 'machine', 'review'] };
+export const TAB_LABEL: Record<string, string> = { tasks: 'Задачі', goals: 'Цілі', habits: 'Звички', quit: 'Шкідливі звички', coach: 'Поради', time: 'Куди йде час', needs: 'Потреби', plan: 'План тижня', people: 'Люди', machine: 'Ціль → дії', review: 'Огляд' };
 /** The section a view belongs to in the menu: «quit» sits under «habits», and so on. */
 export const parentOf = (v: string) => Object.keys(GROUPS).find(p => GROUPS[p].includes(v)) ?? v;
 export const TABS: string[] = ['home', 'focus', 'tasks', 'habits'];
