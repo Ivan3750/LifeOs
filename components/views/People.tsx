@@ -9,12 +9,12 @@ import { Icon } from '../Icon';
 import { DelBtn, Empty } from '../shared';
 import { sinceWord } from '../needs';
 
-const toneOf = (r: number) => (r >= 1 ? 'red' : r >= 0.7 ? 'warn' : 'ok');
+const toneOf = (r: number) => (r >= 1 ? 'warn' : 'ok');
 
 function PersonRow({ p }: { p: Person }) {
   const { S, A } = useStore();
   const [open, setOpen] = useState(false);
-  const [v, setV] = useState({ name: p.name, kind: p.kind, every: String(p.every), next: p.next || '', nextDate: p.nextDate || '' });
+  const [v, setV] = useState({ name: p.name, kind: p.kind, every: String(p.every), next: p.next || '', nextDate: p.nextDate || '', met: p.met || '', note: p.note || '' });
   const days = daysSince(S, p.id), tone = toneOf(overdue(S, p));
   const touches = S.touches.filter(t => t.person === p.id).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id).slice(0, 4);
   const id = (k: string) => `pp${p.id}${k}`;
@@ -23,6 +23,7 @@ function PersonRow({ p }: { p: Person }) {
       <div className={`item hg ${tone}`}>
         <span className="ndot" aria-hidden="true" />
         <span className="t"><b>{p.name}</b><small>{kindLabel(p.kind)} · зв’язок {sinceWord(days)} · хочу раз на {p.every} дн.</small>
+          {p.met && <small>Познайомились: {p.met}</small>}
           {(p.next || p.nextDate) && <small className="nxt">Далі: {p.next || 'зустріч'}{p.nextDate ? ` · ${fmtDate(p.nextDate)}` : ''}</small>}</span>
         <button className="btn ghost sm" onClick={() => A.addTouch(p.id, 'msg')}>Написав</button>
         <button className="btn acc sm" onClick={() => A.addTouch(p.id, 'meet')}>Зустрівся</button>
@@ -39,6 +40,10 @@ function PersonRow({ p }: { p: Person }) {
             <label className="field" htmlFor={id('x')}>Що далі<input id={id('x')} value={v.next} placeholder="Напр. піти на каву" onChange={e => setV({ ...v, next: e.target.value })} /></label>
             <label className="field" htmlFor={id('d')}>Коли<input id={id('d')} type="date" value={v.nextDate} onChange={e => setV({ ...v, nextDate: e.target.value })} /></label>
           </div>
+          <div className="fgrid">
+            <label className="field" htmlFor={id('m')}>Де чи як познайомились<input id={id('m')} value={v.met} placeholder="Напр. на воркшопі" onChange={e => setV({ ...v, met: e.target.value })} /></label>
+          </div>
+          <label className="field" htmlFor={id('o')}>Що хочу запамʼятати про людину<textarea id={id('o')} rows={2} value={v.note} onChange={e => setV({ ...v, note: e.target.value })} /></label>
           {touches.length > 0 && (
             <div className="touches">
               <span className="muted" style={{ fontSize: 12 }}>Останні зустрічі й повідомлення</span>
@@ -48,7 +53,7 @@ function PersonRow({ p }: { p: Person }) {
             </div>
           )}
           <div className="g2foot">
-            <button className="btn acc sm" onClick={() => { A.updatePerson(p.id, { name: v.name, kind: v.kind, every: +v.every || p.every, next: v.next, nextDate: v.nextDate }); setOpen(false); }}>Зберегти</button>
+            <button className="btn acc sm" onClick={() => { A.updatePerson(p.id, { name: v.name, kind: v.kind, every: +v.every || p.every, next: v.next, nextDate: v.nextDate }); A.setPersonNote(p.id, { met: v.met, note: v.note }); setOpen(false); }}>Зберегти</button>
             <DelBtn label="Видалити людину" onDelete={() => A.delPerson(p.id)} />
           </div>
         </div>

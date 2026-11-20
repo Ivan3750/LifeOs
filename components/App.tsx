@@ -20,11 +20,15 @@ import { Needs } from './views/Needs';
 import { Plan } from './views/Plan';
 import { Machine } from './views/Machine';
 import { Review } from './views/Review';
+import { Social } from './views/Social';
+import { Anela } from './views/Anela';
+import { Faith } from './views/Faith';
+import { Automation } from './views/Automation';
 
 const VIEW_COMPONENTS: Record<string, () => React.JSX.Element> = {
   home: Home, focus: Focus, time: TimePage, coach: CoachPage, tasks: Tasks, habits: Habits, health: Health, money: Money, goals: Goals,
   schedule: Schedule, notes: Notes, prefs: Prefs,
-  needs: Needs, plan: Plan, machine: Machine, review: Review,
+  needs: Needs, plan: Plan, machine: Machine, review: Review, social: Social, anela: Anela, faith: Faith, auto: Automation,
   co: CoOverview, leads: Leads, clients: Clients, ads: Ads, deals: Deals, projects: Projects, invoices: Invoices, team: Team,
 };
 

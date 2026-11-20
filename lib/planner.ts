@@ -3,19 +3,25 @@ import { freeTime } from './score';
 import { byHunger, weekKeys, weekStats, type NeedStat } from './needs';
 import { toMin, weekdayIdx, ymd } from './util';
 import { addD } from './util';
+import { MODES, modeOf, seasonNeedKeys, seasonOn } from './life';
 
 /* The week plan: the fixed blocks (school, work, a day off) come from the calendar, the free windows are what is left,
-   and the hungry needs are put into them as ready slots. Not «find the time», but «16:00–16:40 training». */
+   and the hungry needs are put into them as ready slots. Not «find the time», but «16:00–16:40 training».
+   The plan only suggests. It leaves part of every busy day empty (the reserve), does not fill the whole week with work for the business,
+   and follows the current mode of life and the priorities of the season. Nothing becomes an event until the person adds it. */
 
 export type Slot = { need: number; date: string; s: string; e: string };
 export type Plan = { slots: Slot[]; /** Needs that did not fit: how many times each is still missing. */ unplaced: { need: number; missing: number }[]; days: DayFree[] };
-export type DayFree = { date: string; free: number; busy: number; windows: [number, number][] };
+/** kept: minutes of the day that stay free of any suggestion after the plan is made. */
+export type DayFree = { date: string; free: number; busy: number; windows: [number, number][]; kept: number };
 
 const at = (k: string, hm: string) => { const m = toMin(hm); const d = new Date(k + 'T00:00'); d.setHours(Math.floor(m / 60), m % 60, 0, 0); return d.getTime(); };
 const hm = (ms: number) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 /** Slots start on a quarter of an hour. */
 const ceilQ = (ms: number) => Math.ceil(ms / 9e5) * 9e5;
-const MAX_PER_DAY = 3;
+/** The work on the business (the need that is counted from logged work) is suggested a few times a week at most, never to fill the free time. */
+const WORK_CAP = 2, WORK_CAP_SEASON = 3;
+const freeMin = (d: DayFree) => d.windows.reduce((t, [a, b]) => t + (b - a), 0) / 6e4;
 
 /** The first start (on a quarter of an hour) between lo and hi where a slot of `len` fits into a free window. */
 const fit = (day: DayFree, lo: number, hi: number, len: number): number | null => {
@@ -29,7 +35,8 @@ function windowsFrom(S: State, k: string, events: UiEvent[], now: number): DayFr
   const ft = freeTime(S, k, events, S.sessions, now);
   const from = k === ymd(new Date(now)) ? ceilQ(now) : 0;
   const windows = ft.windows.map(([a, b]) => [Math.max(a, from), b] as [number, number]).filter(([a, b]) => b - a >= 15 * 6e4);
-  return { date: k, free: windows.reduce((t, [a, b]) => t + (b - a), 0) / 6e4, busy: ft.busyDay, windows };
+  const free = windows.reduce((t, [a, b]) => t + (b - a), 0) / 6e4;
+  return { date: k, free, busy: ft.busyDay, windows, kept: free };
 }
 
 /** Puts the missing slots of the week that starts on `ws` into the free windows.
@@ -38,19 +45,33 @@ function windowsFrom(S: State, k: string, events: UiEvent[], now: number): DayFr
 export function planWeek(S: State, ws: Date, eventsOn: (k: string) => UiEvent[], now = Date.now(), stats: NeedStat[] = weekStats(S, ws, eventsOn, now)): Plan {
   const keys = weekKeys(ws), today = ymd(new Date(now));
   const days = keys.filter(k => k >= today).map(k => windowsFrom(S, k, eventsOn(k), now));
+  const free0 = new Map(days.map(d => [d.date, d.free]));
+  const cfg = MODES[modeOf(S)];
+  // what the mode and the season put first or leave out of the suggestions
+  const seasonKeys = new Set<string>(); for (const k of keys) for (const n of seasonNeedKeys(S, k)) seasonKeys.add(n);
+  const boost = new Set([...cfg.boost, ...seasonKeys]), skip = new Set(cfg.skip.filter(k => !seasonKeys.has(k)));
+  const businessFirst = keys.some(k => seasonOn(S, k)?.main.includes('business'));
   const focus = new Set(S.reviews[ymd(addD(ws, -7))]?.focus || []);
   const placed = new Map<string, number>(), has = new Map<string, number>();
   for (const st of stats) for (let i = 0; i < 7; i++) if (st.byDay[i]) has.set(st.need.id + '|' + keys[i], st.byDay[i]);
   for (const e of S.events) if (e.need && keys.includes(e.date) && !e.ok) has.set(e.need + '|' + e.date, (has.get(e.need + '|' + e.date) || 0) + 1);
   const count = (k: string) => (placed.get(k) || 0) + S.events.filter(e => e.need && e.date === k && !e.ok).length;
+  const work = (n: Need) => !!n.machine;
 
-  // the order of placing: focus first, then the needs with the most to do for the days that suit them (a need that only fits weekends cannot wait), then the hungriest
+  // the order of placing: focus of the review first, then the needs of the mode and the season, then the needs with the most to do for the days that suit them
+  // (a need that only fits weekends cannot wait), then the hungriest
   const pressure = (st: NeedStat) => {
     const fit = days.filter(d => dayFits(st.need, d.date)).length || days.length || 1;
     return Math.max(0, st.need.weekly - st.done - st.planned) / fit;
   };
-  const order = [...stats].sort((a, b) => Number(focus.has(b.need.id)) - Number(focus.has(a.need.id)) || pressure(b) - pressure(a) || byHunger(a, b));
-  const slots: Slot[] = [], left = new Map(stats.map(st => [st.need.id, Math.max(0, st.need.weekly - st.done - st.planned)]));
+  const wanted = (st: NeedStat) => (st.need.key ? Number(boost.has(st.need.key)) : 0);
+  const eligible = stats.filter(st => !(st.need.key && skip.has(st.need.key)));
+  const order = [...eligible].sort((a, b) => Number(focus.has(b.need.id)) - Number(focus.has(a.need.id)) || wanted(b) - wanted(a) || pressure(b) - pressure(a) || byHunger(a, b));
+  const slots: Slot[] = [], left = new Map(eligible.map(st => {
+    let n = Math.max(0, st.need.weekly - st.done - st.planned);
+    if (work(st.need)) n = Math.min(n, Math.max(0, (businessFirst ? WORK_CAP_SEASON : WORK_CAP) - st.planned));
+    return [st.need.id, n];
+  }));
   // two passes: first every need goes only to the days that suit it, then what is left may take any day
   for (const strict of [true, false]) {
     for (const st of order) {
@@ -59,7 +80,11 @@ export function planWeek(S: State, ws: Date, eventsOn: (k: string) => UiEvent[],
         let best: { score: number; day: DayFree; a: number } | null = null;
         for (const day of days) {
           const k = day.date;
-          if (count(k) >= MAX_PER_DAY || (strict && !dayFits(n, k))) continue;
+          if (count(k) >= cfg.maxPerDay || (strict && !dayFits(n, k))) continue;
+          // the business gets at most one suggestion a day
+          if (work(n) && has.get(n.id + '|' + k)) continue;
+          // the reserve: from the second suggestion of a day on, a share of the day's free time must stay untouched
+          if (count(k) >= 1 && freeMin(day) - len / 6e4 < cfg.reserve * (free0.get(k) || 0)) continue;
           // the time of day the need likes; when that does not fit, two hours more on each side are allowed at a cost
           let a = fit(day, at(k, n.from), at(k, n.to), len), wide = 0;
           if (a === null) { a = fit(day, at(k, n.from) - 2 * 36e5, at(k, n.to) + 2 * 36e5, len); wide = 2; }
@@ -75,6 +100,7 @@ export function planWeek(S: State, ws: Date, eventsOn: (k: string) => UiEvent[],
         // the slot takes its time out of the window (with a short gap after it)
         const from = best.a, gap = best.a + len + 10 * 6e4;
         best.day.windows = best.day.windows.flatMap(([a, b]) => (from >= a && from < b ? [[a, from], [Math.min(b, gap), b]] as [number, number][] : [[a, b]] as [number, number][])).filter(([a, b]) => b - a >= 15 * 6e4);
+        best.day.kept = freeMin(best.day);
         left.set(n.id, (left.get(n.id) || 0) - 1);
       }
     }

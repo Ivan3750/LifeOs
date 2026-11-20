@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
+import { MODES, modeOf, seasonOn } from '@/lib/life';
+import { areaLabel } from '@/lib/life';
 import type { Slot } from '@/lib/planner';
 import { weekKeys } from '@/lib/needs';
 import { DN, hmPlain, MON, toMin, ymd } from '@/lib/util';
@@ -37,20 +39,20 @@ export function Plan() {
         <div className="card s12">
           <div className="ch">
             <Icon n="schedule" className="ic" />
-            <div><h3>План тижня</h3><p>Зайняті блоки беру з календаря, вільні вікна рахую сам і кладу в них те, чого бракує</p></div>
+            <div><h3>План тижня</h3><p>Лише пропозиції: нічого не потрапляє в розклад, поки ти сам не додаси. Частину вільного часу я лишаю порожньою</p></div>
           </div>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <div className="subtabs" role="tablist" style={{ flex: 'none' }}>
               <button role="tab" aria-selected={!next} onClick={() => setNext(false)}>Цей тиждень</button>
               <button role="tab" aria-selected={next} onClick={() => setNext(true)}>Наступний</button>
             </div>
-            {plan.slots.length > 0 && <button className="btn acc" onClick={() => A.planSlots(plan.slots)}><Icon n="check" />Додати все в розклад · {plan.slots.length}</button>}
           </div>
+          <p className="help" style={{ marginTop: 12 }}>Режим: <b>{MODES[modeOf(S)].label}</b>{(() => { const se = seasonOn(S, today); return se ? <> · зараз головне: {se.main.map(areaLabel).join(', ')}</> : null; })()}. До {MODES[modeOf(S)].maxPerDay} {MODES[modeOf(S)].maxPerDay === 1 ? 'пропозиції' : 'пропозицій'} на день, не менше {Math.round(MODES[modeOf(S)].reserve * 100)}% вільного часу лишається порожнім.</p>
           {noCal && <p className="help" style={{ marginTop: 12 }}>Календар не підключений, тому я бачу лише події, додані тут. Підключи календар у <button className="linkbtn" onClick={() => go('prefs')}>налаштуваннях</button>, і школа, робота й вихідні потраплять у план самі.</p>}
           {!plan.slots.length && !plan.unplaced.length && <p className="help" style={{ marginTop: 12 }}>{short ? 'Вільних вікон для того, чого бракує, немає.' : next ? 'Усе, що треба на цей тиждень, уже в розкладі.' : 'Усе, що ще можна зробити цього тижня, уже в розкладі або виконано.'}</p>}
           {plan.unplaced.length > 0 && (
             <p className="help" style={{ marginTop: 12 }}>
-              Не вмістилось: {plan.unplaced.map(u => `${name(u.need)} ×${u.missing}`).join(', ')}. Звільни час у календарі або зменш ціль у «Потребах».
+              Цього тижня не склалося: {plan.unplaced.map(u => `${name(u.need)} ×${u.missing}`).join(', ')}. Це нормально: можна лишити вільний час або змінити ціль у «Ритмі тижня».
             </p>
           )}
         </div>
@@ -62,7 +64,7 @@ export function Plan() {
             <div className={`card s6 dayplan${k === today ? ' today' : ''}`} key={k}>
               <div className="ch">
                 <div><h3>{DN[i]}, {d.getDate()} {MON[d.getMonth()]}{k === today ? ' · сьогодні' : ''}</h3>
-                  <p>{f ? `вільно ${hmPlain(f.free)} · зайнято ${hmPlain(f.busy)}` : 'день минув'}</p></div>
+                  <p>{f ? `вільно ${hmPlain(f.free)}${f.kept < f.free ? ` · без планів ≈ ${hmPlain(f.kept)}` : ''} · зайнято ${hmPlain(f.busy)}` : 'день минув'}</p></div>
               </div>
               <div className="list">
                 {list.map(r => (
