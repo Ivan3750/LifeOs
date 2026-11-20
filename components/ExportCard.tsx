@@ -23,11 +23,14 @@ export function ExportCard() {
   const { S, ext, toast } = useStore();
   const [preset, setPreset] = useState<Preset>('month');
   const [custom, setCustom] = useState<Period>({ from: ymd(addD(new Date(), -29)), to: TK() });
-  const [on, setOn] = useState<Record<SectionKey, boolean>>(() => Object.fromEntries(SECTIONS.map(([k]) => [k, true])) as Record<SectionKey, boolean>);
+  /** The private sections are in the list only when the settings allow it, and are never ticked by «усе». */
+  const sections = SECTIONS.filter(([k]) => k !== 'private' || S.ui.exportPrivate);
+  const allOn = (v: boolean) => Object.fromEntries(SECTIONS.map(([k]) => [k, k === 'private' ? false : v])) as Record<SectionKey, boolean>;
+  const [on, setOn] = useState<Record<SectionKey, boolean>>(() => allOn(true));
   const [fmt, setFmt] = useState<'zip' | 'json'>('zip');
   const [busy, setBusy] = useState(false);
   const p: Period = preset === 'custom' ? custom : presetPeriod(preset);
-  const picked = SECTIONS.filter(([k]) => on[k]).length;
+  const picked = sections.filter(([k]) => on[k]).length;
 
   /** Calendar events for exactly this period: asked from the server, so old and future dates are included, not just the cached window. */
   const calendarEvents = async (): Promise<{ events: ExtEvent[]; note?: string }> => {
@@ -49,7 +52,7 @@ export function ExportCard() {
     setBusy(true);
     try {
       const { events, note } = await calendarEvents();
-      const tables = buildTables(S, events, p, on);
+      const tables = buildTables(S, events, p, { ...on, private: S.ui.exportPrivate && on.private });
       if (!tables.length) { toast('За цей період нічого нема'); return; }
       const stamp = `${p.from === '0000-01-01' ? 'all' : p.from}_${p.to}`;
       if (fmt === 'json') save(`lifeos-zvit-${stamp}.json`, 'application/json', JSON.stringify(toJson(tables, p, { name: S.name }), null, 2));
@@ -79,12 +82,12 @@ export function ExportCard() {
         <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
           <b style={{ fontSize: 13 }}>Що включити</b>
           <span className="row" style={{ gap: 12 }}>
-            <button className="linkbtn" onClick={() => setOn(Object.fromEntries(SECTIONS.map(([k]) => [k, true])) as Record<SectionKey, boolean>)}>усе</button>
-            <button className="linkbtn" onClick={() => setOn(Object.fromEntries(SECTIONS.map(([k]) => [k, false])) as Record<SectionKey, boolean>)}>нічого</button>
+            <button className="linkbtn" onClick={() => setOn(allOn(true))}>усе</button>
+            <button className="linkbtn" onClick={() => setOn(allOn(false))}>нічого</button>
           </span>
         </div>
         <div className="checks">
-          {SECTIONS.map(([k, l]) => (
+          {sections.map(([k, l]) => (
             <label key={k} className={`check${on[k] ? ' on' : ''}`}>
               <input type="checkbox" checked={on[k]} onChange={e => setOn({ ...on, [k]: e.target.checked })} />
               <span className="box">{on[k] && <Icon n="check" />}</span>{l}

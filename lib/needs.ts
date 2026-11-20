@@ -63,7 +63,9 @@ export function weekStats(S: State, ws: Date, eventsOn: (k: string) => UiEvent[]
   const logs = new Map<string, number>();
   for (const l of S.needLog) logs.set(l.need + '|' + l.date, (logs.get(l.need + '|' + l.date) || 0) + 1);
 
-  return S.needs.filter(n => n.on).map(need => {
+  // a need that is the rhythm of a goal that is resting is left out until the goal comes back
+  const resting = new Set(S.goals.filter(g => g.paused).map(g => g.id));
+  return S.needs.filter(n => n.on && !(n.goal && resting.has(n.goal))).map(need => {
     const words = (need.kw || []).map(w => w.trim().toLowerCase()).filter(Boolean);
     const byDay = keys.map(k => {
       if (k > today) return 0;

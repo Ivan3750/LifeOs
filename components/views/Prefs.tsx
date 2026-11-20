@@ -13,6 +13,7 @@ import { CalStatusChip } from './Schedule';
 import { SYNC_TEXT } from '../Shell';
 import { PinSettings } from '../PinLock';
 import { ReminderSettings } from '../ReminderSettings';
+import { LifeSettings } from '../LifeSettings';
 
 /** Hides the secret part of a calendar address so it can be shown on screen. */
 const maskUrl = (u: string) => {
@@ -247,6 +248,7 @@ export function Prefs() {
           </div>
         </div>
 
+        <div className="s12"><LifeSettings /></div>
         <div className="s6"><ReminderSettings /></div>
         <div className="s6"><PinSettings /></div>
 

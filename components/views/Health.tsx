@@ -1,5 +1,6 @@
 'use client';
 
+import { RestCard } from '../Life';
 import { useRef, useState, type FormEvent } from 'react';
 import type { MoodEntry } from '@/lib/types';
 import { dayMood, moveGoal, waterGoal, ENERGY3, energyLevel, energyWord, MOOD_TAGS, moodColor, moodsOn, moodWord } from '@/lib/score';
@@ -334,6 +335,7 @@ export function Health() {
       </div>
       {tab === 'today' && (
         <>
+          <RestCard cls="" />
           <div className="card">
             <div className="ch"><Icon n="health" className="ic" /><div><h3>Кільця дня</h3><p>{isT ? 'Сьогодні' : `${WD[dd.getDay()]}, ${dd.getDate()} ${MON[dd.getMonth()]}`}{sportStat ? ` · спорт цього тижня: ${sportStat.done} з ${sportStat.need.weekly}` : ''}</p></div></div>
             <div className="hrings">{rings.map(r => <Ring key={r.key} pct={r.pct} color={r.color} label={r.label} value={r.value} />)}</div>

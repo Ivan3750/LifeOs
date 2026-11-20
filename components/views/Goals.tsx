@@ -117,6 +117,7 @@ function GoalItem({ g, stats }: { g: Goal; stats: NeedStat[] }) {
           )}
           <div className="g2foot">
             <button className="btn ghost sm" onClick={() => setEdit(!edit)}><Icon n="edit" />{edit ? 'Закрити редагування' : 'Змінити'}</button>
+            <button className="btn ghost sm" onClick={() => A.pauseGoal(g.id, !g.paused)}><Icon n="pause" />{g.paused ? 'Повернути' : 'Пауза'}</button>
             <DelBtn label="Видалити ціль" onDelete={() => A.delGoal(g.id)} />
           </div>
         </div>
@@ -190,8 +191,9 @@ export function Goals() {
   const weakest = AREAS[S.wheel.indexOf(Math.min(...S.wheel))];
   const startAdd = (area: string) => { setAdding(area); setTimeout(() => top.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30); };
   const known = new Set<string>(AREAS);
-  const other = S.goals.filter(g => !known.has(g.area));
-  const active = S.goals.filter(g => goalProgress(g) < 1).length;
+  const live = S.goals.filter(g => !g.paused), resting = S.goals.filter(g => g.paused);
+  const other = live.filter(g => !known.has(g.area));
+  const active = live.filter(g => goalProgress(g) < 1).length;
   return (
     <section className="view">
       <div className="vh">
@@ -228,7 +230,7 @@ export function Goals() {
 
       <div className="areas">
         {AREAS.map((a, i) => {
-          const goals = S.goals.filter(g => g.area === a);
+          const goals = live.filter(g => g.area === a);
           return (
             <div className="card area" key={a}>
               <div className="area-h">
@@ -246,6 +248,7 @@ export function Goals() {
         })}
       </div>
 
+      {resting.length > 0 && <div className="card" style={{ marginTop: 18 }}><div className="ch"><Icon n="pause" className="ic" /><div><h3>На паузі</h3><p>Ритм цих цілей не рахується, доки вони відпочивають</p></div></div>{resting.map(g => <GoalItem key={g.id} g={g} stats={stats} />)}</div>}
       {other.length > 0 && <div className="card" style={{ marginTop: 18 }}><div className="ch"><div><h3>Інші цілі</h3></div></div>{other.map(g => <GoalItem key={g.id} g={g} stats={stats} />)}</div>}
       {!S.goals.length && <div className="card" style={{ marginTop: 18 }}><Empty icon="goals" title="Цілей ще нема" text="Обери сферу, у якій хочеш рости, і постав першу ціль: кроками, числом або оцінкою сфери." /></div>}
     </section>

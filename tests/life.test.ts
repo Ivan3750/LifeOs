@@ -257,3 +257,65 @@ describe('private spaces and automation ideas', () => {
     expect(S.socialNotes).toHaveLength(1);
   });
 });
+
+/** The undo of lib/store.tsx: the state before and after the change are merged with the state as it is now. */
+function undoOf(S: State, change: () => void): () => State {
+  const before = structuredClone(S);
+  change();
+  const after = structuredClone(S);
+  return () => mergeStates(after as never, before as never, structuredClone(S) as never) as State;
+}
+
+describe('undo and conflicts with the new data', () => {
+  it('takes back a deleted memory, a cleared season, a put-aside batch and a deleted idea', () => {
+    const { S, A } = setup();
+    A.addMemory({ date: '2026-10-01', title: 'Річка', text: 'тепло', thoughts: '' });
+    A.setSeason({ from: TODAY, to: '2026-11-30', main: ['social'], support: [] });
+    A.addAuto({ title: 'Рахунки' });
+    task(S, 'потім', 'lo');
+    const memId = S.anela.memories[0].id, autoId = S.co.auto[0].id;
+
+    expect(undoOf(S, () => A.delMemory(memId))().anela.memories.map(m => m.id)).toEqual([memId]);
+    expect(undoOf(S, () => A.clearSeason())().season?.main).toEqual(['social']);
+    expect(undoOf(S, () => A.delAuto(autoId))().co.auto.map(a => a.id)).toEqual([autoId]);
+    const restored = undoOf(S, () => A.snoozeOptional(3))();
+    expect(restored.tasks.find(t => t.t === 'потім')?.snooze).toBeUndefined();
+  });
+
+  it('keeps a note written after the deletion when the deletion is taken back', () => {
+    const { S, A } = setup();
+    A.addFeeling('перша');
+    const first = S.anela.feelings[0].id;
+    const undo = undoOf(S, () => A.delFeeling(first));
+    A.addFeeling('друга, вже після видалення');
+    const m = undo();
+    expect(m.anela.feelings.map(f => f.text).sort()).toEqual(['друга, вже після видалення', 'перша']);
+  });
+
+  it('two devices that change different private records both keep their work; the same record is decided by the device that saves second', () => {
+    const base = makeState(false);
+    base.faith.push({ id: 500, date: TODAY, kind: 'note', text: 'спільна' });
+    const phone = structuredClone(base), laptop = structuredClone(base);
+    phone.faith[0].text = 'з телефону';
+    phone.anela.intents.push({ id: 700, text: 'намір з телефону' });
+    laptop.anela.intents.push({ id: 701, text: 'намір з ноутбука' });
+    laptop.lifeMode = 'recovery';
+    const m = mergeStates(base as never, phone as never, laptop as never) as State;
+    expect(m.faith[0].text).toBe('з телефону');
+    expect(m.anela.intents.map(i => i.id).sort()).toEqual([700, 701]);
+    expect(m.lifeMode).toBe('recovery');
+    const clash = structuredClone(base), other = structuredClone(base);
+    clash.faith[0].text = 'A'; other.faith[0].text = 'B';
+    expect((mergeStates(base as never, clash as never, other as never) as State).faith[0].text).toBe('A');
+  });
+
+  it('settles a season that was cleared on one device and edited on the other: the device that saves second decides, and nothing breaks', () => {
+    const base = makeState(false);
+    base.season = { id: 5, from: TODAY, to: '2026-11-30', main: ['social'], support: [], notes: {} };
+    const cleared = structuredClone(base), edited = structuredClone(base);
+    cleared.season = null;
+    edited.season!.main = ['health'];
+    expect((mergeStates(base as never, cleared as never, edited as never) as State).season).toBeNull();
+    expect((mergeStates(base as never, edited as never, cleared as never) as State).season?.main).toEqual(['health']);
+  });
+});

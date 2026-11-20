@@ -9,7 +9,7 @@ import { LEAD_STATUS, STAGES } from './util';
 export const SECTIONS = [
   ['focus', 'Фокус і сесії'], ['tasks', 'Задачі'], ['habits', 'Звички'], ['health', 'Сон, вода, рух'], ['moods', 'Настрій'],
   ['acts', 'Справи й відлік часу'], ['money', 'Фінанси'], ['events', 'Події: мої і з календарів'], ['goals', 'Цілі і сфери життя'],
-  ['notes', 'Нотатки'], ['quit', 'Відмова від звичок і потяги'], ['company', 'Компанія: ліди, клієнти, угоди, проєкти, рахунки, реклама'],
+  ['notes', 'Нотатки'], ['private', 'Приватне: Anela, віра (лише якщо дозволено в налаштуваннях)'], ['quit', 'Відмова від звичок і потяги'], ['company', 'Компанія: ліди, клієнти, угоди, проєкти, рахунки, реклама'],
 ] as const;
 export type SectionKey = (typeof SECTIONS)[number][0];
 
@@ -66,6 +66,11 @@ export function buildTables(S: State, ext: ExtEvent[], p: Period, on: Record<Sec
   add('goals', 'Колесо балансу', 'koleso', ['Сфера', 'Оцінка 1–10'], ['Здоровʼя', 'Карʼєра', 'Фінанси', 'Стосунки', 'Друзі', 'Відпочинок', 'Розвиток', 'Дім'].map((a, i) => [a, S.wheel[i] ?? '']));
   add('notes', 'Нотатки', 'notatky', ['Оновлено', 'Назва', 'Текст'],
     S.noteList.filter(n => inP(day(n.updated), p)).map(n => [day(n.updated), n.title, n.text]));
+  add('company', 'Автоматизація', 'avtomatyzatsiia', ['Що', 'Опис', 'Хвилин за раз', 'Разів на тиждень', 'Складність', 'Пріоритет', 'Статус', 'Помічено разів'],
+    S.co.auto.map(a => [a.title, a.what, a.mins || '', a.perWeek || '', a.effort, a.priority, a.status, a.seen]));
+  add('private', 'Почуття', 'pochuttia', ['Дата', 'Теги', 'Текст'], S.anela.feelings.filter(f => inP(day(f.t), p)).map(f => [day(f.t), f.tags.join(', '), f.text]));
+  add('private', 'Спогади', 'spohady', ['Дата', 'Назва', 'Що було', 'Думки'], S.anela.memories.filter(m => inP(m.date, p)).map(m => [m.date, m.title, m.text, m.thoughts]));
+  add('private', 'Віра', 'vira', ['Дата', 'Вид', 'Місце', 'Текст'], S.faith.filter(f => inP(f.date, p)).map(f => [f.date, f.kind, f.ref || '', f.text]));
   add('company', 'Ліди', 'lidy', ['Створено', 'Імʼя', 'Контакт', 'Джерело', 'Статус', 'Очікувана сума', 'Наступний контакт', 'Нотатка'],
     S.co.leads.filter(l => inP(l.created, p)).map(l => [l.created, l.name, l.contact, l.source, LEAD_STATUS.find(x => x[0] === l.status)?.[1] || l.status, l.value, l.next, l.note]));
   add('company', 'Клієнти (база)', 'klijenty-baza', ['Клієнт', 'Контакт', 'Джерело', 'З', 'Принесли', 'Чекаємо оплату', 'Відкриті угоди', 'Активні проєкти'],

@@ -385,19 +385,19 @@ function Details() {
   const ws = wStart().getTime(), blocks = [...Array(7)].map(() => Array(6).fill(0) as number[]);
   S.sessions.forEach(s => { const i = Math.floor((sod(s.t).getTime() - ws) / DAY); if (i >= 0 && i < 7) blocks[i][Math.floor(new Date(s.t).getHours() / 4)] += s.m; });
   const k = TK(), habits = S.habits.filter(h => !h.paused), hDone = habits.filter(h => h.days[k]).length;
-  const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S);
+  const mt = monthTx(S), out = sumT(S, mt, 'out'), b = budgetDKK(S), hide = S0.ui.hideMetrics;
   return (
     <>
       <AdviceCard />
       <SchedCard />
-      <FreeTimeCard />
-      <WeekSummary worked={worked} />
+      {!hide && <FreeTimeCard />}
+      {!hide && <WeekSummary worked={worked} />}
       <div className="card s12">
         <div className="ch"><Icon n="life" className="ic" /><div><h3>Сьогодні</h3><p>Сон, настрій і гроші</p></div><button className="sel" onClick={() => go('health')}>Здоровʼя</button></div>
         <LifeTiles full={false} />
       </div>
       <div className="card s4">
-        <div className="ch"><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>{habits.length ? `${hDone} з ${habits.length} сьогодні` : 'Звичок немає'}</p></div><button className="sel" onClick={() => go('habits')}>Усі</button></div>
+        <div className="ch"><Icon n="habits" className="ic" /><div><h3>Звички</h3><p>{hide ? ' ' : habits.length ? `${hDone} з ${habits.length} сьогодні` : 'Звичок немає'}</p></div><button className="sel" onClick={() => go('habits')}>Усі</button></div>
         <div className="list">
           {habits.slice(0, 6).map(h => {
             const on = !!h.days[k];
@@ -415,19 +415,23 @@ function Details() {
         <div className="cats"><CatBars tx={mt} limit={4} /></div>
       </div>
       <QuitMini />
-      <div className="card s4">
-        <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div></div>
-        <div className="bigstat"><span className="v num">{Math.floor(tot / 60) > 0 && <>{Math.floor(tot / 60)}<small>год</small></>}{tot % 60}<small>хв</small></span></div>
-        <FocusArea week={w} today={ti} />
-      </div>
-      <div className="card s8">
-        <div className="ch"><Icon n="wave" className="ic" /><div><h3>Ритм навчання</h3><p>Фокус по 4-годинних блоках</p></div></div>
-        <div className="hscroll"><Rhythm blocks={blocks} today={ti} /></div>
-      </div>
-      <div className="card s4">
-        <div className="ch"><Icon n="map" className="ic" /><div><h3>Карта фокусу</h3><p>Коли найлегше зосередитись</p></div></div>
-        <HeatMap />
-      </div>
+      {!hide && (
+        <>
+          <div className="card s4">
+            <div className="ch"><Icon n="clock" className="ic" /><div><h3>Час фокусу</h3><p>Глибока робота за тиждень</p></div></div>
+            <div className="bigstat"><span className="v num">{Math.floor(tot / 60) > 0 && <>{Math.floor(tot / 60)}<small>год</small></>}{tot % 60}<small>хв</small></span></div>
+            <FocusArea week={w} today={ti} />
+          </div>
+          <div className="card s8">
+            <div className="ch"><Icon n="wave" className="ic" /><div><h3>Ритм навчання</h3><p>Фокус по 4-годинних блоках</p></div></div>
+            <div className="hscroll"><Rhythm blocks={blocks} today={ti} /></div>
+          </div>
+          <div className="card s4">
+            <div className="ch"><Icon n="map" className="ic" /><div><h3>Карта фокусу</h3><p>Коли найлегше зосередитись</p></div></div>
+            <HeatMap />
+          </div>
+        </>
+      )}
       <AffirmationsCard />
     </>
   );
