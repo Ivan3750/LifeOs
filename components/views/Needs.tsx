@@ -107,7 +107,7 @@ export function Needs() {
             <Icon n="needs" className="ic" />
             <div>
               <h3>Потреби тижня</h3>
-              <p>{ws.getDate()} {MON[ws.getMonth()]} – {end.getDate()} {MON[end.getMonth()]} · {red ? `${red} ${plural(red, 'голодна', 'голодні', 'голодних')}` : warn ? `${warn} ${plural(warn, 'просить', 'просять', 'просять')} уваги` : 'усе в нормі'}</p>
+              <p>{ws.getDate()} {MON[ws.getMonth()]} – {end.getDate()} {MON[end.getMonth()]} · {red || warn ? `${red + warn} ${plural(red + warn, 'потребі', 'потребам', 'потребам')} можна приділити час` : 'усе в нормі'}</p>
             </div>
             <button className="sel" onClick={() => go('plan')}>Скласти план</button>
           </div>

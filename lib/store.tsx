@@ -5,6 +5,7 @@ import type { ExtEvent, Mode, State, UiEvent } from './types';
 import { makeState } from './seed';
 import { DEFAULT_ACCOUNTS } from './money';
 import { makeActions, goalStep } from './actions';
+import { makeLifeActions } from './lifeActions';
 import { mergeStates } from './merge';
 import { extOn, seriesSizes } from './extcal';
 import { addD, hhmm, sod, ymd } from './util';
@@ -28,14 +29,17 @@ export const VIEWS: [string, string, string][] = [
   ['notes', 'Нотатки', 'notes'], ['prefs', 'Налаштування', 'prefs'],
   ['co', 'Огляд', 'company'], ['leads', 'Ліди', 'leads'], ['clients', 'Клієнти', 'user'], ['ads', 'Реклама', 'ads'], ['deals', 'Угоди', 'deals'], ['projects', 'Проєкти', 'projects'], ['invoices', 'Рахунки', 'invoice'], ['team', 'Команда', 'team'],
   ['needs', 'Ритм тижня', 'needs'], ['plan', 'План тижня', 'schedule'], ['machine', 'Гроші → дії', 'trend'], ['review', 'Огляд тижня', 'check'],
+  ['social', 'Соціальне життя', 'team'], ['faith', 'Віра', 'sun'], ['anela', 'Anela', 'user'], ['auto', 'Автоматизація', 'refresh'],
 ];
 export const NAV: Record<Mode, string[]> = {
-  me: ['home', 'goals', 'focus', 'tasks', 'habits', 'health', 'money', 'schedule', 'prefs'],
-  co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'team', 'tasks', 'schedule', 'prefs'],
+  me: ['home', 'goals', 'focus', 'tasks', 'habits', 'health', 'social', 'faith', 'anela', 'money', 'schedule', 'prefs'],
+  co: ['co', 'leads', 'clients', 'deals', 'projects', 'invoices', 'ads', 'auto', 'team', 'tasks', 'schedule', 'prefs'],
 };
+/** The menu of a mode without the modules the person switched off (their data stays). Home and settings are always there. */
+export const navFor = (S: State, m: Mode) => NAV[m].filter(k => S.ui?.modules?.[k] !== false || k === 'home' || k === 'prefs');
 export const TABS: Record<Mode, string[]> = { me: ['home', 'goals', 'tasks', 'money'], co: ['co', 'leads', 'deals', 'invoices'] };
-const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'deals', 'projects', 'invoices', 'team'];
-const ME_ONLY = ['home', 'needs', 'plan', 'machine', 'review', 'focus', 'time', 'coach', 'habits', 'health', 'money', 'goals'];
+const CO_ONLY = ['co', 'leads', 'clients', 'ads', 'auto', 'deals', 'projects', 'invoices', 'team'];
+const ME_ONLY = ['home', 'needs', 'plan', 'machine', 'review', 'focus', 'time', 'coach', 'habits', 'health', 'money', 'goals', 'social', 'faith', 'anela'];
 /** Old keys that now live inside another section: the habits to quit are on the habits page. */
 const ALIAS: Record<string, string> = { quit: 'habits' };
 export const canon = (v: string) => ALIAS[v] ?? v;
@@ -48,7 +52,7 @@ export const vinfo = (k: string) => VIEWS.find(x => x[0] === k);
 
 export type ToastAction = { label: string; run: () => void };
 /** init pre-fills form fields by key, e.g. { date, s, e } when adding an event at a picked time. */
-export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'people' } | { kind: 'mark' } | { kind: 'sos'; habit?: number } | { kind: 'form'; key: string; init?: Record<string, string> } | null;
+export type Sheet = { kind: 'qa' } | { kind: 'more' } | { kind: 'people' } | { kind: 'mark' } | { kind: 'season' } | { kind: 'sos'; habit?: number } | { kind: 'form'; key: string; init?: Record<string, string> } | null;
 export type CalStatus = { state: 'idle' | 'loading' | 'ok' | 'none' | 'error'; at?: number; errors?: string[]; count?: number };
 
 const durOf = (s: State, m: 'focus' | 'break') => (m === 'focus' ? s.focusMin : s.breakMin) * 60;
@@ -496,7 +500,7 @@ function useStoreValue(dbOn: boolean) {
   const getS = useCallback(() => Sref.current, []);
   // getS only reads the ref when an action runs, never while rendering
   // eslint-disable-next-line react-hooks/refs
-  const A = useMemo(() => makeActions({ update, getS, toast, notify, del }), [update, getS, toast, notify, del]);
+  const A = useMemo(() => ({ ...makeActions({ update, getS, toast, notify, del }), ...makeLifeActions({ update, getS, toast, del }) }), [update, getS, toast, notify, del]);
 
   // regular payments come due by themselves: checked on start and whenever the page is shown again
   // (not before the first contact with the server: another device may already have created them)

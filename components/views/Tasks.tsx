@@ -7,11 +7,12 @@ import { byUrgency, dueLabel, dueState, focusByTask, parseTask, type DueState } 
 import { hmPlain, plural, sod, TK } from '@/lib/util';
 import { Icon } from '../Icon';
 import { Empty, IconBtn } from '../shared';
+import { isSnoozed } from '@/lib/life';
 
 type Filter = 'open' | 'today' | 'done' | 'all';
 
 const GROUPS: [DueState, string][] = [
-  ['overdue', 'Прострочені'], ['today', 'Сьогодні'], ['tomorrow', 'Завтра'], ['week', 'Цього тижня'], ['later', 'Пізніше'], ['none', 'Без терміну'],
+  ['overdue', 'З минулих днів'], ['today', 'Сьогодні'], ['tomorrow', 'Завтра'], ['week', 'Цього тижня'], ['later', 'Пізніше'], ['none', 'Без терміну'],
 ];
 
 function TaskRow({ t, minutes }: { t: Task; minutes: number }) {
@@ -55,7 +56,7 @@ export function Tasks() {
 
   const today = TK(), t0 = sod(new Date()).getTime();
   const spent = useMemo(() => focusByTask(S), [S]);
-  const open = S.tasks.filter(t => !t.d), done = S.tasks.filter(t => t.d);
+  const open = S.tasks.filter(t => !t.d && !isSnoozed(t, today)), done = S.tasks.filter(t => t.d), aside = S.tasks.filter(t => !t.d && isSnoozed(t, today));
   const overdue = open.filter(t => dueState(t.due) === 'overdue').length;
   const dueToday = open.filter(t => dueState(t.due) === 'today').length;
   const doneToday = done.filter(t => (t.doneAt || 0) >= t0).length;
@@ -63,7 +64,7 @@ export function Tasks() {
   const todayList = open.filter(t => t.due && t.due <= today);
 
   const counts: Record<Filter, number> = { open: open.length, today: todayList.length, done: done.length, all: S.tasks.length };
-  const base = f === 'open' ? open : f === 'today' ? todayList : f === 'done' ? done : S.tasks;
+  const base = f === 'open' ? open : f === 'today' ? todayList : f === 'done' ? done : S.tasks.filter(t => t.d || !isSnoozed(t, today));
   const openPart = base.filter(t => !t.d).sort(byUrgency);
   const donePart = base.filter(t => t.d).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   const hasDates = openPart.some(t => t.due);
@@ -84,7 +85,7 @@ export function Tasks() {
       <div className="vh">
         <div>
           <h2>Задачі</h2>
-          <p>{open.length ? `${open.length} ${plural(open.length, 'відкрита', 'відкриті', 'відкритих')}` : 'Усе зроблено'}{overdue > 0 && <span className="late-note"> · {overdue} {plural(overdue, 'прострочена', 'прострочені', 'прострочених')}</span>}</p>
+          <p>{open.length ? `${open.length} ${plural(open.length, 'відкрита', 'відкриті', 'відкритих')}` : 'Усе зроблено'}</p>
         </div>
         {planned > 0 && (
           <div className="tprog" role="img" aria-label={`Сьогодні виконано ${doneToday} з ${planned}`}>
@@ -144,6 +145,13 @@ export function Tasks() {
             </>
           )}
 
+        {aside.length > 0 && f !== 'done' && (
+          <div className="tgroup">
+            <h4>Відкладені<span className="cnt">{aside.length}</span><button className="linkbtn" style={{ marginLeft: 'auto' }} onClick={() => A.unsnoozeAll()}>Повернути всі</button></h4>
+            <p className="help" style={{ margin: '0 0 8px' }}>Вони повернуться самі в обраний день. Нічого не накопичується.</p>
+            <div className="list">{rows(aside)}</div>
+          </div>
+        )}
         {!(f === 'done' ? donePart : f === 'all' ? [...openPart, ...donePart] : openPart).length && (
           f === 'done'
             ? <Empty icon="check" title="Виконаних задач ще нема" text="Відміч задачу галочкою, і вона зʼявиться тут." />

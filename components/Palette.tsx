@@ -24,11 +24,14 @@ function PaletteDialog() {
 
   const items = useMemo<Cmd[]>(() => {
     const base: Cmd[] = [
-      ...VIEWS.map(([k, l]) => ({ l: 'Відкрити: ' + l, k: 'Перехід', run: () => go(k) })),
+      ...VIEWS.filter(([k]) => S.ui.modules[k] !== false).map(([k, l]) => ({ l: 'Відкрити: ' + l, k: 'Перехід', run: () => go(k) })),
       { l: S.timer.running ? 'Поставити таймер на паузу' : 'Запустити таймер фокусу', k: 'Таймер', run: () => { if (S.timer.mode !== 'focus' && !S.timer.running) setTimerMode('focus'); toggleTimer(); } },
       { l: 'Скинути таймер', k: 'Таймер', run: resetTimer },
       { l: 'Швидко додати…', k: 'N', run: () => setSheet({ kind: 'qa' }) },
       { l: 'Люди й клуби', k: 'Люди', run: () => setSheet({ kind: 'people' }) },
+      { l: 'Пріоритети на період', k: 'Життя', run: () => setSheet({ kind: 'season' }) },
+      { l: 'Режим: відновлення', k: 'Життя', run: () => A.setLifeMode('recovery') },
+      { l: 'Режим: звичайний', k: 'Життя', run: () => A.setLifeMode('normal') },
       { l: S.mode === 'co' ? 'Перейти в особистий режим' : 'Перейти в режим компанії', k: 'Режим', run: () => setMode(S.mode === 'co' ? 'me' : 'co') },
       { l: 'Нова угода', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'deal' }) },
       { l: 'Новий рахунок', k: 'Компанія', run: () => setSheet({ kind: 'form', key: 'invoice' }) },

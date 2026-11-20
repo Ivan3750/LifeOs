@@ -42,13 +42,13 @@ export const HungerTag = ({ st }: { st: NeedStat }) => <span className={`hgtag h
 export function NeedsCard({ cls = 's5' }: { cls?: string }) {
   const { A, go } = useStore();
   const { stats } = useNeeds();
-  const hungry = stats.filter(s => s.status !== 'ok'), red = stats.filter(s => s.status === 'red').length;
+  const hungry = stats.filter(s => s.status !== 'ok'), red = hungry.length;
   const list = (hungry.length ? hungry : stats.slice(0, 3)).slice(0, 5);
   return (
     <div className={`card ${cls}`}>
       <div className="ch">
         <Icon n="needs" className="ic" />
-        <div><h3>Чого бракує цього тижня</h3><p>{!stats.length ? 'Увімкни потреби в розділі «Потреби»' : red ? `${red} ${plural(red, 'потреба голодна', 'потреби голодні', 'потреб голодні')}` : hungry.length ? 'Є на що звернути увагу' : 'Усе в нормі'}</p></div>
+        <div><h3>Чого бракує цього тижня</h3><p>{!stats.length ? 'Увімкни потреби в розділі «Потреби»' : red ? 'Є на що звернути увагу, коли буде час' : 'Усе в нормі'}</p></div>
         <button className="sel" onClick={() => go('needs')}>Усі</button>
       </div>
       <div className="list">
@@ -120,17 +120,20 @@ export function DailyCard({ cls = 's7' }: { cls?: string }) {
 /** Days since a person was last in touch, in words. */
 export const sinceWord = (d: number | null) => (d === null ? 'ще не було' : d === 0 ? 'сьогодні' : d === 1 ? 'вчора' : `${d} ${plural(d, 'день', 'дні', 'днів')} тому`);
 
-/** On Sunday: a reminder of the five-minute review of the week, until it is done. */
+/** On Sunday: a quiet offer of the five-minute review. It can be set aside, and it is asked for only once. */
 export function WeekReviewPrompt() {
-  const { S, go } = useStore();
-  const now = useNow(60_000), d = new Date(now);
-  if (d.getDay() !== 0 || S.reviews[weekKey(d)]?.done || !S.needs.some(n => n.on)) return null;
+  const { S, A, go } = useStore();
+  const now = useNow(60_000), d = new Date(now), wk = weekKey(d);
+  if (d.getDay() !== 0 || S.reviews[wk]?.done) return null;
   return (
     <div className="card s12 reviewprompt">
       <div className="ch" style={{ marginBottom: 0 }}>
         <Icon n="check" className="ic" />
-        <div><h3>Недільний огляд · 5 хвилин</h3><p>Оціни кожну потребу від 1 до 5. Я запропоную 1–2 зміни на наступний тиждень</p></div>
-        <button className="btn acc sm" style={{ marginLeft: 'auto' }} onClick={() => go('review')}>Почати</button>
+        <div><h3>Огляд тижня, якщо є настрій</h3><p>Три коротких запитання, близько 5 хвилин. Можна пропустити</p></div>
+        <div className="row" style={{ marginLeft: 'auto' }}>
+          <button className="btn ghost sm" onClick={() => A.skipWeekReview(wk)}>Не зараз</button>
+          <button className="btn acc sm" onClick={() => go('review')}>Почати</button>
+        </div>
       </div>
     </div>
   );

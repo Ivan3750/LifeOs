@@ -141,7 +141,7 @@ export function headline(stats: NeedStat[], plan: Plan | null, motto: string | u
   if (!need) return { title: motto?.trim() || 'Усе рухається. Тримай темп', sub: stats.length ? 'Усі потреби цього тижня в нормі. Можна просто жити.' : 'Увімкни потреби, і я підкажу, що робити.' };
   const slot = plan?.slots.find(x => x.need === need.need.id && x.date === TK());
   const left = Math.max(0, need.need.weekly - need.done);
-  const title = need.status === 'red' ? `${need.need.name} чекає на тебе, ${name}` : `Час для: ${need.need.name}`;
+  const title = `Час для: ${need.need.name}`; void name;
   const sub = `Цього тижня ${need.done} з ${need.need.weekly}, лишилось ${left}.${slot ? ` Є вільне вікно ${slot.s}–${slot.e}.` : ''}`;
   return { title, sub, slot, need };
 }

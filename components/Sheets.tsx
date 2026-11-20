@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, type FormEvent } from 'react';
-import { NAV, useStore, vinfo, type Store } from '@/lib/store';
+import { navFor, useStore, vinfo, type Store } from '@/lib/store';
 import type { AccId } from '@/lib/types';
 import type { LeadStatus } from '@/lib/types';
 import { parseTask } from '@/lib/tasks';
@@ -12,6 +12,7 @@ import { ModeSeg } from './Shell';
 import { SosBody } from './Sos';
 import { PeopleBody } from './views/People';
 import { MarkBody } from './needs';
+import { SeasonForm } from './Life';
 
 type Field = { k: string; label: string; type?: 'text' | 'number' | 'date' | 'time' | 'select' | 'textarea' | 'hidden'; req?: boolean; half?: boolean; ph?: string; val?: string; opts?: readonly (readonly [string, string])[] };
 /** del: shown as a two-click «Видалити» button in edit forms. */
@@ -116,7 +117,7 @@ export function SheetHost() {
       <>
         <ModeSeg />
         <div className="qa-grid" style={{ marginTop: 14 }}>
-          {NAV[m].map(k => { const [, l, i] = vinfo(k)!; return <button key={k} onClick={() => go(k)}><Icon n={i as IconName} className="ic" />{l}</button>; })}
+          {navFor(S, m).map(k => { const [, l, i] = vinfo(k)!; return <button key={k} onClick={() => go(k)}><Icon n={i as IconName} className="ic" />{l}</button>; })}
         </div>
       </>
     );
@@ -126,6 +127,9 @@ export function SheetHost() {
   } else if (sheet.kind === 'people') {
     title = 'Люди й клуби';
     body = <PeopleBody />;
+  } else if (sheet.kind === 'season') {
+    title = 'Пріоритети періоду';
+    body = <SeasonForm close={close} />;
   } else if (sheet.kind === 'sos') {
     title = 'SOS: сильний потяг';
     body = <SosBody close={close} habit={sheet.habit} />;

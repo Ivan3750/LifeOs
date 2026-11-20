@@ -3,10 +3,12 @@ export type Session = { t: number; m: number; task?: string; demo?: 1 };
 /** goal: id of the goal this task moves forward. */
 /** due: date to finish by ('YYYY-MM-DD'), doneAt: when it was ticked off. */
 /** rep: the task comes back by itself when it is done (every day, week or month). */
-export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; due?: string; rep?: 'day' | 'week' | 'month'; doneAt?: number; demo?: 1 };
+/** snooze: the task is put aside until this date ('YYYY-MM-DD') and does not show in the day lists; no penalty, it comes back by itself. */
+export type Task = { id: number; t: string; p: 'hi' | 'lo'; d: boolean; goal?: number; due?: string; rep?: 'day' | 'week' | 'month'; doneAt?: number; snooze?: string; demo?: 1 };
 /** need: id of the need this event was planned for (a slot made by the week planner); ok: it was done, and the need got its mark. */
 export type LocalEvent = { id: number; date: string; s: string; e: string; title: string; c: string; need?: number; ok?: 1; demo?: 1 };
-export type Habit = { id: number; name: string; days: Record<string, 1>; demo?: 1 };
+/** paused: the habit rests; it is not shown in the day lists and nothing is counted against it. */
+export type Habit = { id: number; name: string; days: Record<string, 1>; paused?: 1; demo?: 1 };
 /** One day, keyed by the date you woke up. bed/wake are 'HH:MM'; sleep hours are derived from them when both are set.
     mood and steps are kept only for data saved by older versions (mood is now logged in State.moods). */
 export type HealthDay = {
@@ -38,7 +40,8 @@ export type GoalStep = { id: number; t: string; d: boolean };
 /** A goal is measured either by a number (cur of target) or, when it has steps, by the share of steps done. */
 /** kind 'rating': a goal for a life area that cannot be counted (relationships, rest): it is reached when the area's wheel rating
     climbs from `from` to `target`. Steps are the actions that get you there. */
-export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; steps?: GoalStep[]; kind?: 'rating'; from?: number; demo?: 1 };
+/** paused: the goal rests; its weekly rhythm is not counted while it does. */
+export type Goal = { id: number; title: string; area: string; target: number; cur: number; unit: string; due: string; steps?: GoalStep[]; kind?: 'rating'; from?: number; paused?: 1; demo?: 1 };
 export type Stage = 'lead' | 'talk' | 'proposal' | 'won' | 'lost';
 export type Deal = { id: number; title: string; client: string; amt: number; stage: Stage; demo?: 1 };
 /** deal: the deal this project came from. */
@@ -85,7 +88,8 @@ export type NeedLog = { id: number; need: number; date: string; t: number; src?:
 /** The daily minimum: movement and one new thing are ticked here (the person is a touch in the people list). */
 export type DailyMark = { move?: 1; nov?: 1 };
 /** Someone in your life. every: how often (days) you want to be in touch; next: what comes next, nextDate: when (if known). */
-export type Person = { id: number; name: string; kind: 'friend' | 'family' | 'partner' | 'work'; every: number; next?: string; nextDate?: string };
+/** met: where or how you met, note: what you want to remember about them. */
+export type Person = { id: number; name: string; kind: 'friend' | 'family' | 'partner' | 'work'; every: number; next?: string; nextDate?: string; met?: string; note?: string };
 /** A message or a meeting with a person. */
 export type Touch = { id: number; person: number; date: string; kind: 'msg' | 'meet' };
 /** A club or community. was: last time you were there, going: the day you go next. */
@@ -96,7 +100,59 @@ export type MachineLog = { id: number; date: string; leads: number; clients: num
     price: what one client brings, conv: share of leads that become clients (%), saved: what is already there. */
 export type Machine = { id: number; goal?: number; title: string; target: number; saved: number; due: string; price: number; conv: number; url?: string; log: MachineLog[] };
 /** The Sunday review of one week. ratings: need id → 1–5; focus: needs that get the first slots next week; accepted: suggestions taken. */
-export type Review = { ratings: Record<string, number>; focus: number[]; accepted: string[]; done?: number };
+/** good / missing / change: the three short answers of the weekly review (the old marks 1–5 in `ratings` are kept for older reviews). */
+export type Review = { ratings: Record<string, number>; focus: number[]; accepted: string[]; done?: number; good?: string; missing?: string; change?: string };
+
+
+/* ---------- LifeOS 2.0: modes, seasons, social life, Anela, faith, automation ---------- */
+
+/** The rhythm of life right now. It changes what is suggested and what is put forward, never what has to be done. */
+export type LifeMode = 'normal' | 'busy' | 'exam' | 'recovery' | 'social';
+/** A temporary choice of 1–3 main directions for a period. main: the ones that come first, support: kept alive but not pushed.
+    notes: a few words per direction. dismissed: the review after the end was set aside. Nothing is created when it ends. */
+export type Season = { id: number; from: string; to: string; main: string[]; support: string[]; notes: Record<string, string>; dismissed?: 1 };
+
+/** What the person chose to see and keep. Everything here is optional: an empty value means the default (on, shown, off). */
+export type Ui = {
+  /** Only today's one to three things and the nearest events on the home screen. */
+  minimal: boolean;
+  /** Hides numbers (steps, minutes, percentages) on the home screen. */
+  hideMetrics: boolean;
+  /** Modules that are switched off, by key (false = off). */
+  modules: Record<string, boolean>;
+  /** Home blocks that are switched off, by key (false = off). */
+  home: Record<string, boolean>;
+  /** Private texts (Anela, faith) are shown only after a tap. */
+  hideText: boolean;
+  /** Private texts are left out of the spreadsheet export (the full backup always has everything). */
+  exportPrivate: boolean;
+};
+
+/** A thing about social life that is worth keeping: a talk, a shared memory, an idea for a meeting, a thought about the experience. */
+export type SocialNote = { id: number; date: string; kind: 'talk' | 'memory' | 'idea' | 'experience'; text: string; person?: number };
+/** One small step out of the comfort zone. Optional; there is no target and no streak. */
+export type ExposureKind = 'start' | 'ask' | 'keep' | 'meet' | 'invite';
+export type Exposure = { id: number; date: string; kind: ExposureKind; note: string; felt?: 1 | 2 | 3 };
+
+/** Anela: a private space for what the person feels about someone who matters to them. It is not a CRM and has no goals about her. */
+export type AnelaFeeling = { id: number; t: number; text: string; tags: string[] };
+export type AnelaMemory = { id: number; date: string; title: string; text: string; thoughts: string };
+/** kind: opener (how to start), topic, question, manner (how I want to be), bs (Bosnian: phrase, with its meaning or a joke in extra). */
+export type AnelaTalkKind = 'opener' | 'topic' | 'question' | 'manner' | 'bs';
+export type AnelaTalk = { id: number; kind: AnelaTalkKind; text: string; extra?: string };
+/** An intention is about the person's own way of being, never about getting a reaction. paused: set aside for now. */
+export type AnelaIntent = { id: number; text: string; paused?: 1 };
+/** A reflection from the optional reality check: the answers by question key, and a free line. */
+export type AnelaCheck = { id: number; t: number; answers: Record<string, 'yes' | 'partly' | 'no'>; note: string };
+export type Anela = { feelings: AnelaFeeling[]; memories: AnelaMemory[]; talk: AnelaTalk[]; intents: AnelaIntent[]; checks: AnelaCheck[] };
+
+/** Spiritual life: no points and no streaks. */
+export type FaithKind = 'prayer' | 'verse' | 'note' | 'insight' | 'thanks';
+export type FaithEntry = { id: number; date: string; kind: FaithKind; text: string; ref?: string };
+
+/** Something in the business that is done by hand again and again and could be automated.
+    mins / perWeek are the person's own numbers (0 = not known); the app never invents a saving. seen: how many times it was noticed. */
+export type AutoIdea = { id: number; title: string; what: string; mins: number; perWeek: number; effort: 'low' | 'mid' | 'high'; priority: 'low' | 'mid' | 'high'; status: 'idea' | 'doing' | 'done'; seen: number; created: string };
 
 export type State = {
   v: 1;
@@ -126,7 +182,7 @@ export type State = {
   money: { budget: number; tx: Tx[]; accounts: Account[]; uahPerDkk: number; rateAt: number; rateSrc: 'nbu' | 'manual'; budgetMode: 'fixed' | 'income'; saveRate: number; catBudgets: Record<string, number>; recurring: Recurring[]; pots: Pot[] };
   goals: Goal[]; wheel: number[];
   mode: Mode; view: string;
-  co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[] };
+  co: { name: string; goal: number; invSeq: number; deals: Deal[]; projects: Project[]; invoices: Invoice[]; team: Member[]; leads: Lead[]; clients: Client[]; ads: AdSpend[]; auto: AutoIdea[] };
   icalUrls: string[];
   /** Personal touches: a line that is shown on the home screen instead of the general quotes, and the accent colour of the app (a key of ACCENTS). */
   motto?: string; accent?: string;
@@ -145,6 +201,13 @@ export type State = {
   /** Needs and everything around them. needLog: each time a need was met; daily: the daily minimum by date; reviews: Sunday reviews by the Monday of the week. */
   needs: Need[]; needLog: NeedLog[]; daily: Record<string, DailyMark>; reviews: Record<string, Review>;
   people: Person[]; touches: Touch[]; places: Place[]; machines: Machine[];
+  /** LifeOS 2.0. lifeMode: the current rhythm; season: the current temporary priorities (null = none). */
+  lifeMode: LifeMode; season: Season | null;
+  ui: Ui;
+  /** Energy by day when the person wrote it down: 1 low, 3 normal, 5 high. Kept apart from mood so no mood is invented. */
+  energy: Record<string, 1 | 3 | 5>;
+  socialNotes: SocialNote[]; exposure: Exposure[];
+  anela: Anela; faith: FaithEntry[];
 };
 
 /** Event as shown in the UI: either one of ours or one pulled from a subscribed calendar. */

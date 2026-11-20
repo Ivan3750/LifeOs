@@ -17,8 +17,9 @@ export const DEFAULT_NEEDS: Need[] = [
 ];
 
 export type Hunger = 'ok' | 'warn' | 'red';
-export const HUNGER_WORD: Record<Hunger, string> = { ok: 'Все гаразд', warn: 'Просить уваги', red: 'Голодна' };
-export const HUNGER_COLOR: Record<Hunger, string> = { ok: 'var(--good)', warn: 'var(--warn)', red: 'var(--m1)' };
+export const HUNGER_WORD: Record<Hunger, string> = { ok: 'Все гаразд', warn: 'Трохи бракує', red: 'Варто приділити увагу' };
+/** No red anywhere: what needs attention is shown in the warm accent colour, never as an alarm. */
+export const HUNGER_COLOR: Record<Hunger, string> = { ok: 'var(--good)', warn: 'var(--warn)', red: 'var(--accent)' };
 const HUNGER_ORDER: Record<Hunger, number> = { red: 0, warn: 1, ok: 2 };
 
 /** How hungry a need is. dayIdx: 0 = Monday … 6 = Sunday (the day of the week it is now).

@@ -115,7 +115,7 @@ export function makeState(demo: boolean): State {
         .map(([title, area, target, cur, unit, dd]) => ({ id: id(), title, area, target, cur, unit, due: ymd(addD(now, dd)), demo: 1 as const }))
     : [];
 
-  const co: State['co'] = { name: 'Моя студія', goal: 150000, invSeq: 0, deals: [], projects: [], invoices: [], team: [], leads: [], clients: [], ads: [] };
+  const co: State['co'] = { name: 'Моя студія', goal: 150000, invSeq: 0, deals: [], projects: [], invoices: [], team: [], leads: [], clients: [], ads: [], auto: [] };
   if (demo) {
     co.deals = ([['Сайт для кавʼярні', 'Kaffebar Bønne', 45000, 'proposal'], ['Брендинг фітнес-клубу', 'FitLab', 80000, 'talk'], ['Підтримка вебмагазину', 'Shopik ApS', 15000, 'lead'], ['Лендінг конференції', 'DevDays', 30000, 'lead'], ['Мобільний застосунок', 'MedCare', 220000, 'talk'], ['SMM на 3 місяці', 'Bloom', 36000, 'won']] as const)
       .map(([title, client, amt, stage]) => ({ id: id(), title, client, amt, stage, demo: 1 as const }));
@@ -182,6 +182,10 @@ export function makeState(demo: boolean): State {
     mode: 'me', view: 'home', co, icalUrls: [],
     evCats: {}, evWords: {}, social, badHabits, cravings, socialGoals: { Instagram: 30, YouTube: 60 }, bedTarget: '23:30', wakeTarget: '07:30',
     needs: DEFAULT_NEEDS.map(n => ({ ...n })), needLog: [], daily: {}, reviews: {}, people: [], touches: [], places: [], machines: [],
+    lifeMode: 'normal', season: null,
+    ui: { minimal: false, hideMetrics: false, modules: {}, home: {}, hideText: false, exportPrivate: false },
+    energy: {}, socialNotes: [], exposure: [],
+    anela: { feelings: [], memories: [], talk: [], intents: [], checks: [] }, faith: [],
   };
 }
 
